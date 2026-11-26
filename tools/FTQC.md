@@ -1,6 +1,6 @@
 # Fault-tolerant quantum computing in BootLoops
 
-The seven tools on this branch cover different parts of a fault-tolerance and logical-compilation argument. Start with the object you want to certify and identify what the next step needs from its receipt.
+The seven tools on `ftqc_integration` cover different parts of a fault-tolerance and logical-compilation argument. Start with the object you want to certify and identify what the next step needs from its receipt.
 
 | Tool | Input and question | Evidence |
 |---|---|---|

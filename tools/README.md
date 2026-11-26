@@ -52,7 +52,7 @@ clone differs by package:
 
 ## Package index
 
-The [FTQC tool guide](FTQC.md) maps the seven packages in the FTQC stack to their proof obligations and gives the commands for the combined test run and research replay.
+The [FTQC tool guide](FTQC.md) maps the seven packages on `ftqc_integration` to their proof obligations and gives the commands for the combined test run and research replay.
 
 | package | what it is | battery |
 |---|---|---|
