@@ -77,6 +77,8 @@ Winnow's certificate layer is the
 receipt component vendored inside its package (byte-identical to Trust's receipt
 member, `tools/trust/receipt`, test-enforced).
 
+The [FTQC package](../../tools/ftqc/GUIDE.md) verifies HGP extractors and scheduled logical measurements. Its circuit SAT backend reuses the [QECcert](../../tools/qeccert/GUIDE.md) CNF encoder and LRAT checker.
+
 What runs today:
 
 - the packages under [`../../tools/`](../../tools/README.md) — the index there says,

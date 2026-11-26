@@ -84,6 +84,10 @@
   "cmd": "python3 asdminer/run_control.py && python3 deform_transport/battery/run_battery_deform.py --stages S0,S1 && python3 -m frobenius_boundary.selftest",
   "cwd": "package"
  },
+ "ftqc": {
+  "cmd": "python3 -m unittest ftqc.test_algebra ftqc.test_extractor ftqc.test_receipts",
+  "cwd": "root"
+ },
  "galois": {
   "cmd": "python3 svmap21.py selftest",
   "cwd": "package"

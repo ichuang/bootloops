@@ -75,6 +75,7 @@ clone differs by package:
 | `ffcapital/` | exact salvage of FireFly `ff_save` reconstruction state from dead or capped runs, fail-closed | data-gated |
 | `formglue/` | glue around FORM 5: traces, color, term-stream rewriting, MZV evaluation, GRACE integration | partial |
 | `frobenius-boundary/` | family-agnostic Frobenius-branch boundary machinery at var=∞ for non-analytic anchors | data-gated |
+| `ftqc/` | HGP code, extractor-surgery and gate-location fault-distance certificates with exhaustive, theorem-based, and SAT/LRAT replay | selftest |
 | `galois/` | motivic Galois coaction-cut engine + the exact MZV relation ring it reduces against | data-gated |
 | `gatekeeper/` | Gatekeeper — data-integrity + held-out-CV honesty layer that gates every closure | selftest |
 | `geotriage/` | GeoTriage — per-graph maximal-cut geometry and value-fittability triage with mandatory honesty gates | selftest |
@@ -106,7 +107,7 @@ clone differs by package:
 | `wayfinder/` | Wayfinder — the eps-graded DE-transport pipeline: one evaluator contract, certified transport, Frobenius landings, the dlog-connection sampler wing, the engine-agnostic eps->0 limit extractor (epslimit: Laurent/Richardson extrapolation of an external engine's eps-grid) and the FLINT exact rational-function exporter (flintexport) | partial |
 | `winnow/` | upgraded-Laporta F_p eliminator library with native lambda-witness receipts — Seedling's exact elimination engine (`import ibplapper`) | partial |
 
-51 packages (`wayfinder` includes the sampler wing; `counterweight`
+52 packages (`wayfinder` includes the sampler wing; `counterweight`
 includes `canonical_form/`; `landau-alphabet` includes the Gröbner escalation
 backend and `LandauAlphabet.jl/`, the Julia engine `gpl-eval` builds on).
 The one operations package, Turnstile (admission control for long jobs on a

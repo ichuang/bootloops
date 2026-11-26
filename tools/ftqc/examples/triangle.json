@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "kind": "canonical",
+  "n": 3,
+  "polynomial": 7,
+  "edges": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      2
+    ],
+    [
+      0,
+      2
+    ]
+  ]
+}
