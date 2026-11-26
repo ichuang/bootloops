@@ -234,6 +234,14 @@ def rotated_surface(d):
                    dict(family="rotated_surface", d=d))
 
 
+def concatenate(outer, inner, name=None):
+    """Concatenation of an outer CSS code with an inner CSS code that has k = 1."""
+    from . import concat
+    hx, hz = concat.expected_stabilizers(outer, inner)
+    return CSSCode(name or f"{outer.name} o {inner.name}", outer.n * inner.n, hx, hz,
+                   dict(family="concat", outer=outer.name, inner=inner.name))
+
+
 FAMILIES = {
     "steane": (steane, "Steane [[7,1,3]]"),
     "golay": (golay, "Golay [[23,1,7]]"),

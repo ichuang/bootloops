@@ -206,6 +206,17 @@ def verify(receipt, full=False, max_combos=5_000_000):
         claimed = max([int(ev["claim"].split(">=")[1]) for ev in proved], default=None)
         if lo is not None and (claimed is None or claimed < lo):
             raise Refusal(f"{q}: lower bound {lo} is not backed by any evidence entry")
+        for ev in proved:
+            if ev.get("leg") == "E":      # cut certificates are cheap to re-check
+                from . import cuts
+                m = cuts.verify_cuts(code, q, ev.get("cuts") or [])
+                if m < int(ev["claim"].split(">=")[1]):
+                    raise Refusal(f"{q}: cut certificate has {m} sets, fewer than it claims")
+                lines.append(f"{q} >= {m}: cut certificate re-checked")
+            if ev.get("leg") == "F":      # concatenation: structure and arithmetic
+                from . import concat
+                do, di = concat.recheck(code, q, ev)
+                lines.append(f"{q} >= {do} * {di}: concatenation structure re-checked")
         if full and lo is not None:
             gens, excl = quantities[q]
             a_claims = [int(ev["claim"].split(">=")[1]) for ev in proved if ev.get("leg") == "A"]

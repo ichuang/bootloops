@@ -366,6 +366,126 @@ def t_bch():
           all(e["status"] == "skipped" for e in rec["evidence"] if e["leg"] == "D"))
 
 
+# ---------------------------------------------------------------- 5c. cut certificates
+def t_cuts():
+    from qeccert import cuts
+    for spec, d in (("rotated_surface:3", 3), ("rotated_surface:5", 5), ("rotated_surface:9", 9),
+                    ("planar:3", 3), ("planar:4", 4)):
+        code = codes.load(spec)
+        rec = certify.build(code, legs=())
+        cuts.run_leg(rec, code)
+        check(f"cuts {spec}: d >= {d} from disjoint representatives",
+              rec["facts"]["d"]["lower"] == d)
+        try:
+            lines = certify.verify(rec)
+            check(f"cuts {spec}: certificate re-checked in cheap verify",
+                  sum("cut certificate re-checked" in l for l in lines) == 2)
+        except certify.Refusal as e:
+            check(f"cuts {spec}: certificate re-checked in cheap verify", False, str(e))
+    # the bound never exceeds the truth on codes where the heuristic finds little
+    for spec in ("steane", "golay"):
+        code = codes.load(spec)
+        rec = copy.deepcopy(RECEIPTS[spec])
+        cuts.run_leg(rec, code)
+        e = [x for x in rec["evidence"] if x["leg"] == "E" and x["status"] == "proved"]
+        check(f"cuts {spec}: bound <= true distance",
+              all(int(x["claim"].split(">=")[1]) <= rec["facts"]["d"]["upper"] for x in e))
+    code = codes.load("rotated_surface:5")
+    rec = certify.build(code, legs=())
+    cuts.run_leg(rec, code)
+    ev = next(x for x in rec["evidence"] if x["leg"] == "E" and x["quantity"] == "d_x")
+
+    def tamper(fn):
+        r = copy.deepcopy(rec)
+        e2 = next(x for x in r["evidence"] if x["leg"] == "E" and x["quantity"] == "d_x")
+        fn(e2, r)
+        return r
+    refuses("control: cut set overlapping another",
+            lambda: certify.verify(tamper(lambda e, r: e["cuts"].__setitem__(1, e["cuts"][0]))),
+            "overlaps")
+    stab_x = gf2.supp(code.hz[0])
+    refuses("control: stabilizer used as a cut",
+            lambda: certify.verify(tamper(lambda e, r: e["cuts"].__setitem__(0, stab_x))),
+            "stabilizer")
+    refuses("control: non-logical set used as a cut",
+            lambda: certify.verify(tamper(lambda e, r: e["cuts"].__setitem__(0, [0]))),
+            "not a logical")
+
+    def inflate(e, r):
+        e["claim"] = "d_x >= 6"
+        r["facts"]["d_x"]["lower"] = 6
+        r["facts"]["d_x"]["upper"] = r["facts"]["d_x"]["witness"] = r["facts"]["d_x"]["partner"] = None
+        certify._combine(r["facts"])
+    refuses("control: cut certificate claiming more sets than it has",
+            lambda: certify.verify(tamper(inflate)), "fewer than it claims")
+    code = codes.load("toric:3")
+    rec = certify.build(code, legs=())
+    cuts.run_leg(rec, code)
+    check("cuts control: k = 2 is skipped by name",
+          all(x["status"] == "skipped" for x in rec["evidence"] if x["leg"] == "E"))
+    refuses("control: cut certificate on a k = 2 code",
+            lambda: cuts.verify_cuts(code, "d_x", [[0]]), "k = 1")
+
+
+# ---------------------------------------------------------------- 5d. concatenation
+def t_concat():
+    from qeccert import concat
+    st, st_rec = codes.load("steane"), RECEIPTS["steane"]
+    big = codes.concatenate(st, st)
+    rec = certify.build(big, max_combos=4_000_000)
+    check("concat steane o steane: enumeration gives [[49,1,9]]",
+          rec["facts"]["k"] == 1 and rec["facts"]["d"]["lower"] == 9 and rec["facts"]["d"]["exact"])
+    r2 = certify.build(big, legs=())
+    concat.run_leg(r2, big, st_rec, st_rec)
+    check("concat steane o steane: product bound 3 * 3", r2["facts"]["d"]["lower"] == 9)
+    try:
+        lines = certify.verify(r2)
+        check("concat: structure re-checked in cheap verify",
+              sum("concatenation structure re-checked" in l for l in lines) == 2)
+    except certify.Refusal as e:
+        check("concat: structure re-checked in cheap verify", False, str(e))
+    big2 = codes.concatenate(codes.load("toric:3"), st)       # k = 2 outer is allowed
+    r3 = certify.build(big2, legs=())
+    concat.run_leg(r3, big2, RECEIPTS["toric:3"], st_rec)
+    check("concat toric3 o steane: product bound 9, k = 2",
+          r3["facts"]["d"]["lower"] == 9 and r3["facts"]["k"] == 2)
+    # controls
+    r4 = certify.build(big, legs=())
+    concat.run_leg(r4, big, RECEIPTS["golay"], st_rec)
+    check("concat control: wrong outer code is skipped, no bound",
+          r4["facts"]["d"]["lower"] is None
+          and all(e["status"] == "skipped" for e in r4["evidence"] if e["leg"] == "F"))
+    r5 = certify.build(big, legs=())
+    concat.run_leg(r5, big, st_rec, RECEIPTS["toric:3"])
+    check("concat control: inner code with k = 2 is skipped",
+          all(e["status"] == "skipped" for e in r5["evidence"] if e["leg"] == "F"))
+    other = codes.concatenate(st, codes.load("rotated_surface:3"))
+    r6 = certify.build(other, legs=())
+    concat.run_leg(r6, other, st_rec, st_rec)
+    check("concat control: different inner code of other length is skipped",
+          all(e["status"] == "skipped" for e in r6["evidence"] if e["leg"] == "F"))
+
+    def swap_outer(r):
+        for e in r["evidence"]:
+            if e["leg"] == "F":
+                e["outer"] = RECEIPTS["rotated_surface:3"]["code"]
+    bad = copy.deepcopy(r2)
+    swap_outer(bad)
+    refuses("control: concat evidence with a substituted outer code",
+            lambda: certify.verify(bad), "")
+
+    def inflate(r):
+        for e in r["evidence"]:
+            if e["leg"] == "F":
+                e["claim"] = f"{e['quantity']} >= 12"
+        for q in ("d_x", "d_z"):
+            r["facts"][q]["lower"] = 12
+        certify._combine(r["facts"])
+    bad = copy.deepcopy(r2)
+    inflate(bad)
+    refuses("control: concat claim above the product", lambda: certify.verify(bad), "arithmetic")
+
+
 # ---------------------------------------------------------------- 6. SAT leg (needs cadical)
 def t_sat(heavy):
     if not sat.find_cadical():
@@ -499,7 +619,7 @@ def main():
     heavy, lean = "--heavy" in sys.argv, "--lean" in sys.argv
     t0 = time.monotonic()
     for fn, args in ((t_gf2, ()), (t_minweight, ()), (t_families, ()), (t_controls, ()),
-                     (t_cnf, ()), (t_lrat, ()), (t_bch, ()), (t_sat, (heavy,)), (t_cli, ()), (t_lean, (lean,))):
+                     (t_cnf, ()), (t_lrat, ()), (t_bch, ()), (t_cuts, ()), (t_concat, ()), (t_sat, (heavy,)), (t_cli, ()), (t_lean, (lean,))):
         t = time.monotonic()
         fn(*args)
         print(f"      {fn.__name__:12s} {time.monotonic() - t:6.2f} s")

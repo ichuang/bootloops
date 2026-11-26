@@ -1,7 +1,7 @@
 # qeccert — GUIDE
 
 KIND: package (Python, stdlib only for the default tier; `gf2.py`, `codes.py`,
-`minweight.py`, `certify.py`, `cnf.py`, `lrat.py`, `sat.py`, `bch.py`, `leangen.py`,
+`minweight.py`, `certify.py`, `cnf.py`, `lrat.py`, `sat.py`, `bch.py`, `cuts.py`, `concat.py`, `leangen.py`,
 `selftest.py`, `examples/`). Battery class: partial (the exact leg, the CNF
 direction test, the LRAT checker and all planted controls run from the clone;
 the SAT leg needs `cadical`, the Lean leg needs `lake` and a built Lean-QEC,
@@ -19,7 +19,7 @@ the upper end has a witness word that is checked by dot products alone, the
 lower end names the leg that proved it. A value is reported as exact only when
 a proven lower bound meets a witnessed upper bound.
 
-Four legs prove lower bounds, with separate lineages:
+Six legs prove lower bounds, with separate lineages:
 
 - **A, exact enumeration** (`minweight.py`): Brouwer-Zimmermann information-set
   enumeration over disjoint column sets, integer arithmetic only.
@@ -38,6 +38,19 @@ Four legs prove lower bounds, with separate lineages:
   run of zeros in arithmetic progression gives the bound. The BCH theorem is
   cited, not machine-checked, and the evidence entry says so. This leg reaches
   lengths the others cannot (the BCH-127 codes take 0.1 s).
+
+- **E, cut certificate** (`cuts.py`), for codes with k = 1: m pairwise disjoint
+  supports of nontrivial Z-type logical operators force every X-type logical to
+  have weight at least m (and the mirror statement). The sets are stored in the
+  evidence entry and `verify` re-checks them with dot products, so these are the
+  only lower bounds re-verified in cheap mode. This is the leg for surface codes:
+  rotated d = 31 (961 qubits) takes about a second.
+
+- **F, concatenation** (`concat.py`): checks that a code's stabilizer spaces
+  are exactly those of "outer code with each position replaced by an inner
+  k = 1 code", then applies the product bound d >= d(inner) * d(outer) to the
+  bounds in the two factor receipts. The structural check is repeated by
+  `verify`; the factor bounds are only as good as the factor receipts.
 
 ## USE-WHEN
 
@@ -87,8 +100,13 @@ bb90 bb108 bb144` (parameters as in the Lean-QEC examples).
 `q >= v` is proven and makes legs B and C prove exactly that bound. Without a
 target, legs B and C prove the witnessed upper bound already found.
 
+Legs A to E are selected with `--legs` (default A). Leg F needs the two factor
+receipts and is called from Python.
+
 Library: `from qeccert import load, build, verify, summary`;
-`certify.add_lower_bound`, `sat.run_leg`, `leangen.run_leg`.
+`certify.add_lower_bound`, `sat.run_leg`, `bch.run_leg`, `cuts.run_leg`,
+`concat.run_leg(receipt, code, outer_receipt, inner_receipt)`,
+`leangen.run_leg`, `codes.concatenate(outer, inner)`.
 
 Exit codes: 0 ok; 1 refusal (not a CSS code, receipt fails verification, two
 legs disagree); 2 usage or malformed spec.
@@ -124,6 +142,13 @@ default), `QECCERT_LAKE` (default `lake` on PATH, then `~/.elan/bin/lake`).
   21, 31 and the bound never exceeds the true minimum weight; designed
   distances of three BCH codes match enumeration; a weaker BCH bound does not
   lower a proven one; non-cyclic codes are skipped by name.
+- Cut leg: rotated surface 3, 5, 9 and planar 3, 4 reach their distance and the
+  certificate is re-checked by `verify`; refused controls: overlapping sets, a
+  stabilizer or a non-logical set used as a cut, a claim larger than the number
+  of sets, a k = 2 code.
+- Concatenation leg: Steane in Steane gives 9 by the product bound and by
+  enumeration; a k = 2 outer code works; a wrong outer code, a k = 2 inner code
+  and a substituted or inflated evidence entry are skipped or refused.
 - SAT leg (needs cadical): all four bounds of five codes proved with a checked
   proof and equal to leg A; a target one above the truth comes back refuted
   with a verified word; a proof with a used lemma removed, and a proof replayed
@@ -145,6 +170,10 @@ claim (Steane d >= 4) fails to build.
   the code hash. Leg C drops dependent rows before generating Lean (the
   theorem is then about the matrices printed in the generated file, and the
   receipt records their hash separately).
+- Leg E's search is greedy. On block codes it usually finds one set (the
+  bound 1); that is a weak result, not an error. Its proof needs k = 1.
+- Leg D's bound is the BCH bound, which can be below the true distance (Golay:
+  5 against 7). It never lowers a bound another leg proved.
 - Leg B's soundness rests on one direction of the CNF encoding (every genuine
   word extends to a model). That direction is tested, not proven; leg C is the
   leg with a verified reduction.
@@ -158,8 +187,8 @@ claim (Steane d >= 4) fails to build.
 - Recent CaDiCaL prints partial models unless `--modelalllits=true` is given.
   `sat.py` passes the flag when the solver knows it and refuses a partial model
   otherwise.
-- `verify` without `--full` re-checks witnesses and consistency only; it does
-  not re-prove lower bounds. LRAT and Lean artifacts are re-checked only by
+- `verify` without `--full` re-checks witnesses, consistency and leg E cut
+  certificates; it does not re-prove the lower bounds of the other legs. LRAT and Lean artifacts are re-checked only by
   re-running their legs.
 
 ## What runs publicly

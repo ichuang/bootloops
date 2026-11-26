@@ -106,7 +106,7 @@ def solver_version(solver=None):
         return None
 
 
-def run_leg(receipt, code, targets=None, workdir=None, timeout=600):
+def run_leg(receipt, code, targets=None, workdir=None, timeout=600, quantities=QUANTITIES):
     """Prove q >= b for each quantity, where b is the caller's target or else
     the witnessed upper bound already in the receipt."""
     targets = targets or {}
@@ -117,7 +117,7 @@ def run_leg(receipt, code, targets=None, workdir=None, timeout=600):
     os.makedirs(workdir, exist_ok=True)
     ver = solver_version()
     try:
-        for q in QUANTITIES:
+        for q in quantities:
             entry = receipt["facts"][q]
             ev = dict(leg="B", quantity=q, method="SAT (sequential-counter CNF), LRAT checked "
                                                   "by qeccert.lrat", solver=ver)
