@@ -72,10 +72,6 @@
   "cmd": "python3 tools/famhar/famhar.py --selftest",
   "cwd": "root"
  },
- "faultcert": {
-  "cmd": "python3 tools/faultcert/selftest.py",
-  "cwd": "root"
- },
  "ffcapital": {
   "cmd": "python3 selftest.py",
   "cwd": "package"
@@ -88,8 +84,16 @@
   "cmd": "python3 asdminer/run_control.py && python3 deform_transport/battery/run_battery_deform.py --stages S0,S1 && python3 -m frobenius_boundary.selftest",
   "cwd": "package"
  },
- "ftqc": {
-  "cmd": "python3 -m unittest ftqc.test_algebra ftqc.test_extractor ftqc.test_receipts ftqc.test_magic ftqc.test_faultcert ftqc.test_gross",
+ "ftqc_audit": {
+  "cmd": "python3 tools/ftqc_audit/selftest.py",
+  "cwd": "root"
+ },
+ "ftqc_codes": {
+  "cmd": "python3 tools/ftqc_codes/selftest.py",
+  "cwd": "root"
+ },
+ "ftqc_extractors": {
+  "cmd": "python3 -m unittest ftqc_extractors.test_algebra ftqc_extractors.test_extractor ftqc_extractors.test_receipts ftqc_extractors.test_magic ftqc_extractors.test_audit ftqc_extractors.test_gross",
   "cwd": "root"
  },
  "galois": {
@@ -159,10 +163,6 @@
  "posq": {
   "cmd": "python3 posq.py --selftest",
   "cwd": "package"
- },
- "qeccert": {
-  "cmd": "python3 tools/qeccert/selftest.py",
-  "cwd": "root"
  },
  "qinvert": {
   "cmd": "python3 -m pytest tools/qinvert -x -q -p no:cacheprovider",
