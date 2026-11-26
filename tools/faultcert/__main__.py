@@ -1,0 +1,96 @@
+"""Command line:  python3 -m faultcert <command> ...   (with tools/ on PYTHONPATH)
+
+  analyze SPEC [-o receipt.json] [--max-weight W] [--strict S] [--legs A,B,S]
+               [--cap N] [--workdir DIR] [--sat-timeout T]
+  verify  RECEIPT.json [--full]
+  export  SPEC [-o circuit.json] [--stim]
+SPEC is a circuit JSON file or a library gadget: cat:4, cat:4,verify, css_prep:golay,
+surface:3,2, surface:3,2,z,bad.
+
+Exit codes: 0 ok, 1 refusal (receipt fails, legs disagree), 2 usage or malformed circuit.
+"""
+import argparse
+import json
+import sys
+
+from . import certify, library, stimleg
+from .circuit import CircuitError
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="faultcert", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    a = sub.add_parser("analyze")
+    a.add_argument("spec")
+    a.add_argument("-o", "--out")
+    a.add_argument("--max-weight", type=int, default=4)
+    a.add_argument("--strict", type=int, default=0)
+    a.add_argument("--legs", default="A")
+    a.add_argument("--cap", type=int, default=3_000_000)
+    a.add_argument("--workdir")
+    a.add_argument("--sat-timeout", type=int, default=900)
+    v = sub.add_parser("verify")
+    v.add_argument("receipt")
+    v.add_argument("--full", action="store_true")
+    e = sub.add_parser("export")
+    e.add_argument("spec")
+    e.add_argument("-o", "--out")
+    e.add_argument("--stim", action="store_true")
+    args = ap.parse_args(argv)
+    try:
+        if args.cmd == "verify":
+            with open(args.receipt) as f:
+                rec = json.load(f)
+            for line in certify.verify(rec, full=args.full):
+                print("ok  ", line)
+            print(certify.summary(rec))
+            return 0
+        circ = library.load(args.spec)
+        if args.cmd == "export":
+            if args.stim:
+                from .model import Model
+                txt = stimleg.to_stim(circ, Model(circ))
+            else:
+                txt = json.dumps(circ.to_json()) + "\n"
+            if args.out:
+                with open(args.out, "w") as f:
+                    f.write(txt)
+            else:
+                sys.stdout.write(txt)
+            return 0
+        legs = [x.strip().upper() for x in args.legs.split(",") if x.strip()]
+        if set(legs) - {"A", "B", "S"}:
+            raise CircuitError("--legs takes a subset of A,B,S")
+        rec, model = certify.build(circ, args.max_weight, args.strict, legs, args.cap,
+                                   args.workdir, args.sat_timeout)
+        if "S" in legs:
+            lo = rec["results"].get("circuit_distance", {}).get("lower")
+            ev = stimleg.compare(circ, model, lo)
+            rec["results"]["stim"] = ev
+            if ev["status"] == "DISAGREES":
+                raise certify.Refusal("Stim disagrees: " + ev["reason"])
+        certify.verify(rec)
+        for kind in ("circuit_distance", "fault_distance"):
+            for ev in rec["results"].get(kind, {}).get("evidence", []):
+                print(f"leg {ev['leg']} {kind:17s} {ev['status']:8s} "
+                      f"{ev.get('claim') or ev.get('reason') or ''} {ev.get('note') or ''}")
+        if "stim" in rec["results"]:
+            ev = rec["results"]["stim"]
+            print(f"leg S {'fault model':17s} {ev['status']:8s} {ev.get('reason', '')}")
+        print(certify.summary(rec))
+        if args.out:
+            with open(args.out, "w") as f:
+                json.dump(rec, f)
+                f.write("\n")
+        return 0
+    except certify.Refusal as ex:
+        print(f"REFUSED: {ex}", file=sys.stderr)
+        return 1
+    except (CircuitError, FileNotFoundError, json.JSONDecodeError, ValueError) as ex:
+        print(f"usage/circuit error: {ex}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

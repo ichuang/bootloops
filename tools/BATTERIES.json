@@ -72,6 +72,10 @@
   "cmd": "python3 tools/famhar/famhar.py --selftest",
   "cwd": "root"
  },
+ "faultcert": {
+  "cmd": "python3 tools/faultcert/selftest.py",
+  "cwd": "root"
+ },
  "ffcapital": {
   "cmd": "python3 selftest.py",
   "cwd": "package"
