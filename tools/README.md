@@ -52,6 +52,8 @@ clone differs by package:
 
 ## Package index
 
+The [FTQC tool guide](FTQC.md) explains how the five quantum fault-tolerance packages work together.
+
 | package | what it is | battery |
 |---|---|---|
 | `abacus/` | certified point counts, Frobenius charpolys, and L-factors for abelian fourfolds from a period lattice | selftest |
@@ -72,13 +74,14 @@ clone differs by package:
 | `emitall/` | claims-integrity harness: re-emit every quoted headline number from its receipt, fail on drift; document-side members `battery.py` (paper claims rows) and `paper_seams.py` (comment-swallow seam gate over a paper's tex tree) | selftest |
 | `eras/` | ERAS — dependency-tamed certified enclosure forms in a shared parameter, with the consumer-pluggable adversarial verification battery | selftest |
 | `famhar/` | multi-sheet family evaluator harness over a 2-var dlog connection (one JSON config per family; affine + polynomial letters) | selftest |
-| `ftqc_audit/` | circuit-level fault properties of Clifford gadgets as receipts: the exact fault model of a circuit (which detectors fire, which observables flip, whether the output state is wrong, for every Pauli at every location), circuit distance and fault distance as intervals with replayable witnesses, strict fault tolerance at low order with the first counterexample, and a location census; exact enumeration, SAT through ftqc_codes with the LRAT proof re-checked, and a cross-check of the fault model against Stim | partial (the SAT leg needs cadical, the Stim leg needs the stim package; both skip with a named line otherwise) |
 | `ffcapital/` | exact salvage of FireFly `ff_save` reconstruction state from dead or capped runs, fail-closed | data-gated |
 | `formglue/` | glue around FORM 5: traces, color, term-stream rewriting, MZV evaluation, GRACE integration | partial |
 | `frobenius-boundary/` | family-agnostic Frobenius-branch boundary machinery at var=∞ for non-analytic anchors | data-gated |
+| `ftqc_audit/` | circuit-level fault properties of Clifford gadgets as receipts: the exact fault model of a circuit (which detectors fire, which observables flip, whether the output state is wrong, for every Pauli at every location), circuit distance and fault distance as intervals with replayable witnesses, strict fault tolerance at low order with the first counterexample, and a location census; exact enumeration, SAT through ftqc_codes with the LRAT proof re-checked, and a cross-check of the fault model against Stim | partial (the SAT leg needs cadical, the Stim leg needs the stim package; both skip with a named line otherwise) |
 | `ftqc_codes/` | certified code facts for CSS quantum error-correcting codes: n, k, logical distances d_x and d_z, correctable weight t, lightest stabilizer weights and structural flags as a JSON receipt (`ftqc_codes-receipt-1`), each bound carried with a dot-product-checkable witness (upper) and the leg that proved it (lower); six legs: exact information-set enumeration, SAT with the CaDiCaL LRAT proof re-checked by an in-package checker, a generated Lean 4 theorem built on Lean-QEC (Ehatamm, Lee, Wu, Tao, arXiv:2605.16523), the BCH bound, disjoint logical cuts, and checked code concatenation | partial (the SAT leg needs cadical, the Lean leg needs lake and a built Lean-QEC; both skip with a named line otherwise) |
 | `ftqc_extractors/` | [Fault-tolerance certificates](ftqc_extractors/README.md) for HGP and gross-code memory, extractor surgery and logical circuits with exhaustive, theorem-based and SAT/LRAT replay | selftest |
 | `ftqc_gadgets/` | fault properties of Clifford gadgets on unknown inputs as receipts: each input block enters as half of a noiseless encoded Bell pair, so the action on every input is a property of one stabilizer state; lookup decoders on the measurement record or as a Pauli frame; the gate and error-correction properties of Aliferis, Gottesman and Preskill at low order with replayable counterexamples; refinement of a gadget against a specification and fault equivalence (after Rodatz, Poor and Kissinger, truncated in weight); composition receipts that replace an ancilla factory by its specification | selftest |
+| `ftqc_zx/` | exact F_2 Pauli-web verifier, constructive fault-equivalent ZX-calculus compiler (Rodatz–Poór–Kissinger, arXiv:2506.17181v4), flag-conditioned syndrome decoder synthesizer, and zero-float outward-rounded stochastic FTQC gadget-contract emitter (`ftqc_zx-contract-v1`) | selftest |
 | `galois/` | motivic Galois coaction-cut engine + the exact MZV relation ring it reduces against | data-gated |
 | `gatekeeper/` | Gatekeeper — data-integrity + held-out-CV honesty layer that gates every closure | selftest |
 | `geotriage/` | GeoTriage — per-graph maximal-cut geometry and value-fittability triage with mandatory honesty gates | selftest |
@@ -109,7 +112,7 @@ clone differs by package:
 | `wayfinder/` | Wayfinder — the eps-graded DE-transport pipeline: one evaluator contract, certified transport, Frobenius landings, the dlog-connection sampler wing, the engine-agnostic eps->0 limit extractor (epslimit: Laurent/Richardson extrapolation of an external engine's eps-grid) and the FLINT exact rational-function exporter (flintexport) | partial |
 | `winnow/` | upgraded-Laporta F_p eliminator library with native lambda-witness receipts — Seedling's exact elimination engine (`import ibplapper`) | partial |
 
-52 packages (`wayfinder` includes the sampler wing; `counterweight`
+55 packages (`wayfinder` includes the sampler wing; `counterweight`
 includes `canonical_form/`; `landau-alphabet` includes the Gröbner escalation
 backend and `LandauAlphabet.jl/`, the Julia engine `gpl-eval` builds on).
 The one operations package, Turnstile (admission control for long jobs on a

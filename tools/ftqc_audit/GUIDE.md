@@ -192,10 +192,10 @@ J. Preskill (2006). SAT leg: ftqc_codes, CaDiCaL (A. Biere et al.), LRAT
 
 ## HGP extractors and logical T circuits
 
-The [ftqc_extractors comparison guide](https://github.com/ichuang/bootloops/blob/ftqc_extractors/tools/ftqc_extractors/AUDIT.md) shows how to analyze an actual HGP meter's cat preparation here and how to use this package's forward propagator to replay a logical fault in the enclosing circuit.
+The [ftqc_extractors comparison guide](../ftqc_extractors/AUDIT.md) shows how to analyze an actual HGP meter's cat preparation here and how to use this package's forward propagator to replay a logical fault in the enclosing circuit.
 
 ## Repeated gross-code syndrome extraction
 
-Run `python3 -m ftqc_audit records CIRCUIT.json` on an exported CSS probe with explicit detectors and record-only endpoints. The report checks through weight two. Supply repeatable `--fault LOCATION:LABEL` arguments for forward replay, or `--stim` for an independent comparison of all single-fault signatures. ftqc_extractors combines both probes with the bounded projected-support search and the readout check to certify the gross-code measurement. [Run and interpret the gross-code experiment](https://github.com/ichuang/bootloops/blob/ftqc_extractors/tools/ftqc_extractors/GROSS_CIRCUIT.md)
+Run `python3 -m ftqc_audit records CIRCUIT.json` on an exported CSS probe with explicit detectors and record-only endpoints. The report checks through weight two. Supply repeatable `--fault LOCATION:LABEL` arguments for forward replay, or `--stim` for an independent comparison of all single-fault signatures. ftqc_extractors combines both probes with the bounded projected-support search and the readout check to certify the gross-code measurement. [Run and interpret the gross-code experiment](../ftqc_extractors/GROSS_CIRCUIT.md)
 
 Receipts use `ftqc_audit-receipt-1`. The verifier also accepts archived `faultcert-receipt-1` evidence.

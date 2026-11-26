@@ -1,0 +1,222 @@
+{
+  "kind": "CliffordCircuit",
+  "name": "steane_optimised_5anc_X_prop_7_12",
+  "n_qubits": 12,
+  "input_qubits": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "output_qubits": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "all_wires_fault_free": false,
+  "fault_free_wires": [],
+  "ops": [
+    {
+      "kind": "PREP_PLUS",
+      "qubits": [
+        7
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_0",
+      "qubits": [
+        8
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_PLUS",
+      "qubits": [
+        9
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_PLUS",
+      "qubits": [
+        10
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_0",
+      "qubits": [
+        11
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        7,
+        0
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        9,
+        5
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        10,
+        6
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        9,
+        8
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        9,
+        10
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        10,
+        11
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        7,
+        8
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        10,
+        7
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        7,
+        9
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        8,
+        11
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        9,
+        11
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "MEAS_Z",
+      "qubits": [
+        11
+      ],
+      "mode": "noisy",
+      "label": "steane5_flag"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        7,
+        1
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        8,
+        2
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        9,
+        3
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        10,
+        4
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "MEAS_X",
+      "qubits": [
+        7
+      ],
+      "mode": "noisy",
+      "label": "steane5_w0"
+    },
+    {
+      "kind": "MEAS_X",
+      "qubits": [
+        8
+      ],
+      "mode": "noisy",
+      "label": "steane5_w1"
+    },
+    {
+      "kind": "MEAS_X",
+      "qubits": [
+        9
+      ],
+      "mode": "noisy",
+      "label": "steane5_w2"
+    },
+    {
+      "kind": "MEAS_X",
+      "qubits": [
+        10
+      ],
+      "mode": "noisy",
+      "label": "steane5_w3"
+    }
+  ]
+}

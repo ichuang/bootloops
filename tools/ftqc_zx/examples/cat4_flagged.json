@@ -1,0 +1,99 @@
+{
+  "kind": "CliffordCircuit",
+  "name": "cat4_flagged_prop_7_1",
+  "n_qubits": 5,
+  "input_qubits": [],
+  "output_qubits": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "all_wires_fault_free": false,
+  "fault_free_wires": [],
+  "ops": [
+    {
+      "kind": "PREP_PLUS",
+      "qubits": [
+        0
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_0",
+      "qubits": [
+        1
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_0",
+      "qubits": [
+        2
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_0",
+      "qubits": [
+        3
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_0",
+      "qubits": [
+        4
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        0,
+        4
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        0,
+        1
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        1,
+        2
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        2,
+        3
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        3,
+        4
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "MEAS_Z",
+      "qubits": [
+        4
+      ],
+      "mode": "noisy",
+      "label": "cat4_flag"
+    }
+  ]
+}

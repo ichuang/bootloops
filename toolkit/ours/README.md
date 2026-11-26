@@ -48,11 +48,11 @@ The registered packages, grouped as the index groups them:
   ring-basis member), Annihilator, Ansatzer, Galois, Rankscreen.
 - **Exact statistics and evidence** — Mixalot (with Boxwalk, the exact box-moment
   contiguity walker, as member), Popcorn, POSQ, and JaCK & Jill.
-- **Fault-tolerant quantum computing** — `ftqc_codes` (certified parameters of CSS codes as
-  receipts: exact enumeration, SAT with a checked LRAT proof, a generated Lean 4
-  theorem on top of Lean-QEC, the BCH bound, disjoint logical cuts, and checked
-  concatenation; Lean-QEC and CaDiCaL are credited in its GUIDE and listed in
-  [`../external/TOOLS.md`](../external/TOOLS.md)).
+- **Fault-tolerant quantum computing** — `ftqc_codes` certifies CSS code parameters,
+  `ftqc_audit` checks faults in scheduled circuits, and `ftqc_gadgets` verifies
+  encoded operations and their composition. `ftqc_extractors` checks logical
+  measurements and `ftqc_zx` verifies and synthesizes Clifford gadgets with ZX
+  methods. [Interfaces, proof assumptions and examples](../../tools/FTQC.md)
 - **Operations** — Turnstile (admission control for long jobs on a shared machine:
   priority token, RAM and CPU-width ledgers; formerly Bigram-queue) ships under
   [`../../ops/`](../../ops/README.md), not `tools/`, and has its own page outside the
@@ -105,12 +105,6 @@ discipline) is packaged as portable skill files in their own repository,
 `skills`, published beside this one.
 
 1.0 is installed by cloning (INSTALL.md); there is no pip distribution.
-
-The [ftqc_audit package](../../tools/ftqc_audit/GUIDE.md) checks circuit-level fault properties of Clifford gadgets, including fault distance and strict fault tolerance. It cross-checks the circuit fault model with Stim.
-
-The [ftqc_extractors package](../../tools/ftqc_extractors/GUIDE.md) verifies HGP and gross-code extractors and scheduled logical measurements. Its SAT backend uses the [ftqc_codes](../../tools/ftqc_codes/GUIDE.md) CNF encoder and LRAT checker.
-
-The [ftqc_gadgets package](../../tools/ftqc_gadgets/GUIDE.md) checks gate and error-correction properties on unknown inputs, fault equivalence, refinement, and composition of gadget receipts.
 
 ## License
 
