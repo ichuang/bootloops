@@ -12,6 +12,6 @@ disjoint logical cuts, and checked code concatenation.
     python3 tools/ftqc_codes/selftest.py                  # battery, from the repository root
 
 See [`GUIDE.md`](GUIDE.md) for scope, gates, hazards, and when to reach for
-`ftqc_codes` vs sibling circuit-level tools (`ftqc_zx`, `faultcert`,
-`gadgetcert`, `ftqc`). `examples/` holds two banked code specs and their
+`ftqc_codes` vs sibling circuit-level tools (`ftqc_zx`, `ftqc_audit`,
+`ftqc_gadgets`, `ftqc_extractors`). `examples/` holds two banked code specs and their
 receipts; `tools/qeccert.py` preserves legacy `import qeccert` compatibility.

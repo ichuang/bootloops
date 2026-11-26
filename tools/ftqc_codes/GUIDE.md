@@ -70,9 +70,9 @@ Six legs prove lower bounds, with separate lineages:
   flag decoders): the facts here are about the static code, not about any
   circuit. Use **`ftqc_zx`** for constructive ZX fault-equivalence proofs,
   flag-decoder tables, and zero-float stochastic gadget contracts;
-  **`faultcert`** for single-circuit CaDiCaL/LRAT distance proofs and Stim DEM
-  checks; **`gadgetcert`** for truncated AGP `prep`/`gate`/`ec`/`close`
-  composition receipts; and **`ftqc`** for hypergraph-product extractors and
+  **`ftqc_audit`** for single-circuit CaDiCaL/LRAT distance proofs and Stim DEM
+  checks; **`ftqc_gadgets`** for truncated AGP `prep`/`gate`/`ec`/`close`
+  composition receipts; and **`ftqc_extractors`** for hypergraph-product extractors and
   non-Clifford magic-state logical $T$ schedules.
 - Non-CSS stabilizer codes, subsystem codes, qudit codes.
 - Large codes beyond leg D/E/F structure. Leg A is exponential in the weight searched; leg B took 186 s for
