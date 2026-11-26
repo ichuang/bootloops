@@ -72,6 +72,7 @@ clone differs by package:
 | `emitall/` | claims-integrity harness: re-emit every quoted headline number from its receipt, fail on drift; document-side members `battery.py` (paper claims rows) and `paper_seams.py` (comment-swallow seam gate over a paper's tex tree) | selftest |
 | `eras/` | ERAS — dependency-tamed certified enclosure forms in a shared parameter, with the consumer-pluggable adversarial verification battery | selftest |
 | `famhar/` | multi-sheet family evaluator harness over a 2-var dlog connection (one JSON config per family; affine + polynomial letters) | selftest |
+| `faultcert/` | circuit-level fault properties of Clifford gadgets as receipts: the exact fault model of a circuit (which detectors fire, which observables flip, whether the output state is wrong, for every Pauli at every location), circuit distance and fault distance as intervals with replayable witnesses, strict fault tolerance at low order with the first counterexample, and a location census; exact enumeration, SAT through qeccert with the LRAT proof re-checked, and a cross-check of the fault model against Stim | partial (the SAT leg needs cadical, the Stim leg needs the stim package; both skip with a named line otherwise) |
 | `ffcapital/` | exact salvage of FireFly `ff_save` reconstruction state from dead or capped runs, fail-closed | data-gated |
 | `formglue/` | glue around FORM 5: traces, color, term-stream rewriting, MZV evaluation, GRACE integration | partial |
 | `frobenius-boundary/` | family-agnostic Frobenius-branch boundary machinery at var=∞ for non-analytic anchors | data-gated |
@@ -107,7 +108,7 @@ clone differs by package:
 | `wayfinder/` | Wayfinder — the eps-graded DE-transport pipeline: one evaluator contract, certified transport, Frobenius landings, the dlog-connection sampler wing, the engine-agnostic eps->0 limit extractor (epslimit: Laurent/Richardson extrapolation of an external engine's eps-grid) and the FLINT exact rational-function exporter (flintexport) | partial |
 | `winnow/` | upgraded-Laporta F_p eliminator library with native lambda-witness receipts — Seedling's exact elimination engine (`import ibplapper`) | partial |
 
-52 packages (`wayfinder` includes the sampler wing; `counterweight`
+53 packages (`wayfinder` includes the sampler wing; `counterweight`
 includes `canonical_form/`; `landau-alphabet` includes the Gröbner escalation
 backend and `LandauAlphabet.jl/`, the Julia engine `gpl-eval` builds on).
 The one operations package, Turnstile (admission control for long jobs on a

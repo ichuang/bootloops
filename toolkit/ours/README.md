@@ -51,7 +51,9 @@ The registered packages, grouped as the index groups them:
 - **Fault-tolerant quantum computing** — Qeccert (certified parameters of CSS codes as
   receipts: exact enumeration, SAT with a checked LRAT proof, and a generated Lean 4
   theorem on top of Lean-QEC, which is credited in its GUIDE and listed in
-  [`../external/TOOLS.md`](../external/TOOLS.md)).
+  [`../external/TOOLS.md`](../external/TOOLS.md)). Faultcert (circuit-level fault
+  properties of Clifford gadgets: the exact fault model, circuit and fault distance,
+  strict fault tolerance at low order, cross-checked against Stim).
 - **Operations** — Turnstile (admission control for long jobs on a shared machine:
   priority token, RAM and CPU-width ledgers; formerly Bigram-queue) ships under
   [`../../ops/`](../../ops/README.md), not `tools/`, and has its own page outside the
