@@ -43,3 +43,27 @@ def frame_observable(p,x):
         if physical!=phase:
             raise ValueError("signed readout disagrees with Clifford frame")
     return axis,sign
+
+
+def check_readout_classifier():
+    """Exact instrument comparison for both adaptive physical readout choices.
+
+    Projector entries have common denominator 2. Compare their omega exponents
+    up to one global phase per transcript, on the entire input qubit.
+    """
+    for p,x,dp,dx,lx,lz,dr,b in product(range(2),repeat=8):
+        arm=p^dp
+        reported=b^dr^frame_observable(arm,x^dx)[1]
+        phases=[]
+        for col,row in product(range(2),repeat=2):
+            anc=p^col
+            j=row^lx
+            raw=anc+4*x*anc
+            if j!=col:
+                raw+=4*b+(2-4*col if arm else 0)
+            actual=raw+4*lz*j+(2*arm+4*(x^dx))*row
+            wanted=col+(4*reported if row!=col else 0)
+            phases.append((actual-wanted)%8)
+        wrong=len(set(phases))!=1
+        if wrong!=bool(dp or (lz^(arm*lx)^dx) or (dr^dx)):
+            raise ValueError("adaptive readout test disagrees with branch matrices")

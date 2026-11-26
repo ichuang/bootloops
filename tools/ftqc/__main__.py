@@ -11,7 +11,10 @@ from .audit import audit_canonical, audit_hgp
 from .circuit import Schedule, search
 from .proof import solve, replay_sat
 
+from .t_verify import analyze as analyze_t
+
 FIELDS = {
+    "t_gate": ("a b logical_x logical_z rounds target resource","trailing_identity"),
     "hgp": ("a b", ""),
     "column": ("a b column word vertices ports edges target", "paths"),
     "canonical": ("n polynomial edges", "assembly"),
@@ -51,9 +54,11 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     ):
         raise ValueError("invalid search options")
     kind = s["kind"]
-    if backend == "sat" and kind != "circuit":
+    if backend == "sat" and kind not in ("circuit","t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "t_gate":
+            return analyze_t(s,backend,budget,seconds,reverse)
         if kind == "hgp":
             result = dict(
                 status="proved", **hgp_parameters(*seed(s["a"]), *seed(s["b"]))
@@ -99,6 +104,10 @@ def verify(s, r):
     result = r["result"]
     if result["status"] not in ("proved", "counterexample"):
         raise ValueError("receipt contains an open obligation")
+    if r["backend"] == "sat" and s['kind']=='t_gate':
+        if digest(result)!=digest(analyze_t(s,'sat',r['budget'],60,True,result)):
+            raise ValueError("T-gate SAT receipt mismatch")
+        return
     if r["backend"] == "sat":
         if s["kind"] != "circuit":
             raise ValueError("wrong backend")

@@ -139,15 +139,13 @@ class TSchedule:
             self.det.extend((row<<shift,0,0) for row in hx)
             self.det.extend((0,row<<shift,0) for row in hz)
         self.mask=(1<<len(self.det))-1
-        self.obs=[(0,0,p),(0,Z,0),(X,0,x)]
+        self.obs=[(0,0,p),(0,Z,0),(X,0,x)] if arm is None else [
+            (0,0,p), (X,Z if arm else 0,x), (0,0,read^x)
+        ]
         # Require identity on the full spectator algebra in BOTH blocks.
         for shift in (0,n):
             self.obs.extend((r<<shift,0,0) for r in kernel(hz+[Z],n))
             self.obs.extend((0,r<<shift,0) for r in kernel(hx+[X],n))
-        if arm is not None:
-            # Sufficient branch-channel equality: p is correct, final corrected
-            # Pauli trivial, and signed follow-on measurement equals ideal.
-            self.obs.append((0,0,read^x))
         self.flows=self.det+self.obs
         self.modes=[range(1,16 if g=='CX' else 2 if g[0] in 'RM' else 4) for g,*_ in self.ops]
         self.n=n
