@@ -76,7 +76,7 @@ clone differs by package:
 | `ffcapital/` | exact salvage of FireFly `ff_save` reconstruction state from dead or capped runs, fail-closed | data-gated |
 | `formglue/` | glue around FORM 5: traces, color, term-stream rewriting, MZV evaluation, GRACE integration | partial |
 | `frobenius-boundary/` | family-agnostic Frobenius-branch boundary machinery at var=∞ for non-analytic anchors | data-gated |
-| `ftqc/` | [Fault-tolerance certificates](ftqc/README.md) for HGP memory, extractor surgery and logical circuits with exhaustive, theorem-based and SAT/LRAT replay | selftest |
+| `ftqc/` | [Fault-tolerance certificates](ftqc/README.md) for HGP and gross-code memory, extractor surgery and logical circuits with exhaustive, theorem-based and SAT/LRAT replay | selftest |
 | `galois/` | motivic Galois coaction-cut engine + the exact MZV relation ring it reduces against | data-gated |
 | `gatekeeper/` | Gatekeeper — data-integrity + held-out-CV honesty layer that gates every closure | selftest |
 | `geotriage/` | GeoTriage — per-graph maximal-cut geometry and value-fittability triage with mandatory honesty gates | selftest |

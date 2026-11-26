@@ -57,3 +57,7 @@ The physical adapter is a verified-cat parity meter with direct access to the li
 ## Cross-checks with faultcert
 
 Compare the two fault propagators on an extractor or fixed T arm, replay a logical witness, or export a verified cat for a native strict-FT analysis. The [comparison guide](FAULTCERT.md) gives the commands and the input, acceptance and output assumptions for each claim.
+
+## Bivariate bicycle partial extractor
+
+Use input kind `gross_z` for the published BB144 unprimed Z setting. The exact backend computes and certifies both CSS distances. The measurement command exports the merged matrices, ideal readout and split frame. See the [gross-code guide](GROSS.md) for the input, coordinate conventions, proof format and scope.
