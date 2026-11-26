@@ -235,7 +235,7 @@ class ZXNode:
     def __post_init__(self) -> None:
         if self.kind not in ("Z", "X", "H", "BOUND"):
             raise RefusalError("UNKNOWN-ZX-NODE", f"invalid ZX node kind {self.kind!r}")
-        if not isinstance(self.phase_k, int) or self.phase_k not in (0, 1, 2, 3):
+        if not isinstance(self.phase_k, int) or isinstance(self.phase_k, bool) or self.phase_k not in (0, 1, 2, 3):
             raise RefusalError(
                 "NON-CLIFFORD-PHASE-REFUSED",
                 f"spider phase_k must be in {{0,1,2,3}} (multiples of pi/2), got {self.phase_k!r}",
@@ -283,7 +283,7 @@ class ZXDiagram:
         return out
 
     def add_node(self, kind: str, phase_k: int = 0, label: str = "") -> int:
-        if isinstance(phase_k, float) or phase_k not in (0, 1, 2, 3):
+        if not isinstance(phase_k, int) or isinstance(phase_k, bool) or phase_k not in (0, 1, 2, 3):
             raise RefusalError(
                 "NON-CLIFFORD-PHASE-REFUSED",
                 f"Clifford ZX accepts phase_k in {{0,1,2,3}} (multiples of pi/2), got {phase_k!r}",
@@ -1203,48 +1203,53 @@ def extract_circuit_fe(
             "ZX diagram boundary counts do not match candidate circuit inputs/outputs",
         )
     if target_noise_model == "circuit_depolarizing":
-        # Check whether `zx` carries cross-sector gadgets; if not, every noisy CNOT must satisfy Prop 6.9 or 6.10!
-        has_mixed_gadgets = any(ed.gadget_sector == "MIXED" for ed in zx.edges.values())
-        if not has_mixed_gadgets:
-            n_ops = len(circuit_template.ops)
-            next_op_on_q: dict[tuple[int, int], int] = {}
-            last_seen: dict[int, int] = {}
-            for idx in range(n_ops - 1, -1, -1):
-                op = circuit_template.ops[idx]
-                for q in op.qubits:
-                    if q in last_seen:
-                        next_op_on_q[(idx, q)] = last_seen[q]
-                    last_seen[q] = idx
-            prev_op_on_q: dict[tuple[int, int], int] = {}
-            prev_seen: dict[int, int] = {}
-            for idx, op in enumerate(circuit_template.ops):
-                for q in op.qubits:
-                    if q in prev_seen:
-                        prev_op_on_q[(idx, q)] = prev_seen[q]
-                    prev_seen[q] = idx
+        # Each unguarded noisy CNOT requires 4 cross-sector Prop. 6.8 fault gadgets unless covered
+        # by Prop. 6.9 (merge into MEAS_Z/MEAS_X) or Prop. 6.10 (split from PREP_PLUS/PREP_0)!
+        n_mixed_gadgets = sum(1 for ed in zx.edges.values() if ed.gadget_sector == "MIXED")
+        n_ops = len(circuit_template.ops)
+        next_op_on_q: dict[tuple[int, int], int] = {}
+        last_seen: dict[int, int] = {}
+        for idx in range(n_ops - 1, -1, -1):
+            op = circuit_template.ops[idx]
+            for q in op.qubits:
+                if q in last_seen:
+                    next_op_on_q[(idx, q)] = last_seen[q]
+                last_seen[q] = idx
+        prev_op_on_q: dict[tuple[int, int], int] = {}
+        prev_seen: dict[int, int] = {}
+        for idx, op in enumerate(circuit_template.ops):
+            for q in op.qubits:
+                if q in prev_seen:
+                    prev_op_on_q[(idx, q)] = prev_seen[q]
+                prev_seen[q] = idx
 
-            for idx, op in enumerate(circuit_template.ops):
-                if op.kind == "CX" and op.mode == "noisy" and not circuit_template.all_wires_fault_free:
-                    qc, qt = op.qubits
-                    pc_idx = prev_op_on_q.get((idx, qc))
-                    pt_idx = prev_op_on_q.get((idx, qt))
-                    nc_idx = next_op_on_q.get((idx, qc))
-                    nt_idx = next_op_on_q.get((idx, qt))
-                    split_ok = (
-                        (pc_idx is not None and circuit_template.ops[pc_idx].kind == "PREP_PLUS")
-                        or (pt_idx is not None and circuit_template.ops[pt_idx].kind == "PREP_0")
-                    )
-                    merge_ok = (
-                        (nt_idx is not None and circuit_template.ops[nt_idx].kind == "MEAS_Z")
-                        or (nc_idx is not None and circuit_template.ops[nc_idx].kind == "MEAS_X")
-                    )
-                    if not (split_ok or merge_ok):
-                        raise RefusalError(
-                            "UNGUARDED-CNOT-EXTRACTION",
-                            f"CNOT at op {idx} on qubits ({qc}, {qt}) lacks split/merge termination "
-                            f"(Props 6.9-6.10) and ZX diagram has no Prop 6.8 cross-sector fault gadgets "
-                            f"under circuit_depolarizing noise",
-                        )
+        unguarded_cxs: list[tuple[int, int, int]] = []
+        for idx, op in enumerate(circuit_template.ops):
+            if op.kind == "CX" and op.mode == "noisy" and not circuit_template.all_wires_fault_free:
+                qc, qt = op.qubits
+                pc_idx = prev_op_on_q.get((idx, qc))
+                pt_idx = prev_op_on_q.get((idx, qt))
+                nc_idx = next_op_on_q.get((idx, qc))
+                nt_idx = next_op_on_q.get((idx, qt))
+                split_ok = (
+                    (pc_idx is not None and circuit_template.ops[pc_idx].kind == "PREP_PLUS")
+                    or (pt_idx is not None and circuit_template.ops[pt_idx].kind == "PREP_0")
+                )
+                merge_ok = (
+                    (nt_idx is not None and circuit_template.ops[nt_idx].kind == "MEAS_Z")
+                    or (nc_idx is not None and circuit_template.ops[nc_idx].kind == "MEAS_X")
+                )
+                if not (split_ok or merge_ok):
+                    unguarded_cxs.append((idx, qc, qt))
+
+        if n_mixed_gadgets < 4 * len(unguarded_cxs):
+            idx, qc, qt = unguarded_cxs[0]
+            raise RefusalError(
+                "UNGUARDED-CNOT-EXTRACTION",
+                f"CNOT at op {idx} on qubits ({qc}, {qt}) lacks split/merge termination "
+                f"(Props 6.9-6.10) and ZX diagram has {n_mixed_gadgets} < {4 * len(unguarded_cxs)} "
+                f"Prop 6.8 cross-sector fault gadgets under circuit_depolarizing noise",
+            )
     return circuit_template
 
 

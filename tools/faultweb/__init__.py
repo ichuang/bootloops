@@ -1,5 +1,6 @@
 """faultweb — ZX-calculus fault equivalence, Pauli-web analysis, and FTQC gadget certifier."""
 
+from .decoder_synth import FlagConditionedDecoder, synthesize_flag_decoder
 from .diagram import (
     AtomicFaultGroup,
     CircuitOp,
@@ -12,6 +13,19 @@ from .diagram import (
     extract_circuit_fe,
     load_spec_file,
 )
+from .equivalence import (
+    BUILTIN_CODES,
+    CSSCodeSpec,
+    DistanceResult,
+    FaultEquivResult,
+    check_fault_equiv,
+    circuit_distance,
+    make_golay_23_1_7,
+    make_shor_9_1_3,
+    make_steane_7_1_3,
+    prepend_ideal_encoder,
+    resolve_code,
+)
 from .frame_oracle import SpackleOracleResult, analyze_circuit_spackle
 from .pauliweb import (
     FaultSignatureTables,
@@ -22,25 +36,65 @@ from .pauliweb import (
     compile_outcome_map,
     match_measurement_branches,
 )
+from .rewrites import DerivationCertificate, RewriteStep, apply_zx_rewrite, verify_derivation
+from .synthesize import (
+    make_cat_spec,
+    make_full_syndrome_spec,
+    make_syndrome_meas_spec,
+    synth_cat_state,
+    synth_sequential_cat4_steane_bad,
+    synth_shor_syndrome,
+    synth_steane_goto_prep,
+    synth_steane_syndrome,
+    synth_steane_zero_like,
+    synth_unflagged_cat_state,
+)
 
 __all__ = [
     "AtomicFaultGroup",
+    "BUILTIN_CODES",
+    "CSSCodeSpec",
     "CircuitOp",
     "CliffordCircuit",
+    "DerivationCertificate",
+    "DistanceResult",
+    "FaultEquivResult",
     "FaultSignatureTables",
+    "FlagConditionedDecoder",
     "OutcomePushOutMap",
     "PauliWebAnalysis",
     "RefusalError",
+    "RewriteStep",
     "SpackleOracleResult",
     "ZXDiagram",
     "ZXEdge",
     "ZXNode",
     "analyze_circuit_spackle",
     "analyze_pauli_webs",
+    "apply_zx_rewrite",
     "build_fault_signature_tables",
+    "check_fault_equiv",
+    "circuit_distance",
     "circuit_to_zx_fe",
     "compile_outcome_map",
     "extract_circuit_fe",
     "load_spec_file",
+    "make_cat_spec",
+    "make_full_syndrome_spec",
+    "make_golay_23_1_7",
+    "make_shor_9_1_3",
+    "make_steane_7_1_3",
+    "make_syndrome_meas_spec",
     "match_measurement_branches",
+    "prepend_ideal_encoder",
+    "resolve_code",
+    "synth_cat_state",
+    "synth_sequential_cat4_steane_bad",
+    "synth_shor_syndrome",
+    "synth_steane_goto_prep",
+    "synth_steane_syndrome",
+    "synth_steane_zero_like",
+    "synth_unflagged_cat_state",
+    "synthesize_flag_decoder",
+    "verify_derivation",
 ]
