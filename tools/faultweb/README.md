@@ -5,8 +5,17 @@ compiler, flag-conditioned syndrome decoder synthesizer, and zero-float outward-
 stochastic gadget-contract emitter (`faultweb-contract-v1`) for fault-tolerant
 quantum computing (FTQC).
 
-See [`GUIDE.md`](GUIDE.md) for scope, acceptance gates, footguns, and full credit
-keys.
+See [`GUIDE.md`](GUIDE.md) for scope, acceptance gates, footguns, sibling-tool
+comparisons, and full credit keys.
+
+## Choosing between `faultweb`, `qeccert`, `faultcert`, and `ftqc`
+
+| Package | What it certifies | Use when | Do **not** use for |
+|---|---|---|---|
+| **`qeccert`** | Static CSS code parameters $[n,k,d_X,d_Z,t,w_{\min}]$ via enumeration, CaDiCaL/LRAT, Lean-QEC, BCH, cuts, and concatenation | You have check matrices $(H_X, H_Z)$ and need a machine-checkable proof of **code** distance | Circuit hook errors, schedules, flags, or gates |
+| **`faultweb`** (this package) | Relational $w$-fault equivalence ($C_1 \stackrel{w}{\widehat{=}} C_2$), polynomial-time ZX rewrite proofs, ancilla-reduced cat/Shor/Steane synthesis, flag-decoder tables, and zero-float outward-rounded stochastic contracts (`faultweb-contract-v1`) | Designing/optimising Clifford gadgets *by construction* via ZX rewrites, quotienting classical Pauli-frame byproducts (`Appendix A`), certifying `circuit_css` + flag decoders (`Appendix C.2`), or bounding all-orders stochastic escape/dirt rates | Static code-distance proofs (`qeccert`), unstructured high-weight SAT/LRAT searches (`faultcert`), or non-Clifford magic-state logical $T$ / HGP surgery (`ftqc`) |
+| **`faultcert`** | Single-circuit adversarial fault model, circuit/fault distance, strict FT order, and location census via meet-in-the-middle, CaDiCaL/LRAT, and Stim DEM | Auditing one hand-written Clifford tick circuit (e.g. rotated surface-code CX schedules) with LRAT proofs or Stim DEM diffs | Relational equivalence between open circuits, ZX synthesis, `circuit_css` sector mode, or all-orders probability enclosures |
+| **`ftqc`** | Hypergraph-product (HGP) static/scheduled logical extractors and non-Clifford magic-state logical $T$ protocols ($\mathbb{Z}_8$ branch checks + Clifford arm bounds) | Proving HGP graph-surgery logical measurements, spectator preservation, or conditional $S^p Z^x$ logical $T$ channels | General ZX circuit synthesis/leg-bending, flag-decoder table compilation, or outward-rounded stochastic gadget contracts |
 
 ## Quick start
 

@@ -53,22 +53,78 @@ runtime containment check (`Fraction(lo) <= exact <= Fraction(hi)`).
 
 ## NOT-FOR
 
-- Non-Clifford gates ($T$, $\text{CCZ}$, arbitrary-angle $R_Z(\theta)$):
-  non-Clifford phases and QASM instructions are refused fail-closed with
-  `NON-CLIFFORD-PHASE-REFUSED` / `NON-CLIFFORD-OR-UNSUPPORTED-QASM` (magic-state
-  distillation and Clifford+$T$ gadgets enter via their Clifford verification
-  wrappers or external algebraic verifiers).
-- Brute-force semantic enumeration (`check_fault_equiv` / `circuit_distance`)
-  at large weight on large codes: semantic distance/equivalence checking is
-  NP-hard (`Theorem 3.11`); the reachable syndrome BFS enforces a deterministic
-  cap (`FAULT-ENUM-BUDGET-EXCEEDED`) and directs large-scale callers to
-  polynomial-time proof verification (`verify_derivation`).
-- Unchecked `pyzx.full_reduce()` / `pyzx.clifford_simp()` optimisation: standard
-  ZX simplification preserves only the noise-free linear map and destroys fault
-  equivalence (`§5`); always verify external graph rewrites with
+- **Static CSS code distance / parameter proofs** (`[n, k, d_x, d_z, t, w_min]`
+  from check matrices `(H_X, H_Z)`, LRAT code-distance proofs, BCH/cut bounds, or
+  Lean-QEC theorems): use **`qeccert`**. `faultweb` takes a `CSSCodeSpec` as an
+  *input precondition* (`prepend_ideal_encoder`, `Prop. C.1`) and never proves
+  the static distance of the underlying code itself.
+- **Non-Clifford logical protocols & HGP extractor surgery** ($T$ gates, magic
+  states, $\mathbb{Z}_8$ conditional $S^p Z^x$ branch identities, or hypergraph
+  product single-column / cyclic graph-surgery extractors): use **`ftqc`**.
+  `faultweb` refuses non-Clifford phases and QASM instructions fail-closed with
+  `NON-CLIFFORD-PHASE-REFUSED` / `NON-CLIFFORD-OR-UNSUPPORTED-QASM`.
+- **SAT/LRAT UNSAT distance certificates or Stim DEM mechanism diffs on large
+  unstructured Clifford schedules**: when you have one hand-written tick circuit
+  (e.g. a distance-5 rotated surface-code memory patch with no constructive ZX
+  derivation) and need an LRAT-checked CaDiCaL refutation or a live Stim
+  detector-error-model comparison, use **`faultcert`**. `faultweb`'s direct
+  semantic BFS enforces a deterministic state cap (`FAULT-ENUM-BUDGET-EXCEEDED`,
+  `Theorem 3.11`) and scales via constructive ZX proof verification
+  (`verify_derivation`) instead of SAT solving.
+- **Unchecked `pyzx.full_reduce()` / `pyzx.clifford_simp()` optimisation**:
+  standard ZX simplification preserves only the noise-free linear map and
+  destroys fault equivalence (`§5`); always verify external graph rewrites with
   `audit_pyzx_rewrite`.
-- Context-dependent surface-code single-ancilla hook schedules (`Remark 3.6`)
-  without supplying the surrounding spacetime context.
+- **Context-dependent surface-code single-ancilla hook schedules (`Remark 3.6`)**
+  without supplying the surrounding spacetime context — audit the full
+  multi-round patch in **`faultcert`** instead.
+
+## Relationship to sibling QEC/FTQC packages (`qeccert`, `faultcert`, `ftqc`)
+
+BootLoops separates quantum error correction and fault tolerance into four
+complementary layers so each claim is checked by the right mathematical engine:
+
+| Dimension | `qeccert` | `faultcert` | `ftqc` | `faultweb` |
+|---|---|---|---|---|
+| **Primary object** | Static CSS check matrices $(H_X, H_Z)$ | One fixed physical Clifford tick circuit | HGP code-deformation extractors & magic-state logical $T$ schedules | Relational pairs $(C_1, C_2)$ of open Clifford circuits / ZX diagrams + stochastic gadget contracts |
+| **Core question** | What are $[n, k, d_X, d_Z, t, w_{\min}]$ of this code? | Which location faults in this one circuit escape its detectors or leave heavy residual error? | Does this HGP surgery or conditional logical $T$ protocol preserve target + spectator logicals to distance $d$? | Is $C_1 \stackrel{w}{\widehat{=}} C_2$? Does a polynomial-time ZX rewrite proof certify $C_{\mathrm{impl}}$ from $C_{\mathrm{spec}}$? What are its flag decoder and all-orders stochastic error bounds? |
+| **Beyond Clifford?** | No (binary CSS) | No (Clifford + 1-bit `CZ`/`Z` feed-forward) | **Yes** ($\mathbb{Z}_8$ magic-state logical $T$ branch check + Clifford arm transport) | No (Clifford $k\frac{\pi}{2}$ ZX fragment; non-Clifford refused) |
+| **Noise & weight semantics** | Hamming weight of codewords | Location count; joint output Pauli weight only ("strict FT"); flipped classical Pauli frame counted as harm | Location count under ideal input + terminal HGP syndrome boundaries | Grouped location weight under **both** `circuit_depolarizing` (joint) and `circuit_css` (per-sector $X$/$Z$); `Appendix A` automatic classical Pauli-frame byproduct quotient |
+| **Scaling mechanism** | 6 legs: Brouwer-Zimmermann, CaDiCaL+LRAT, Lean-QEC, BCH, cuts ($d=31$ surface), concatenation | Meet-in-the-middle enumeration + CaDiCaL/LRAT + Stim DEM cross-check | Forward/reverse bit-plane propagation, CaDiCaL/LRAT, + structural counting lemma ($\min(d, V+1, \lceil R/L\rceil)$ at 450q) | **Constructive ZX rewrites + $O(\sum_i \lvert D_i\rvert)$ proof verifier** (e.g. 125-qubit $w=3$ `cat_64` in $< 0.4\text{ s}$) |
+| **Stochastic / probability bounds?** | No (combinatorial distance only) | No (finite fault-count census only) | Exact raw-state postselection rate on `t_source` only | **Yes**: exact all-orders `Fraction` fault polynomials $\to$ zero-float outward-rounded `Decimal` intervals (`faultweb-contract-v1`) |
+
+### When to reach for each (and how they compose)
+
+1. **Reach for `qeccert` (not `faultweb`)** whenever a theorem or `Prop. C.1`
+   codespace precondition depends on the static distance $d$ of a CSS code (BCH,
+   QR, Golay, surface, bivariate-bicycle gross code `bb144`, or concatenated
+   codes) and you want an independent LRAT, cut, or Lean-QEC distance receipt.
+2. **Reach for `faultweb` (not `faultcert` or `ftqc`)** when:
+   - synthesizing or optimising gadgets *by construction* via ZX leg-bending and
+     detecting regions (3-ancilla Shor `Prop. 7.6`, 2-rail dynamic teleportation
+     Shor `Prop. 7.7`, 5-ancilla 15-CNOT Steane `Prop. 7.12`, or $w$-truncated
+     $2n$-cat states `Prop. 7.3`),
+   - checking **relational $w$-fault equivalence** between an open circuit (with
+     inputs, migrating output wires, or random byproduct branches) and an
+     idealised specification (`ff` / `ft`),
+   - certifying gadgets under `circuit_css` sector noise or compiling an
+     `Appendix C.2` flag-conditioned lookup decoder (`synthesize_flag_decoder`),
+   - verifying large recursive gadgets in polynomial time via
+     `verify_derivation`, or
+   - emitting certified all-orders stochastic space-time / dirt contracts
+     (`faultweb-contract-v1`) for whole-circuit overhead ledgers.
+3. **Reach for `faultcert` (not `faultweb`)** when auditing a single fixed
+   multi-round memory or state-prep schedule without a ZX derivation (such as
+   comparing hook-safe vs hook-aligned CX orders on a rotated surface code) and
+   you want a CaDiCaL/LRAT UNSAT proof at weight $4\text{--}5$ or a direct
+   mechanism-set equivalence check against Stim's detector error model.
+4. **Reach for `ftqc` (not `faultweb` or `faultcert`)** when certifying HGP
+   graph-surgery logical measurements (`column`, `canonical`, `circuit` with
+   spectator preservation) or non-Clifford magic-state logical $T$ protocols
+   (`t_gate`, `t_bounds`, `t_source`). To lower ancilla overhead in an `ftqc`
+   protocol, design and certify the compact ancilla/syndrome sub-gadget in
+   `faultweb` first, then validate the enclosing HGP or logical-$T$ schedule in
+   `ftqc`.
 
 ## INVOKE
 
