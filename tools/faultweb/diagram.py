@@ -24,11 +24,15 @@ class RefusalError(ValueError):
         self.code = code
         self.detail = detail
 
+    def to_dict(self) -> dict[str, str]:
+        return {"verdict": "REFUSAL", "code": self.code, "detail": self.detail}
+
 
 VALID_NOISE_MODELS = ("circuit_depolarizing", "circuit_css", "fault_free")
 VALID_OP_MODES = ("noisy", "ft", "ff")
 
 SINGLE_QUBIT_GATES = ("I", "X", "Y", "Z", "H", "S", "SDG")
+TWO_QUBIT_GATES = ("CX", "CZ", "SWAP")
 PREP_STATES = ("PREP_0", "PREP_1", "PREP_PLUS", "PREP_MINUS")
 SINGLE_MEAS = ("MEAS_Z", "MEAS_X", "MEAS_Y")
 

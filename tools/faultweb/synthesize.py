@@ -349,28 +349,30 @@ def synth_shor_syndrome(
         #   ancillas a0 = n_data (|0>), a1 = n_data+1 (|0>), bridge1 = n_data+2 (|+>..MEAS_X), bridge2 = n_data+3 (|+>..MEAS_X).
         #   Note bridge1 and bridge2 run sequentially, so peak physical ancilla count is 3!
         if r == 4:
-            a0, a1, br0, br1 = n_data, n_data + 1, n_data + 2, n_data + 3
+            # Reuse physical bridge qubit `br = n_data + 2` after `MEAS_X` so total auxiliary
+            # qubits is 3 (a0, a1, br), matching Proposition 7.6 (Kissinger p. 34)!
+            a0, a1, br = n_data, n_data + 1, n_data + 2
             q0, q1, q2, q3 = act_qs
             ops = list(pre_ops) + [
                 CircuitOp("PREP_0", (a0,)),
                 CircuitOp("PREP_0", (a1,)),
                 CircuitOp("CX", (q0, a0)),
                 CircuitOp("CX", (q1, a1)),
-                CircuitOp("PREP_PLUS", (br0,)),
-                CircuitOp("CX", (br0, a0)),
-                CircuitOp("CX", (br0, a1)),
-                CircuitOp("MEAS_X", (br0,), label="k3_flagA"),
-                CircuitOp("PREP_PLUS", (br1,)),
-                CircuitOp("CX", (br1, a0)),
-                CircuitOp("CX", (br1, a1)),
-                CircuitOp("MEAS_X", (br1,), label="k4_flagB"),
+                CircuitOp("PREP_PLUS", (br,)),
+                CircuitOp("CX", (br, a0)),
+                CircuitOp("CX", (br, a1)),
+                CircuitOp("MEAS_X", (br,), label="k3_flagA"),
+                CircuitOp("PREP_PLUS", (br,)),
+                CircuitOp("CX", (br, a0)),
+                CircuitOp("CX", (br, a1)),
+                CircuitOp("MEAS_X", (br,), label="k4_flagB"),
                 CircuitOp("CX", (q2, a0)),
                 CircuitOp("CX", (q3, a1)),
                 CircuitOp("MEAS_Z", (a0,), label="k1"),
                 CircuitOp("MEAS_Z", (a1,), label="k2"),
             ] + list(post_ops)
             circ = CliffordCircuit(
-                n_data + 4,
+                n_data + 3,
                 tuple(range(n_data)),
                 tuple(range(n_data)),
                 ops,
@@ -387,7 +389,7 @@ def synth_shor_syndrome(
             )
             return circ, cert
 
-        # General r != 4: pair up floor(r/2) ancilla rails with sequential double-XX flag bridges!
+        # General r != 4: pair up ceil(r/2) ancilla rails with a reusable sequential XX flag qubit!
         n_rails = (r + 1) // 2
         rails = [n_data + i for i in range(n_rails)]
         ops = list(pre_ops)
@@ -395,13 +397,11 @@ def synth_shor_syndrome(
             ops.append(CircuitOp("PREP_0", (rq,)))
         for i in range(n_rails):
             ops.append(CircuitOp("CX", (act_qs[i], rails[i])))
-        next_q = n_data + n_rails
-        # Connect adjacent rails (rails[i], rails[i+1]) with double |+> -> CX -> MEAS_X bridges
-        # so the n_rails rails form a fault-equivalent H|cat>-like hub!
+        bq = n_data + n_rails
+        used_bridge = False
         for i in range(n_rails - 1):
             for rep in range(2):
-                bq = next_q
-                next_q += 1
+                used_bridge = True
                 ops.append(CircuitOp("PREP_PLUS", (bq,)))
                 ops.append(CircuitOp("CX", (bq, rails[i])))
                 ops.append(CircuitOp("CX", (bq, rails[i + 1])))
@@ -412,7 +412,7 @@ def synth_shor_syndrome(
             ops.append(CircuitOp("MEAS_Z", (rq,), label=f"shor_opt_m{i}"))
         ops.extend(post_ops)
         circ = CliffordCircuit(
-            next_q,
+            n_data + n_rails + (1 if used_bridge else 0),
             tuple(range(n_data)),
             tuple(range(n_data)),
             ops,
@@ -436,8 +436,8 @@ def synth_shor_syndrome(
                 f"Proposition 7.7 teleportation syndrome gadget requires active weight 4, got {r}",
             )
         q0, q1, q2, q3 = act_qs
-        a0, a1, br0, br1 = n_data, n_data + 1, n_data + 2, n_data + 3
-        # Proposition 7.7 (p. 35): data shifts down by two rails!
+        a0, a1, br = n_data, n_data + 1, n_data + 2
+        # Proposition 7.7 (p. 35): data shifts down by two rails using 3 auxiliary qubits (a0, a1, br)!
         #   in q0 -> out q2, in q1 -> out q3, in q2 -> out a0, in q3 -> out a1!
         mig = {q0: q2, q1: q3, q2: a0, q3: a1}
         out_qs = [mig.get(q, q) for q in range(n_data)]
@@ -454,21 +454,21 @@ def synth_shor_syndrome(
             CircuitOp("PREP_0", (a1,)),
             CircuitOp("CX", (q2, a0)),
             CircuitOp("CX", (q3, a1)),
-            CircuitOp("PREP_PLUS", (br0,)),
-            CircuitOp("CX", (br0, q2)),
-            CircuitOp("CX", (br0, q3)),
-            CircuitOp("MEAS_X", (br0,), label="tp_flagA"),
-            CircuitOp("PREP_PLUS", (br1,)),
-            CircuitOp("CX", (br1, q2)),
-            CircuitOp("CX", (br1, q3)),
-            CircuitOp("MEAS_X", (br1,), label="tp_flagB"),
+            CircuitOp("PREP_PLUS", (br,)),
+            CircuitOp("CX", (br, q2)),
+            CircuitOp("CX", (br, q3)),
+            CircuitOp("MEAS_X", (br,), label="tp_flagA"),
+            CircuitOp("PREP_PLUS", (br,)),
+            CircuitOp("CX", (br, q2)),
+            CircuitOp("CX", (br, q3)),
+            CircuitOp("MEAS_X", (br,), label="tp_flagB"),
             CircuitOp("CX", (q2, q0)),
             CircuitOp("CX", (q3, q1)),
             CircuitOp("MEAS_Z", (q0,), label="tp_m1"),
             CircuitOp("MEAS_Z", (q1,), label="tp_m2"),
         ] + post_migrated
         circ = CliffordCircuit(
-            n_data + 4,
+            n_data + 3,
             tuple(range(n_data)),
             tuple(out_qs),
             ops,
