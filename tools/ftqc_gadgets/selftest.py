@@ -815,6 +815,30 @@ def t_local(heavy):
         check(f"local: enumeration without tables stops with a note ({name})",
               e["holds_through"] < 1 and "lookup table" in (e["note"] or ""), str(e)[:200])
         check("local: without a radius and without tables nothing is claimed", props.local(a2)["local"] is False)
+    meas = library.measure("steane", "Z")
+    rejected = certify.build(meas, local=7, tables=False)
+    certify.verify(rejected)
+    check("radius seven without tables is disproved for Steane measurement",
+          rejected["results"][0]["local"] is False and "proved radius 1" in rejected["results"][0]["reason"])
+    pair = Analysis(meas)
+    check("two record flips contradict the proposed seven-column tolerance",
+          pair.effect(pair.replay([(11, "flip"), (12, "flip")])) != 0)
+    valid = certify.build(meas, local=1, tables=False)
+    certify.verify(valid)
+    decoder = valid["results"][0]["decoders"][0]
+    check("the no-table proof establishes the kernel lower bound",
+          decoder["proof"] == dict(method="minimum weight of check kernel", kernel_lower=3, empty_kernel=False))
+    legacy = copy.deepcopy(valid)
+    del legacy["results"][0]["radius_request"]
+    del legacy["results"][0]["decoders"][0]["proof"]
+    certify.verify(legacy)
+    legacy["results"][0]["through"] = legacy["results"][0]["decoders"][0]["radius"] = 7
+    refuses("a legacy unproved seven-column receipt cannot verify", lambda: certify.verify(legacy), "recompute")
+    forged = copy.deepcopy(valid)
+    forged["results"][0]["decoders"][0]["proof"]["kernel_lower"] = 15
+    refuses("an inflated kernel proof is recomputed", lambda: certify.verify(forged), "recompute")
+    check("a kernel search that runs out of budget cannot certify the proposed radius",
+          not props.local(Analysis(meas, tables=False, cap=0), 1)["local"])
     # repeated correction: later rounds do not depend on the input
     a = Analysis(library.load("steane_ec:steane,anc=spec,rounds=2"))
     ind = props.independent_of_input(a)
@@ -918,6 +942,9 @@ def t_levels(heavy):
     idle = certify.build(library.idle("steane"), [("gate", 1)])
     refuses("one-block idle cannot fill a CNOT role",
             lambda: levels.reduction(outer, dict(inner, cnot=idle)), "arity")
+    no_radius = certify.build(library.measure("steane", "Z"), local=7, tables=False)
+    refuses("an unsupported outer radius cannot enter a level reduction",
+            lambda: levels.reduction(no_radius, inner), "no positive locality")
     swapped = dict(inner, measure_x=inner["measure_z"], measure_z=inner["measure_x"])
     refuses("X and Z measurement roles cannot be exchanged",
             lambda: levels.reduction(outer, swapped), "logical relation")

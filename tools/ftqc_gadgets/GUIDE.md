@@ -55,9 +55,13 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   (`props.LEMMA`) then gives `gate`, `ec` and `close` whenever faults and input
   errors together touch at most T coordinates, T the decoders' radius, however many
   faults lie inside those coordinates. This is the route for codes whose t is too
-  large to enumerate (QR-47, BCH-127): the radius is taken from the code's
+  large to enumerate (QR-47, BCH-127): a candidate radius can come from the code's
   `ftqc_codes` receipt (`--code-receipt`, `library.radii`) and decoder tables are
-  skipped (`--no-tables`).
+  skipped (`--no-tables`). For a lightest-pattern decoder the verifier then
+  proves from the actual check matrix that its kernel contains no nonzero word
+  of weight at most twice the requested radius. A code receipt or an explicit
+  number supplies the target. An insufficient search bound yields a refusal.
+  A hierarchical decoder instead uses its verified inner unique-decoding radius.
   Wire order fixes the physical coordinate for every fault mode. All gates and
   classical controls in the body must respect those coordinates. The exception
   for a fresh specified ancilla is checked against its complete preparation

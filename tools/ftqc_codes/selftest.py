@@ -548,6 +548,12 @@ def t_hier():
           cert["n"] == 161 and cert["sectors"]["X"] == dict(t1=1, t2=3) and "Step 3" in cert["proof"])
     refuses("hier: an inner code with k = 2 is refused",
             lambda: hier.certificate(RECEIPTS["steane"], RECEIPTS["toric:3"]), "k = 1")
+    inflated = copy.deepcopy(RECEIPTS["steane"])
+    for quantity in ("d_x", "wmin_x"):
+        inflated["facts"][quantity].update(lower=15, upper=None, exact=False, witness=None, partner=None)
+        inflated["evidence"].append(dict(leg="A", quantity=quantity, status="proved", claim=f"{quantity} >= 15"))
+    refuses("hier: claimed radii must follow from the actual parity checks",
+            lambda: hier.certificate(inflated, RECEIPTS["steane"]), "proved kernel radius")
     tab, u = hier.leader_table(codes.golay().hz, 23)
     check("hier: Golay table has 2048 entries, unique through 3", len(tab) == 2048 and u == 3)
 

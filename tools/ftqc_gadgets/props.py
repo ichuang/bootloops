@@ -436,19 +436,41 @@ def local(an, radius=None):
             if gf2.rank(aug) != gf2.rank(cols):
                 lin = False
     decs, through = [], None
-    for d, info in zip(g.decoders, an.dec_info):
+    # The lightest-pattern decoder returns every weight <= r pattern exactly
+    # iff no two such patterns share a syndrome, i.e. ker(H) has no nonzero
+    # word of weight <= 2r. Re-prove this when a table was omitted. A
+    # hierarchical decoder uses a different algorithm and needs its own bound.
+    from ftqc_codes.hier import kernel_radius
+    kernel_proofs = {}
+    for index, (d, info) in enumerate(zip(g.decoders, an.dec_info)):
         r = radius.get(d.name) if isinstance(radius, dict) else radius
-        src = "given"
-        if r is None:
-            r, src = info["unique_through"], "table"
-        if r is None:
+        supplied = r is not None
+        bound = info["unique_through"]
+        proof = "leader table"
+        if d.rule is not None:
+            # With at most t1 total errors every inner column decodes exactly.
+            bound = an.dec[index][2].h.t1
+            proof = "hierarchical inner leader tables"
+        if not supplied:
+            r = bound
+        if type(r) is not int or not 0 <= r <= d.npos:
             return dict(type="local", local=False, coordinates=n,
-                        reason=f"no radius for decoder {d.name}: its table was not built and none was given")
-        if info["unique_through"] is not None and r > info["unique_through"]:
+                        reason=f"no valid integer radius for decoder {d.name}")
+        evidence = {}
+        if bound is None:
+            key = (tuple(d.checks), d.npos, r)
+            if key not in kernel_proofs:
+                kernel_proofs[key] = kernel_radius(d.checks, d.npos, r, an.cap)
+            bound, evidence = kernel_proofs[key]
+            proof = "minimum weight of check kernel"
+        if r > bound:
             return dict(type="local", local=False, coordinates=n,
-                        reason=f"the radius given for decoder {d.name} exceeds the one its table shows")
-        decs.append(dict(name=d.name, radius=int(r), source=src))
-        through = int(r) if through is None else min(through, int(r))
+                        reason=f"radius {r} exceeds proved radius {bound} for decoder {d.name}")
+        row = dict(name=d.name, radius=r, source="given" if supplied else "table")
+        if supplied or d.rule is not None:
+            row["proof"] = dict(method=proof, **evidence)
+        decs.append(row)
+        through = r if through is None else min(through, r)
     return dict(type="local", local=True, coordinates=n, fault_effects=len(an.cols), decoders=decs,
                 through=through, gate=gate, ec=ec, close=bool(ec and lin), sector=sector)
 

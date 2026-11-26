@@ -52,6 +52,8 @@ def build(gadget, checks=(), close=None, refines=(), sector=False, cap=3_000_000
         results.append(r)
     if local is not None and local is not False:
         r = props.local(an, None if local is True else local)
+        if local is not True:
+            r["radius_request"] = local
         r["lemma"] = props.LEMMA
         results.append(r)
     return _clean(dict(schema=SCHEMA, tool="ftqc_gadgets", tool_version=VERSION,
@@ -144,12 +146,19 @@ def verify(receipt, full=False, cap=3_000_000):
                     done.append(f"{tag}: re-enumerated")
             elif typ == "local":
                 given = {d["name"]: d["radius"] for d in r.get("decoders", []) if d.get("source") == "given"}
-                again = _clean(props.local(an, given or None))
+                request = r.get("radius_request", given or None)
+                again = _clean(props.local(an, request))
+                if "radius_request" in r:
+                    again["radius_request"] = request
+                elif given and again.get("local"):
+                    # Legacy receipts recorded the number, without its proof.
+                    # Only compare their old fields after proving it afresh.
+                    for row in again["decoders"]:
+                        row.pop("proof", None)
                 again["lemma"] = props.LEMMA
                 if again != r:
                     raise Refusal(f"{tag}: the locality certificate does not recompute")
-                done.append(f"{tag}: every fault and input error placed again"
-                            + (" (decoder radii are taken as given)" if given else ""))
+                done.append(f"{tag}: physical fault columns and decoder bounds recomputed")
             else:
                 raise Refusal(f"{tag}: unknown result type")
         except (KeyError, TypeError, ValueError, IndexError) as e:

@@ -25,7 +25,7 @@ column.
 from itertools import combinations
 from math import comb
 
-from . import certify, concat, gf2
+from . import certify, concat, gf2, minweight
 
 
 def leader_table(checks, npos, cap=5_000_000):
@@ -108,6 +108,13 @@ class Hier:
         return [i for i in range(self.N) if ((pattern >> (i * self.m)) & mask).bit_count() > t1]
 
 
+def kernel_radius(checks, n, requested, cap=5_000_000):
+    """Prove uniqueness through the requested weight using the actual decoder matrix."""
+    search = minweight.min_weight(gf2.nullspace(checks, n), n, target=2*requested+1, max_combos=cap)
+    bound = n if search["empty"] else (search["lower"] - 1) // 2
+    return bound, dict(kernel_lower=search["lower"], empty_kernel=search["empty"])
+
+
 def radius(receipt, sector):
     """Radius within which the lightest pattern of a sector is unique, from a code
     receipt: (m - 1) // 2 with m the smaller of the proven lower bounds on the distance
@@ -116,7 +123,13 @@ def radius(receipt, sector):
     d, w = ("d_x", "wmin_x") if sector == "X" else ("d_z", "wmin_z")
     if f[d]["lower"] is None or f[w]["lower"] is None:
         raise certify.Refusal(f"the receipt proves no lower bound on {d} or {w}")
-    return (min(f[d]["lower"], f[w]["lower"]) - 1) // 2
+    requested = (min(f[d]["lower"], f[w]["lower"]) - 1) // 2
+    from .codes import CSSCode
+    code = CSSCode.from_json(receipt["code"])
+    bound, _ = kernel_radius(code.hz if sector == "X" else code.hx, code.n, requested)
+    if not 0 <= requested <= bound:
+        raise certify.Refusal(f"{sector}: requested radius {requested} exceeds the proved kernel radius {bound}")
+    return requested
 
 
 def certificate(outer_receipt, inner_receipt):
