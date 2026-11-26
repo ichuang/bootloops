@@ -20,7 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
-    "gross_circuit": ("rounds target", ""),
+    "gross_circuit": ("rounds target", "spacetime fault_witnesses"),
     "gross_z": ("target", ""),
     "t_bounds": (
         "a b logical_x logical_z rounds resource",

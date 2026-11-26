@@ -38,6 +38,15 @@ def main(argv=None):
     e.add_argument("spec")
     e.add_argument("-o", "--out")
     e.add_argument("--stim", action="store_true")
+    r = sub.add_parser(
+        "records", help="check fault signatures of a CSS record-only circuit"
+    )
+    r.add_argument("spec")
+    r.add_argument(
+        "--stim", action="store_true", help="compare all detector/observable mechanisms"
+    )
+    r.add_argument("--fault", action="append", default=[], metavar="LOCATION:LABEL")
+    r.add_argument("-o", "--out")
     args = ap.parse_args(argv)
     try:
         if args.cmd == "verify":
@@ -48,9 +57,21 @@ def main(argv=None):
             print(certify.summary(rec))
             return 0
         circ = library.load(args.spec)
+        if args.cmd == "records":
+            from .record_model import record_report
+
+            result = record_report(circ, args.fault, args.stim)
+            out = json.dumps(result, indent=2, sort_keys=True) + "\n"
+            if args.out:
+                with open(args.out, "w") as f:
+                    f.write(out)
+            else:
+                sys.stdout.write(out)
+            return 0
         if args.cmd == "export":
             if args.stim:
                 from .model import Model
+
                 txt = stimleg.to_stim(circ, Model(circ))
             else:
                 txt = json.dumps(circ.to_json()) + "\n"

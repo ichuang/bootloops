@@ -56,6 +56,8 @@ def compare(circuit, model, distance_lower=None, search_logical=True):
     """Returns an evidence dict; status 'agrees', 'DISAGREES' or 'skipped'."""
     why = available()
     ev = dict(leg="S", method="Stim detector error model and logical-error search")
+    if not search_logical:
+        ev["method"] = "Stim detector error model"
     if why:
         ev.update(status="skipped", reason=why)
         return ev

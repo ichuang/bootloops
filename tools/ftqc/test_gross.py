@@ -191,3 +191,62 @@ class CircuitDistanceTests(unittest.TestCase):
         r["result"]["witness"]["faults"][0][0] += 1
         with self.assertRaises(ValueError):
             verify(s, r)
+
+
+class SpacetimeTests(unittest.TestCase):
+    def test_domains(self):
+        from faultcert.spacetime import xor_feasible
+        from itertools import product
+        from random import Random
+
+        rng = Random(155)
+        for _ in range(90):
+            groups = [
+                set(rng.sample(range(16), rng.randint(1, 4)))
+                for _ in range(rng.randint(1, 4))
+            ]
+            target = rng.randrange(16)
+            self.assertEqual(
+                xor_feasible(groups, target),
+                any(reduce(xor, c) == target for c in product(*groups)),
+            )
+
+    def test_native_cover_and_zero_projection_fault(self):
+        from faultcert.spacetime import (
+            support_enumerator,
+            lift_bound,
+            enumerate_supports,
+        )
+        from itertools import combinations
+        from random import Random
+        import shutil
+
+        if not shutil.which("c++"):
+            self.skipTest("C++17 compiler absent")
+        rng = Random(12)
+        with support_enumerator() as exe:
+            for _ in range(15):
+                cols = sorted(set(rng.randrange(1, 32) for _ in range(8)))
+                patterns, _ = enumerate_supports(exe, cols, 4, 4, 1000000)
+                actual = [
+                    ids
+                    for r in range(1, 5)
+                    for ids in combinations(range(len(cols)), r)
+                    if reduce(xor, (cols[i] for i in ids)) == 16
+                ]
+                # Minimum words are irreducible. At most one further site
+                # cannot add a nonempty detector-silent/trivial subset.
+                d = min(map(len, actual), default=5)
+                self.assertEqual(min(map(len, patterns), default=5), d)
+                if d >= 2:
+                    self.assertEqual(
+                        sorted(p for p in patterns if len(p) <= d + 1),
+                        sorted(p for p in actual if len(p) <= d + 1),
+                    )
+            # The three spatial classes sum to a logical. An extra fault
+            # with zero spatial projection is needed to cancel its time tag.
+            tags = {1: {1}, 2: {2}, 7: {0}, 0: {0, 3}}
+            self.assertEqual(lift_bound(exe, tags, 2, 3, 1000)["lower"], 4)
+            self.assertEqual(
+                lift_bound(exe, tags, 2, 4, 1000)["outcome"], "possible lift"
+            )

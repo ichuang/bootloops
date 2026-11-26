@@ -1,6 +1,6 @@
 """Gate layers for one extraction of the BB144 unprimed-Z merged checks."""
 
-from .algebra import bits
+from .algebra import bits, kernel
 from .gross import cell, gross_z, shifted_z
 
 # The first 162 wires hold data. Meters follow the row order in gross_z().
@@ -104,20 +104,26 @@ def cycle():
 
 
 def validate_cycle(layers, hx, hz):
-    # CSS CNOT transfer in reverse: each measured meter must pull back to its
-    # own prepared Pauli and the intended data Pauli. Other same-basis
-    # prepared meters are harmless. Opposite-basis factors are forbidden.
-    for is_x, rows, start in ((True, hx, X0), (False, hz, Z0)):
-        for j, row in enumerate(rows):
-            mask = 1 << (start + j)
-            for layer in reversed(layers):
-                for op in layer:
-                    if op[0] != "CX":
-                        continue
-                    c, t = op[1:]
-                    src, dst = (c, t) if is_x else (t, c)
-                    if mask >> src & 1:
-                        mask ^= 1 << dst
+    cnots = [
+        (op[1], op[2]) for layer in reversed(layers) for op in layer if op[0] == "CX"
+    ]
+    data = (1 << X0) - 1
+    for is_x, rows, other, start in ((True, hx, hz, X0), (False, hz, hx, Z0)):
+
+        def pull(mask):
+            for c, t in cnots:
+                src, dst = (c, t) if is_x else (t, c)
+                if mask >> src & 1:
+                    mask ^= 1 << dst
             forbidden = mask >> Z0 if is_x else (mask >> X0) & ((1 << (Z0 - X0)) - 1)
-            if mask & ((1 << X0) - 1) != row or forbidden:
+            return mask & data, forbidden
+
+        for j, row in enumerate(rows):
+            if pull(1 << (start + j)) != (row, 0):
                 raise ValueError(f"incorrect ideal check at meter {start + j}")
+        # A nondemolition measurement preserves the full commutant. Test
+        # its X and Z generators on unrestricted data, ignoring only known
+        # + preparation factors on the measured meters.
+        for row in kernel(other, X0):
+            if pull(row) != (row, 0):
+                raise ValueError("syndrome circuit disturbs a commuting data Pauli")

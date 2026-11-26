@@ -105,3 +105,48 @@ class RecordModel:
         if actual != expected:
             raise ValueError("forward and adjoint witness signatures disagree")
         return actual & self.mask, actual >> self.nd
+
+
+def record_report(circ, fault_args, use_stim=False):
+    from . import stimleg
+    from .analysis import min_undetected
+
+    model = RecordModel(circ)
+    cols = sorted((d, o) for d, o, _ in model.columns)
+    short = min_undetected(cols, any, 2)
+    chosen = short.pop("witness")
+    if chosen is not None:
+        needed = {cols[i] for i in chosen}
+        faults = []
+        for site, group in enumerate(model.groups):
+            for label, v in group.items():
+                pair = (v & model.mask, v >> model.nd)
+                if pair in needed:
+                    needed.remove(pair)
+                    faults.append((site, label))
+        d, o = model.replay(faults)
+        if needed or d or not o:
+            raise ValueError("two-column witness failed replay")
+        short["witness"] = faults
+    result = dict(
+        circuit_sha256=circ.sha256(),
+        locations=len(model.groups),
+        mechanisms=len(cols),
+        through_weight_two=short,
+    )
+    if fault_args:
+        faults = []
+        for arg in fault_args:
+            loc, label = arg.split(":", 1)
+            faults.append((int(loc), label))
+        d, o = model.replay(faults)
+        result["replay"] = dict(
+            detectors=[i for i in range(model.nd) if d >> i & 1],
+            observables=[i for i in range(len(circ.observables)) if o >> i & 1],
+        )
+    if use_stim:
+        ev = stimleg.compare(circ, model, search_logical=False)
+        if ev["status"] != "agrees":
+            raise ValueError(str(ev))
+        result["stim"] = ev
+    return result
