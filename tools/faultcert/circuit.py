@@ -19,8 +19,8 @@ import hashlib
 import json
 
 ONE_Q = {"R", "RX", "I", "H", "M", "MX"}
-ALIASES = {"P0": "R", "PZ": "R", "0": "R", "Z": "R", "P+": "RX", "PX": "RX", "+": "RX",
-           "X": "RX", "CNOT": "CX", "MZ": "M", "MR": "M"}
+ALIASES = {"P0": "R", "PZ": "R", "P": "R", "P+": "RX", "PX": "RX", "PP": "RX",
+           "CNOT": "CX", "MZ": "M"}
 
 
 class CircuitError(ValueError):

@@ -163,7 +163,7 @@ def _leg_b(model, kind, cols, back, res, max_weight, workdir, timeout):
 
 
 def build(circuit, max_weight=4, strict_order=0, legs=("A",), cap=3_000_000, workdir=None,
-          sat_timeout=900, want=("circuit_distance", "fault_distance", "census")):
+          sat_timeout=900, want=("circuit_distance", "fault_distance", "census"), heavier=()):
     model = Model(circuit)
     rec = dict(schema=SCHEMA, circuit=circuit.to_json(), noise_model=NOISE,
                counts=circuit.counts(), model=model.stats(),
@@ -178,6 +178,16 @@ def build(circuit, max_weight=4, strict_order=0, legs=("A",), cap=3_000_000, wor
             faults = _faults(model, r["violation"]["columns"])
             r["violation"] = dict(order=r["violation"]["order"], faults=model.describe(faults))
         rec["results"]["strict_ft"] = r
+    if heavier:
+        rows = []
+        for w in heavier:
+            r = analysis.min_heavier(model, w, max_weight, cap)
+            row = dict(weight=w, lower=r["lower"], upper=r["upper"], exact=r["exact"], note=r["note"],
+                       witness=None)
+            if r["witness"] is not None:
+                row["witness"] = model.describe(_faults(model, r["witness"]))
+            rows.append(row)
+        rec["results"]["heavier_than"] = rows
     if "census" in want:
         rec["results"]["census"] = analysis.census(model)
     return rec, model
@@ -242,6 +252,17 @@ def verify(receipt, full=False, cap=3_000_000):
         if again["holds_through"] != s["holds_through"] or again["per_order"] != s["per_order"]:
             raise Refusal("strict_ft: re-enumeration gives different counts")
         lines.append(f"strict fault tolerance through order {s['holds_through']}: re-enumerated")
+    for row in receipt["results"].get("heavier_than", []):
+        if row["upper"] is not None:
+            faults = [(w["location"], w["fault"]) for w in row["witness"] or []]
+            det, obs, syn = model.replay(faults)
+            if det or len(faults) != row["upper"] or syn in analysis.weight_table(model, row["weight"]):
+                raise Refusal(f"heavier_than {row['weight']}: witness does not replay as claimed")
+            lines.append(f"accepted error heavier than {row['weight']} with {row['upper']} faults: replayed")
+        if full and row["lower"] is not None and row["lower"] > 1:
+            again = analysis.min_heavier(model, row["weight"], row["lower"] - 1, cap)
+            if again["witness"] is not None or again["lower"] < row["lower"]:
+                raise Refusal(f"heavier_than {row['weight']}: re-enumeration does not confirm the bound")
     c = receipt["results"].get("census")
     if c and c != analysis.census(model):
         raise Refusal("census differs from the recomputed one")

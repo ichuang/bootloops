@@ -1,6 +1,6 @@
 """Command line:  python3 -m faultcert <command> ...   (with tools/ on PYTHONPATH)
 
-  analyze SPEC [-o receipt.json] [--max-weight W] [--strict S] [--legs A,B,S]
+  analyze SPEC [-o receipt.json] [--max-weight W] [--strict S] [--heavier 1,2] [--legs A,B,S]
                [--cap N] [--workdir DIR] [--sat-timeout T]
   verify  RECEIPT.json [--full]
   export  SPEC [-o circuit.json] [--stim]
@@ -26,6 +26,7 @@ def main(argv=None):
     a.add_argument("-o", "--out")
     a.add_argument("--max-weight", type=int, default=4)
     a.add_argument("--strict", type=int, default=0)
+    a.add_argument("--heavier", default="", help="comma-separated weights w")
     a.add_argument("--legs", default="A")
     a.add_argument("--cap", type=int, default=3_000_000)
     a.add_argument("--workdir")
@@ -62,8 +63,9 @@ def main(argv=None):
         legs = [x.strip().upper() for x in args.legs.split(",") if x.strip()]
         if set(legs) - {"A", "B", "S"}:
             raise CircuitError("--legs takes a subset of A,B,S")
+        heavier = tuple(int(x) for x in args.heavier.split(",") if x.strip())
         rec, model = certify.build(circ, args.max_weight, args.strict, legs, args.cap,
-                                   args.workdir, args.sat_timeout)
+                                   args.workdir, args.sat_timeout, heavier=heavier)
         if "S" in legs:
             lo = rec["results"].get("circuit_distance", {}).get("lower")
             ev = stimleg.compare(circ, model, lo)
@@ -78,6 +80,9 @@ def main(argv=None):
         if "stim" in rec["results"]:
             ev = rec["results"]["stim"]
             print(f"leg S {'fault model':17s} {ev['status']:8s} {ev.get('reason', '')}")
+        for row in rec["results"].get("heavier_than", []):
+            val = row["lower"] if row["exact"] else f">= {row['lower']}"
+            print(f"accepted error heavier than weight {row['weight']} needs {val} faults")
         print(certify.summary(rec))
         if args.out:
             with open(args.out, "w") as f:

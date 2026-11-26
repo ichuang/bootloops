@@ -29,6 +29,10 @@ Outputs:
 - **strict fault tolerance through order s**: every set of j <= s faults that
   fires no detector leaves the output within Pauli weight j of the believed
   state, or the first counterexample;
+- **heavier than w**: least number of faults that fire no detector and leave
+  the output further than Pauli weight w from the believed state, with the
+  fault set (for a purification step: how many faults an accepted heavy error
+  needs);
 - **census**: how many locations are harmless, how many can leave only a
   single-qubit error (per output qubit), how many can leave a heavier one.
 
@@ -84,7 +88,7 @@ With `tools/` on `PYTHONPATH` (or from `tools/`):
 
     python3 -m faultcert analyze surface:3,2 --legs A,B,S -o r.json
     python3 -m faultcert analyze surface:3,2,z,bad
-    python3 -m faultcert analyze cat:4,verify --strict 2
+    python3 -m faultcert analyze cat:4,verify --strict 2 --heavier 1,2
     python3 -m faultcert analyze mycircuit.json --max-weight 5 --strict 2
     python3 -m faultcert verify r.json --full
     python3 -m faultcert export css_prep:golay --stim
@@ -159,6 +163,9 @@ component); the dense test failed on each (41 to 142 failing checks).
 - **Wrong Pauli frame is counted as harm.** A flipped outcome that an
   experimenter would use to fix the frame of the output makes the output state
   wrong even though no physical error is on it.
+- Discovered detectors need the symbolic simulation of the whole circuit, whose
+  cost grows with qubits squared per measurement: 368 qubits and 3451 locations
+  (a 16-copy Golay purification tree) take 12 s, a 64-copy tree is out of reach.
 - `lower` is what was proven. A capped leg A run says so in its evidence note.
 - Leg S compares fault mechanisms, not probabilities, and Stim's logical-error
   search is heuristic: it gives an upper bound only.

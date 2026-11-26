@@ -152,6 +152,22 @@ def strict_ft(model, order, cap=3_000_000):
     return dict(holds_through=holds, per_order=per, violation=violation, note=note)
 
 
+def min_heavier(model, weight, max_faults, cap=3_000_000):
+    """Least number of faults that fire no detector and leave the output further than
+    Pauli weight `weight` from the believed state ("an accepted error heavier than
+    `weight`").  Same return shape as min_undetected, witness in model columns."""
+    ok = weight_table(model, weight)
+    index = {}
+    for i, (d, o, s) in enumerate(model.columns):
+        if d or s:
+            index.setdefault((d, s), i)
+    cols = sorted(index)
+    r = min_undetected(cols, lambda p: p[0] not in ok, max_faults, cap)
+    if r["witness"] is not None:
+        r["witness"] = [index[cols[i]] for i in r["witness"]]
+    return r
+
+
 def census(model):
     """Per location, the worst thing any of its Paulis leaves on the output, ignoring
     detection: 0 harmless, 1 equivalent to a single-qubit error, 2 heavier ("hook")."""

@@ -321,9 +321,25 @@ def t_library(heavy):
     check("cat4: a single fault leaves a weight-2 error (the hook)",
           r["strict_ft"]["holds_through"] == 0 and r["strict_ft"]["violation"]["order"] == 1
           and r["fault_distance"]["lower"] == 1 and r["census"]["hook_capable"] >= 1)
-    rec, _ = certify.build(library.load("cat:4,verify"), strict_order=2)
+    rec, _ = certify.build(library.load("cat:4,verify"), strict_order=2, heavier=(1,))
     check("cat4 with one verification: strict through order 1 at least",
           rec["results"]["strict_ft"]["holds_through"] >= 1)
+    h = rec["results"]["heavier_than"][0]
+    check("cat4 with one verification: an accepted error heavier than 1 needs 2 faults or more",
+          h["lower"] >= 2)
+    try:
+        certify.verify(rec, full=True)
+        check("heavier-than receipt verifies in full", True)
+    except certify.Refusal as e:
+        check("heavier-than receipt verifies in full", False, str(e))
+    raw, _ = certify.build(library.load("cat:4"), max_weight=2, heavier=(1,))
+    h = raw["results"]["heavier_than"][0]
+    check("cat4 chain: one fault already leaves an accepted error heavier than 1",
+          h["exact"] and h["lower"] == 1 and len(h["witness"]) == 1)
+    bad = copy.deepcopy(raw)
+    bad["results"]["heavier_than"][0]["witness"][0]["fault"] = "Z"
+    bad["results"]["heavier_than"][0]["witness"][0]["location"] = 0
+    refuses("control: heavier-than witness that is not one", lambda: certify.verify(bad), "does not replay")
     for basis in ("z", "x"):
         good, _ = certify.build(library.load(f"surface:3,2,{basis}"), max_weight=4)
         bad, _ = certify.build(library.load(f"surface:3,2,{basis},bad"), max_weight=4)
