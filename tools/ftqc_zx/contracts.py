@@ -1,4 +1,4 @@
-"""Zero-Float Outward-Rounded Stochastic Gadget Contracts (`faultweb-contract-v1`).
+"""Zero-Float Outward-Rounded Stochastic Gadget Contracts (`ftqc_zx-contract-v1`).
 
 Bridges adversarial w-fault equivalence (Rodatz, Poor, and Kissinger, arXiv:2506.17181v4)
 to rigorous stochastic FTQC space-time ledgers (`ftqc_masking_v2c_certified_carbon` and
@@ -412,7 +412,7 @@ def build_gadget_contract(
     certified_w: int = 3,
     t_allow: int = 1,
 ) -> dict[str, Any]:
-    """Audit `circuit` and emit a zero-float outward-rounded `faultweb-contract-v1` dictionary."""
+    """Audit `circuit` and emit a zero-float outward-rounded `ftqc_zx-contract-v1` dictionary."""
     if noise_model not in ("circuit_depolarizing", "circuit_css"):
         raise RefusalError("CONTRACT-NOISE-MODEL", f"unsupported contract noise model {noise_model!r}")
     p = parse_exact_rate(p_phys)
@@ -810,7 +810,7 @@ def build_gadget_contract(
     )
 
     return {
-        "schema": "faultweb-contract-v1",
+        "schema": "ftqc_zx-contract-v1",
         "verdict": verdict,
         "circuit_name": circuit.name,
         "noise_model": noise_model,

@@ -72,10 +72,10 @@ clone differs by package:
 | `emitall/` | claims-integrity harness: re-emit every quoted headline number from its receipt, fail on drift; document-side members `battery.py` (paper claims rows) and `paper_seams.py` (comment-swallow seam gate over a paper's tex tree) | selftest |
 | `eras/` | ERAS — dependency-tamed certified enclosure forms in a shared parameter, with the consumer-pluggable adversarial verification battery | selftest |
 | `famhar/` | multi-sheet family evaluator harness over a 2-var dlog connection (one JSON config per family; affine + polynomial letters) | selftest |
-| `faultweb/` | exact F_2 Pauli-web verifier, constructive fault-equivalent ZX-calculus compiler (Rodatz–Poór–Kissinger, arXiv:2506.17181v4), flag-conditioned syndrome decoder synthesizer, and zero-float outward-rounded stochastic FTQC gadget-contract emitter (`faultweb-contract-v1`) | selftest |
 | `ffcapital/` | exact salvage of FireFly `ff_save` reconstruction state from dead or capped runs, fail-closed | data-gated |
 | `formglue/` | glue around FORM 5: traces, color, term-stream rewriting, MZV evaluation, GRACE integration | partial |
 | `frobenius-boundary/` | family-agnostic Frobenius-branch boundary machinery at var=∞ for non-analytic anchors | data-gated |
+| `ftqc_zx/` | exact F_2 Pauli-web verifier, constructive fault-equivalent ZX-calculus compiler (Rodatz–Poór–Kissinger, arXiv:2506.17181v4), flag-conditioned syndrome decoder synthesizer, and zero-float outward-rounded stochastic FTQC gadget-contract emitter (`ftqc_zx-contract-v1`) | selftest |
 | `galois/` | motivic Galois coaction-cut engine + the exact MZV relation ring it reduces against | data-gated |
 | `gatekeeper/` | Gatekeeper — data-integrity + held-out-CV honesty layer that gates every closure | selftest |
 | `geotriage/` | GeoTriage — per-graph maximal-cut geometry and value-fittability triage with mandatory honesty gates | selftest |

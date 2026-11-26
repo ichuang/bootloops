@@ -72,10 +72,6 @@
   "cmd": "python3 tools/famhar/famhar.py --selftest",
   "cwd": "root"
  },
- "faultweb": {
-  "cmd": "python3 tools/faultweb/selftest.py",
-  "cwd": "root"
- },
  "ffcapital": {
   "cmd": "python3 selftest.py",
   "cwd": "package"
@@ -87,6 +83,10 @@
  "frobenius-boundary": {
   "cmd": "python3 asdminer/run_control.py && python3 deform_transport/battery/run_battery_deform.py --stages S0,S1 && python3 -m frobenius_boundary.selftest",
   "cwd": "package"
+ },
+ "ftqc_zx": {
+  "cmd": "python3 tools/ftqc_zx/selftest.py",
+  "cwd": "root"
  },
  "galois": {
   "cmd": "python3 svmap21.py selftest",

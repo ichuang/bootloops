@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-contained BootLoops acceptance battery entrypoint for `faultweb` (`selftest` class).
+"""Self-contained BootLoops acceptance battery entrypoint for `ftqc_zx` (`selftest` class).
 
 Runs all positive legs (L1-L5), planted negative/refusal controls (N1-N5), and all 4
 scratch-copy mutation-sabotage controls (M1-M4) from an isolated temporary directory.
@@ -19,7 +19,7 @@ TOOLS_PARENT = PKG_DIR.parent
 if str(TOOLS_PARENT) not in sys.path:
     sys.path.insert(0, str(TOOLS_PARENT))
 
-from faultweb.battery import run_battery  # noqa: E402
+from ftqc_zx.battery import run_battery  # noqa: E402
 
 
 def main() -> int:
@@ -36,7 +36,7 @@ def main() -> int:
         print(f"  [{tag}] {leg['id']} ({leg['elapsed_ms']} ms): {leg['summary']}")
 
     overall = "PASS" if report["passed"] else "FAIL"
-    print(f"[{overall}] faultweb selftest ({report['passed_count']}/{report['total_count']} legs)")
+    print(f"[{overall}] ftqc_zx selftest ({report['passed_count']}/{report['total_count']} legs)")
     return 0 if report["passed"] else 1
 
 

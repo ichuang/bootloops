@@ -1,11 +1,11 @@
-"""In-tree Synthetic Verification & 4-Mutant Sabotage Battery for `faultweb`.
+"""In-tree Synthetic Verification & 4-Mutant Sabotage Battery for `ftqc_zx`.
 
 Runs in < 5 s with zero external dependencies, verifying:
   - L1: AST zero-float literal & builtin purity scan across the entire package,
   - L2: Cat-state family (Props. 7.1-7.3), dual-lineage (`pauliweb` == `spackle`), and 64-qubit proof verifier,
   - L3: Shor syndrome variants (`standard`, `optimised`, `teleport`; Props. 7.5-7.7) + Appendix A outcome push-out,
   - L4: Steane 8-ancilla & 5-ancilla (Props. 7.8-7.12, X & Z sectors), closed circuit distance, + Appendix C.2 flag decoder,
-  - L5: Zero-float outward-rounded `faultweb-contract-v1` enclosures, `examples/*.json`, QASM/Stim bridges, and CLI exit codes,
+  - L5: Zero-float outward-rounded `ftqc_zx-contract-v1` enclosures, `examples/*.json`, QASM/Stim bridges, and CLI exit codes,
   - N1-N5: Planted negative controls and fail-closed refusals,
   - M1-M4 (when `include_mutations=True`): Scratch-copy single-line sabotages proving every verification gate is live!
 
@@ -340,9 +340,9 @@ def _run_mutant_sabotage(
     target_snippet: str,
     replacement_snippet: str,
 ) -> str:
-    """Copy `faultweb/` to a scratch dir, apply 1-line sabotage, and require battery to FAIL!"""
+    """Copy `ftqc_zx/` to a scratch dir, apply 1-line sabotage, and require battery to FAIL!"""
     with tempfile.TemporaryDirectory() as tmp:
-        stage_pkg = Path(tmp) / "faultweb"
+        stage_pkg = Path(tmp) / "ftqc_zx"
         shutil.copytree(PKG_DIR, stage_pkg, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         f_path = stage_pkg / rel_file
         src = f_path.read_text(encoding="utf-8")
@@ -356,7 +356,7 @@ def _run_mutant_sabotage(
             [
                 sys.executable,
                 "-c",
-                "import sys; from faultweb.battery import run_battery; "
+                "import sys; from ftqc_zx.battery import run_battery; "
                 "rep = run_battery(include_mutations=False); sys.exit(0 if rep['passed'] else 1)",
             ],
             cwd=tmp,
@@ -452,7 +452,7 @@ def run_battery(include_mutations: bool = True) -> dict[str, Any]:
         )
 
     return {
-        "package": "faultweb",
+        "package": "ftqc_zx",
         "passed": passed_cnt == len(results),
         "passed_count": passed_cnt,
         "total_count": len(results),

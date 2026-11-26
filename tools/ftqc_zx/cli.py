@@ -1,4 +1,4 @@
-"""Command-Line Interface for `faultweb`.
+"""Command-Line Interface for `ftqc_zx`.
 
 Exit codes (BootLoops convention):
   0 : PASS / certified / clean
@@ -20,13 +20,13 @@ if __package__ in (None, ""):
     _PKG_DIR = Path(__file__).resolve().parent
     sys.path = [p for p in sys.path if Path(p or ".").resolve() != _PKG_DIR]
     sys.path.insert(0, str(_PKG_DIR.parent))
-    from faultweb.adapters import circuit_to_qasm2, circuit_to_stim_text
-    from faultweb.contracts import build_gadget_contract
-    from faultweb.diagram import CliffordCircuit, RefusalError, ZXDiagram, circuit_to_zx_fe, load_spec_file
-    from faultweb.equivalence import check_fault_equiv, circuit_distance, resolve_code
-    from faultweb.pauliweb import analyze_pauli_webs, compile_outcome_map
-    from faultweb.rewrites import DerivationCertificate, verify_derivation
-    from faultweb.synthesize import (
+    from ftqc_zx.adapters import circuit_to_qasm2, circuit_to_stim_text
+    from ftqc_zx.contracts import build_gadget_contract
+    from ftqc_zx.diagram import CliffordCircuit, RefusalError, ZXDiagram, circuit_to_zx_fe, load_spec_file
+    from ftqc_zx.equivalence import check_fault_equiv, circuit_distance, resolve_code
+    from ftqc_zx.pauliweb import analyze_pauli_webs, compile_outcome_map
+    from ftqc_zx.rewrites import DerivationCertificate, verify_derivation
+    from ftqc_zx.synthesize import (
         make_cat_spec,
         make_full_syndrome_spec,
         make_steane_7_1_3,
@@ -278,7 +278,7 @@ def cmd_contract(args: argparse.Namespace) -> int:
 
 def cmd_selftest(args: argparse.Namespace) -> int:
     if __package__ in (None, ""):
-        from faultweb.battery import run_battery
+        from ftqc_zx.battery import run_battery
     else:
         from .battery import run_battery
 
@@ -288,13 +288,13 @@ def cmd_selftest(args: argparse.Namespace) -> int:
     else:
         for leg in report["legs"]:
             print(f"  [{'PASS' if leg['passed'] else 'FAIL'}] {leg['id']}: {leg['summary']}")
-        print(f"[{'PASS' if report['passed'] else 'FAIL'}] faultweb battery ({report['passed_count']}/{report['total_count']} legs)")
+        print(f"[{'PASS' if report['passed'] else 'FAIL'}] ftqc_zx battery ({report['passed_count']}/{report['total_count']} legs)")
     return 0 if report["passed"] else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        prog="faultweb",
+        prog="ftqc_zx",
         description="ZX-calculus w-fault equivalence, Pauli-web verifier, FTQC synthesizer, and zero-float contract compiler.",
     )
     sub = ap.add_subparsers(dest="subcmd", required=True)
@@ -341,7 +341,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_syn.add_argument("--json", action="store_true")
     add_common_preset_args(p_syn)
 
-    p_con = sub.add_parser("contract", help="Emit zero-float outward-rounded faultweb-contract-v1 JSON")
+    p_con = sub.add_parser("contract", help="Emit zero-float outward-rounded ftqc_zx-contract-v1 JSON")
     p_con.add_argument("target", help="JSON circuit file or preset name")
     p_con.add_argument("--p", default="1e-4", help="Exact physical fault rate string (e.g. 1e-4 or 1/10000)")
     p_con.add_argument("--idle-ratio", default="1", help="Exact idle-to-gate fault ratio (e.g. 1 or 1/10)")
