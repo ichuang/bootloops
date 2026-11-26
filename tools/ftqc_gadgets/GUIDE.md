@@ -77,6 +77,25 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   statement on it: fault sets with at most t2 columns holding more than t1 faults
   must act ideally, exhaustively at low weight and by sampling above, with a search
   for the first failure one bad column further.
+- **tree** (`--tree`, `factories.py`): the factory certificate of a purification tree,
+  for the statement a level of concatenation needs and enumeration cannot reach: any
+  number of faults that stay on their own coordinate are harmless, and only faults
+  that can spread are counted. The circuit is recognised operation by operation as
+  raw preparations (leaves) joined by checks (transversal CX, the partner measured,
+  acceptance on the fixed parities of the state); every leaf location is classed per
+  sector as harmless, local at one coordinate or junk-capable; the detectors of each
+  check must span exactly the state's parities; the minimum weight of the patterns
+  that act trivially is proved. The filter rule printed in the receipt then gives the
+  contract: the output is its specification with wire faults only on coordinates of
+  faulty local and check locations, unless K leaves hold a junk-capable fault, with
+  K reported per sector. `--strict` keeps only the last idle round of a leaf local
+  (`prep:CODE,STATE,tree=SEQ,rounds=K`): one level up an idle is an inner error
+  correction, and a raw outer preparation is not transversal. `--light` skips the
+  propagation of every fault through the whole circuit, which the certificate does
+  not need. `factories.test` compares the rule with propagation set by set.
+  `levels.reduction(..., factories={role: receipt})` replaces an assumed outer ancilla
+  by its factory and records K: the runs with K or more junk leaves are the junk
+  event, which the receipt leaves to a probability bound.
 - **independent_of_input**: which decoders' check values no input error can change.
   For repeated error correction (`steane_ec:CODE,rounds=2`) the later rounds have
   this property and the first does not: after one round, what a block does next is
@@ -130,8 +149,10 @@ With `tools/` on `PYTHONPATH` (or from `tools/`):
     python3 -m ftqc_gadgets verify r.json --full
     python3 -m ftqc_codes certify qr:47 -o qr47.json
     python3 -m ftqc_gadgets analyze steane_ec:qr:47,anc=spec --local --code-receipt qr47.json --no-tables
+    python3 -m ftqc_gadgets analyze prep:golay,zero,tree=XZXZ --tree -o tree.json
+    python3 -m ftqc_gadgets analyze prep:qr:47,zero,tree=XZXZ,rounds=2 --tree --strict --light --wmin 11
 
-Library gadgets (`library.py`): `prep:CODE,STATE[,raw|spec|tree=SEQ]`,
+Library gadgets (`library.py`): `prep:CODE,STATE[,raw|spec|tree=SEQ][,rounds=K]`,
 `cnot:CODE[,leaky]`, `idle:CODE`, `knill:CODE[,anc=METHOD]`,
 `steane_ec:CODE[,anc=METHOD][,rounds=K]`, `measure:CODE[,x|z]`, `seq_syndrome:CODE`,
 `fc:ftqc_audit_SPEC`; suffixes
@@ -155,7 +176,7 @@ gadget.
 
 ## GATES
 
-`python3 tools/ftqc_gadgets/selftest.py` (about 16 s, 6782 checks; `--heavy` adds the
+`python3 tools/ftqc_gadgets/selftest.py` (about 22 s, 6887 checks; `--heavy` adds the
 Golay gadgets at t = 3 and larger two-level tests, about 5 minutes):
 
 - **Against a state-vector simulation**: seven small gadgets (teleportation and
@@ -203,6 +224,29 @@ Golay gadgets at t = 3 and larger two-level tests, about 5 minutes):
 - Repeated correction: second-round decoders are independent of the input, first-round
   ones are not, with a replayable input error.
 
+- Factories: on nine Steane trees the rule agrees with propagation for every set of
+  at most two locations (one on the larger trees) and thousands of sampled sets,
+  among them sets of up to twenty faults on local locations, the same fault mirrored
+  in neighbouring leaves, and single-coordinate errors on the two sides of a check
+  that add up to a stabilizer. K is the least number of junk leaves that raises the
+  flag, by search over leaves; enumeration against the specification confirms the
+  order and, on the Golay code, stops exactly where the contract does. Location
+  classes equal the definition by replay. Eight things that are not a tree (missing
+  or foreign detector, reversed or skewed or partial gate, a gate inside a block,
+  an idling partner, leaves in different states) are refused. Error correction with
+  real trees: faults confined to at most T coordinates, however many, with fewer
+  than K junk leaves, leave the output within that weight, and two mirrored junk
+  faults defeat it. Levels receipts with factories; refusals for a loose, foreign or
+  wrong-state factory and for missing inner receipts.
+
+Twenty-one defects were planted in the factory code (the intersection taken without
+the weight condition, step faults dropped on either side, the two sectors' rules
+exchanged or weakened, junk read as harmless, several coordinates accepted as local,
+detectors not compared with the state, the count summed in the wrong sector, the
+measured block not tied to the gate, strict or physical not enforced, leaves not
+compared, an idling partner allowed, four omissions in the levels receipt, the
+certificate not recomputed on verification). The battery fails on each.
+
 Ten further defects were planted in the locality and two-level code (hierarchical
 decoder ignoring the inner step, an error allowed to leave its coordinate, an input
 error allowed at another coordinate, the largest decoder radius taken, `ec` claimed
@@ -248,11 +292,24 @@ fails on each. The last was a real bug found this way.
 - **A levels receipt is not a threshold proof.** It certifies "few bad columns,
   hence correct" for the outer gadget and the inner properties level reduction
   needs. The step between them is quoted from the literature for the fixed pattern
-  of error correction, and outer ancillas are listed as assumed.
+  of error correction, and outer ancillas are listed as assumed unless their
+  factories are supplied.
 - **Radii from code receipts assume lightest-pattern decoding and need the lightest
   stabilizer to be heavier than the distance** (true for the quadratic-residue and
   BCH codes here, false for surface codes, where `library.radii` returns a small
   radius by design).
+- **A factory contract is not a refinement order.** It says nothing about a run in
+  which K leaves hold a junk-capable fault, and it counts leaves, not columns: one
+  bad column crosses every leaf. In the levels receipt the columns of failed local
+  and check locations count toward the radius; the junk event is separate.
+- **Which sector a check protects.** A check of one sector copies the partner's
+  errors of the other sector onto the survivor. A candidate verified against fresh
+  unverified copies therefore has K = 1 in the sector whose verifiers come first:
+  one fault in a later verifier's preparation is accepted. Trees avoid this because
+  the partner of every check is itself a verified subtree.
+- **Minimum weights and radii of large cyclic codes** rest on the BCH bound when the
+  search stops short (zeros computed exactly from the matrix at hand, theorem cited);
+  the receipt says which. In a non-cyclic qubit order there is no such fallback.
 - Without decoder tables (`--no-tables`) only the locality certificate is available.
 - The composition theorem is an argument printed in the receipt and tested against
   direct analysis on small gadgets. It is not machine-checked.

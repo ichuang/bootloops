@@ -9,6 +9,8 @@ and `ftqc_codes`.
     python3 tools/ftqc_gadgets/selftest.py                                         # battery, from the repository root
 
 The coordinate-locality certificate (`--local`) and `levels.py` extend the same
-questions to large codes and to the outer level of a concatenated scheme.
+questions to large codes and to the outer level of a concatenated scheme; the
+factory certificate (`--tree`, `factories.py`) does the same for the purification
+trees that make the ancillas.
 
 See `GUIDE.md`.

@@ -305,13 +305,25 @@ class Tree:
             if want is not None and (type(want) is not int or want < 1):
                 raise TreeError("a minimum weight must be a positive integer")
             res = minweight.min_weight(G, self.n, target=want, max_combos=cap)
-            lower = res["lower"]
+            lower, how = res["lower"], "search"
+            if want is not None and lower < want:
+                # the search stopped short: a cyclic group may still have its BCH bound
+                from ftqc_codes import bch
+                try:
+                    r = bch.code_bound(G, self.n)
+                    if r["bound"] > lower:
+                        lower, how = r["bound"], "BCH bound: zeros computed exactly, theorem cited"
+                except (bch.NotCyclic, ValueError):
+                    pass
             if want is not None:
                 if lower < want:
                     raise TreeError(f"minimum weight {want} of S_{t} was requested but only {lower} is proved")
                 lower = want
             self.wmin[t] = lower
-            self.wmin_proof[t] = dict(lower=res["lower"], exact=bool(res.get("exact")))
+            self.wmin_proof[t] = dict(lower=lower if how != "search" else res["lower"],
+                                      exact=bool(res.get("exact")) and how == "search")
+            if how != "search":
+                self.wmin_proof[t].update(search_lower=res["lower"], bound_from=how)
 
     # ------------------------------------------------------------------ rule
     def _info(self):

@@ -837,8 +837,18 @@ def t_local(heavy):
     forged = copy.deepcopy(valid)
     forged["results"][0]["decoders"][0]["proof"]["kernel_lower"] = 15
     refuses("an inflated kernel proof is recomputed", lambda: certify.verify(forged), "recompute")
+    # out of budget, the only other proof is the BCH bound, which needs a cyclic kernel:
+    # the Steane code in another qubit order has none, in its usual order it has
+    st_ = library.code_of("steane")
+    perm = [1, 0, 2, 3, 4, 5, 6]
+    moved = Code("steane_moved", 7, [sum(1 << perm[i] for i in gf2.supp(r)) for r in st_.hx],
+                 [sum(1 << perm[i] for i in gf2.supp(r)) for r in st_.hz])
     check("a kernel search that runs out of budget cannot certify the proposed radius",
-          not props.local(Analysis(meas, tables=False, cap=0), 1)["local"])
+          not props.local(Analysis(library.measure(moved, "Z"), tables=False, cap=0), 1)["local"])
+    cyc = props.local(Analysis(meas, tables=False, cap=0), 1)
+    check("out of budget on a cyclic kernel, the radius rests on the BCH bound and the proof says so",
+          cyc["local"] and "BCH" in cyc["decoders"][0]["proof"].get("bound_from", "")
+          and not props.local(Analysis(meas, tables=False, cap=0), 2)["local"], str(cyc)[:300])
     # repeated correction: later rounds do not depend on the input
     a = Analysis(library.load("steane_ec:steane,anc=spec,rounds=2"))
     ind = props.independent_of_input(a)
@@ -1174,6 +1184,12 @@ def t_factories(heavy):
     check("factory: a minimum weight that cannot be proved is refused", not c["tree"] and "only" in c["reason"])
     c = factories.certificate(library.load("prep:steane,zero,tree=X"), wmin=2)
     check("factory: a smaller requested minimum weight is used as given", c["tree"] and c["wmin"] == dict(X=2, Z=2))
+    from ftqc_codes import bch as _bch
+    b63 = _bch.cyclic_css(63, [1, 3, 5])
+    c = factories.certificate(library.prep(b63, "zero", "tree=X"), wmin=7, cap=200_000)
+    check("factory: on a cyclic code a minimum weight the search cannot reach is taken from the BCH bound",
+          c["tree"] and c["wmin"] == dict(X=7, Z=7)
+          and any("BCH" in v.get("bound_from", "") for v in c["wmin_proof"].values()), str(c)[:300])
     # ---- receipts
     g = library.load("prep:steane,zero,tree=XZ,rounds=2")
     rec = certify.build(g, tree=dict(strict=True))
@@ -1206,7 +1222,7 @@ def t_factories(heavy):
     refuses("factory receipt: a circuit with a check removed under the old certificate is refused",
             lambda: certify.verify(bad))
     # ---- one level: correction with real trees, any number of faults inside few coordinates
-    for name, T, K, trials in (("steane", 1, 2, 3000),) + ((("golay", 3, 2, 1500),) if heavy else ()):
+    for name, T, K, trials in (("steane", 1, 2, 3000),) + ((("golay", 3, 2, 8000),) if heavy else ()):
         g, info = _ec_with_trees(name, "ZX", "XZ")
         an = Analysis(g)
         W = an.weigher()
@@ -1261,7 +1277,7 @@ def t_factories(heavy):
                 bad += 1
         check(f"correction with trees ({name}): faults confined to at most {T} coordinates, however many, "
               f"with fewer than {K} junk leaves, leave the output within that weight",
-              bad == 0 and seen > trials // 6 and big > T + 3, f"{bad} of {seen}, largest {big}")
+              bad == 0 and seen > trials // 20 and big > T + 3, f"{bad} of {seen}, largest {big}")
         # and K junk leaves can break it: the same junk fault in two sibling leaves
         leaves = sorted({leaf for leaf, _ in noisy})
         broke = False

@@ -15,7 +15,7 @@ The six tools on `ftqc_integration` cover different parts of a fault-tolerance a
 
 - **From a code to a noisy circuit.** The audit, gadget and extractor packages reuse code constructions or binary linear algebra from `ftqc_codes`. A static distance counts data qubits supporting a logical Pauli. To count faulty circuit locations, the study also specifies preparations, gates, idles, measurements, detectors and protected outputs.
 - **From extractor to audit to composition.** The extractor defines the measured logical and its spectators, and exports physical X and Z probes as native audit circuits. The compose gross-code checker replays the extractor distance receipt and uses the audit fault model to calculate the residual data Pauli after applying the split-record frame. The HGP bridge also supports replay in the enclosing circuit and export of verified-cat preparations. [HGP bridge](ftqc_extractors/AUDIT.md) · [Gross-code probes](ftqc_extractors/GROSS_CIRCUIT.md) · [Residual checker](ftqc_compose/GUIDE.md#gross-code-residual-data-and-frame)
-- **From a Clifford schedule to a concatenated gadget.** `ftqc_gadgets` uses the audit fault propagator and adds encoded Bell inputs, reference qubits and decoders. Its two-level checker binds inner receipts to signed logical operations and outer faults to physical columns. It verifies the decoder radius and records any specified ancillas and the rectangle argument assumed by the reduction. [Gadget guide](ftqc_gadgets/GUIDE.md)
+- **From a Clifford schedule to a concatenated gadget.** `ftqc_gadgets` uses the audit fault propagator and adds encoded Bell inputs, reference qubits and decoders. Its two-level checker binds inner receipts to signed logical operations and outer faults to physical columns. It verifies the decoder radius and records any specified ancillas and the rectangle argument assumed by the reduction. A purification tree that makes such an ancilla gets a factory certificate, which the reduction accepts in place of the assumption. [Gadget guide](ftqc_gadgets/GUIDE.md)
 - **From gadgets to a circuit-wide noise bound.** `ftqc_compose` checks ordered wires, residual filters and bad fault supports. Its level-reduction checker substitutes physical supports into a logical circuit. A local-stochastic bound also needs a joint fault-support model. A two-level gadget receipt can inform the local claim; a Definition 4.8 hypothesis supplied to compose remains an explicit premise. [Composition guide](ftqc_compose/GUIDE.md#level-reduction)
 - **Comparing a ZX design with a location-fault study.** Run the ZX verifier on the proposed circuit and its reference. To use its result in another argument, match the gates and idles, input codespace, flag or detector handling, output frame and fault-counting convention. The ZX contract has its own verifier and noise model. [ZX guide](ftqc_zx/GUIDE.md)
 
@@ -58,6 +58,15 @@ python3 -m ftqc_gadgets verify "$out/outer.json"
 ```
 
 The report states that the gate, error-correction and any-input properties hold when faults and input errors touch at most five coordinates. Read with a coordinate as a column of inner blocks, that is the outer half of a two-level argument; `ftqc_gadgets/levels.py` joins it to the inner receipts.
+
+That gadget takes its two ancillas as specifications. A purification tree that makes one is certified separately. One level up an idle is an inner correction, so a raw outer preparation ends with idle rounds, and only the last round counts as local.
+
+```sh
+python3 -m ftqc_gadgets analyze prep:qr:47,zero,tree=XZXZ,rounds=2 --tree --strict --light --wmin 11 -o "$out/zero.json"
+python3 -m ftqc_gadgets verify "$out/zero.json"
+```
+
+The report says the sixteen-copy tree acts as its specification, with wire faults only in columns holding a failed local or check location, unless four leaves each hold a failed junk-capable location. `levels.reduction(..., factories=...)` then lists no assumed ancilla and records that count. The probability of the junk event is not computed.
 
 ## Carry a distillation bound into a logical T gate
 
