@@ -17,7 +17,10 @@ from .t_source import source_record
 
 from .t_bounds import structural
 
+from .gross_distance import gross_certificate
+
 FIELDS = {
+    "gross_z": ("target", ""),
     "t_bounds": (
         "a b logical_x logical_z rounds resource",
         "verification_rounds representatives",
@@ -69,6 +72,8 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     if backend == "sat" and kind not in ("circuit", "t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "gross_z":
+            return gross_certificate(s, budget)
         if kind == "t_bounds":
             return structural(s)
         if kind == "t_source":
@@ -120,6 +125,12 @@ def verify(s, r):
     result = r["result"]
     if result["status"] not in ("proved", "counterexample"):
         raise ValueError("receipt contains an open obligation")
+    if s["kind"] == "gross_z":
+        if r["backend"] != "exact" or type(r["budget"]) is not int or r["budget"] < 0:
+            raise ValueError("invalid gross-code receipt backend or budget")
+        if digest(result) != digest(gross_certificate(s, r["budget"], result)):
+            raise ValueError("gross-code distance receipt mismatch")
+        return
     if r["backend"] == "sat" and s["kind"] == "t_gate":
         if digest(result) != digest(analyze_t(s, "sat", r["budget"], 60, True, result)):
             raise ValueError("T-gate SAT receipt mismatch")
