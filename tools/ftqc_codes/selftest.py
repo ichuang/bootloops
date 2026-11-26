@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""qeccert battery.  Default tier is stdlib-only and finishes in a few seconds.
+"""ftqc_codes battery.  Default tier is stdlib-only and finishes in a few seconds.
 
-    python3 tools/qeccert/selftest.py            # default tier
-    python3 tools/qeccert/selftest.py --heavy    # adds QR-47 by SAT, BB72/BB90 targets
-    python3 tools/qeccert/selftest.py --lean     # adds the Lean-QEC leg (needs lake + a built Lean-QEC)
+    python3 tools/ftqc_codes/selftest.py            # default tier
+    python3 tools/ftqc_codes/selftest.py --heavy    # adds QR-47 by SAT, BB72/BB90 targets
+    python3 tools/ftqc_codes/selftest.py --lean     # adds the Lean-QEC leg (needs lake + a built Lean-QEC)
 
 Legs that need an external engine (cadical, lake) skip with a named line when
 the engine is absent; a skip is not a pass and is counted separately.
@@ -21,7 +21,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-from qeccert import certify, cnf, codes, gf2, lrat, minweight, sat  # noqa: E402
+from ftqc_codes import certify, cnf, codes, gf2, lrat, minweight, sat  # noqa: E402
 
 PASS, FAIL, SKIP = [], [], []
 
@@ -307,7 +307,7 @@ def t_lrat():
 
 # ---------------------------------------------------------------- 5b. BCH leg
 def t_bch():
-    from qeccert import bch
+    from ftqc_codes import bch
     rnd = random.Random(7)
     check("bch irreducible test", bch._irreducible(0b10011) and not bch._irreducible(0b10101))
     # the bound never exceeds the true minimum weight, on random cyclic codes
@@ -368,7 +368,7 @@ def t_bch():
 
 # ---------------------------------------------------------------- 5c. cut certificates
 def t_cuts():
-    from qeccert import cuts
+    from ftqc_codes import cuts
     for spec, d in (("rotated_surface:3", 3), ("rotated_surface:5", 5), ("rotated_surface:9", 9),
                     ("planar:3", 3), ("planar:4", 4)):
         code = codes.load(spec)
@@ -429,7 +429,7 @@ def t_cuts():
 
 # ---------------------------------------------------------------- 5d. concatenation
 def t_concat():
-    from qeccert import concat
+    from ftqc_codes import concat
     st, st_rec = codes.load("steane"), RECEIPTS["steane"]
     big = codes.concatenate(st, st)
     rec = certify.build(big, max_combos=4_000_000)
@@ -489,7 +489,7 @@ def t_concat():
 # ---------------------------------------------------------------- 6. SAT leg (needs cadical)
 def t_sat(heavy):
     if not sat.find_cadical():
-        skip("SAT leg", "cadical not found (PATH or QECCERT_CADICAL)")
+        skip("SAT leg", "cadical not found (PATH or FTQC_CODES_CADICAL)")
         return
     specs = ["steane", "golay", "bb18", "toric:3", "rotated_surface:3"]
     if heavy:
@@ -555,7 +555,7 @@ def t_cli():
         out = os.path.join(wd, "r.json")
 
         def run(*args):
-            return subprocess.run([sys.executable, "-m", "qeccert", *args], env=env, cwd=wd,
+            return subprocess.run([sys.executable, "-m", "ftqc_codes", *args], env=env, cwd=wd,
                                   capture_output=True, text=True)
         p = run("certify", "golay", "-o", out)
         check("cli certify exits 0", p.returncode == 0 and "d=7" in p.stdout, p.stderr[-200:])
@@ -576,18 +576,25 @@ def t_cli():
         p = run("spec", "steane", "-o", os.path.join(wd, "s.json"))
         p2 = run("certify", os.path.join(wd, "s.json"))
         check("cli spec file round trip", p.returncode == 0 and p2.returncode == 0 and "d=3" in p2.stdout)
+        for ex in ("steane.receipt.json", "golay.receipt.json"):
+            ex_rec = json.load(open(os.path.join(HERE, "examples", ex)))
+            check(f"banked example {ex} verifies", bool(certify.verify(ex_rec, full=True)))
+        import qeccert as _legacy_shim
+        from qeccert.codes import CSSCode as _LegacyCSSCode
+        check("legacy qeccert shim resolves to ftqc_codes",
+              _legacy_shim.VERSION == certify.VERSION and _LegacyCSSCode is codes.CSSCode)
 
 
 # ---------------------------------------------------------------- 8. Lean leg (needs lake + Lean-QEC)
 def t_lean(enabled):
     try:
-        from qeccert import leangen
+        from ftqc_codes import leangen
     except ImportError:
         skip("Lean leg", "leangen module not present")
         return
     code = codes.load("steane")
-    src = leangen.render(code, dict(d_x=3, d_z=3), "QeccertSteane")
-    check("lean generator emits the theorem", "theorem QeccertSteane_dist" in src
+    src = leangen.render(code, dict(d_x=3, d_z=3), "FtqcCodesSteane")
+    check("lean generator emits the theorem", "theorem FtqcCodesSteane_dist" in src
           and "bitvec_sat_translation_correct" in src and "sorry" not in src)
     if not enabled:
         skip("Lean leg build", "not requested (run with --lean)")
@@ -623,7 +630,7 @@ def main():
         t = time.monotonic()
         fn(*args)
         print(f"      {fn.__name__:12s} {time.monotonic() - t:6.2f} s")
-    print(f"qeccert selftest: {len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped "
+    print(f"ftqc_codes selftest: {len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped "
           f"in {time.monotonic() - t0:.1f} s")
     if FAIL:
         print("FAILED: " + "; ".join(sorted(set(FAIL))[:12]))

@@ -13,7 +13,8 @@ import sys
 from . import gf2, minweight
 from .codes import CSSCode
 
-SCHEMA = "qeccert-receipt-1"
+SCHEMA = "ftqc_codes-receipt-1"
+LEGACY_SCHEMAS = ("qeccert-receipt-1",)
 VERSION = "0.1.0"
 
 
@@ -131,7 +132,7 @@ def build(code, targets=None, max_combos=5_000_000, legs=("A",)):
     facts.update(mw)
     _combine(facts)
     return dict(schema=SCHEMA, code=code.to_json(), facts=facts, evidence=evidence,
-                tool=dict(name="qeccert", version=VERSION,
+                tool=dict(name="ftqc_codes", version=VERSION,
                           python=platform.python_version(), argv=sys.argv[1:]))
 
 
@@ -156,7 +157,7 @@ def verify(receipt, full=False, max_combos=5_000_000):
     upper-bound witness, and internal consistency.  Full mode also re-proves
     every leg-A lower bound.  Returns a list of check lines; raises Refusal on
     the first failure."""
-    if receipt.get("schema") != SCHEMA:
+    if receipt.get("schema") not in (SCHEMA, *LEGACY_SCHEMAS):
         raise Refusal("unknown receipt schema")
     try:
         code = CSSCode.from_json(receipt["code"])

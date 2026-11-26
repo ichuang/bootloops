@@ -17,7 +17,7 @@ QUANTITIES = ("d_x", "d_z", "wmin_x", "wmin_z")
 
 
 def find_cadical():
-    cand = os.environ.get("QECCERT_CADICAL")
+    cand = os.environ.get("FTQC_CODES_CADICAL") or os.environ.get("QECCERT_CADICAL")
     if cand:
         return cand if os.path.isfile(cand) and os.access(cand, os.X_OK) else None
     return shutil.which("cadical")
@@ -50,7 +50,7 @@ def solve(formula, workdir, tag, timeout, solver=None):
     """Returns ("unsat", info) | ("sat", word, info) | ("unknown", reason)."""
     solver = solver or find_cadical()
     if not solver:
-        return ("unknown", "cadical not found (put it on PATH or set QECCERT_CADICAL)")
+        return ("unknown", "cadical not found (put it on PATH or set FTQC_CODES_CADICAL)")
     cnf_path = os.path.join(workdir, f"{tag}.cnf")
     proof_path = os.path.join(workdir, f"{tag}.lrat")
     text = formula.dimacs()
@@ -112,7 +112,7 @@ def run_leg(receipt, code, targets=None, workdir=None, timeout=600, quantities=Q
     targets = targets or {}
     tmp = None
     if workdir is None:
-        tmp = tempfile.mkdtemp(prefix="qeccert-sat-")
+        tmp = tempfile.mkdtemp(prefix="ftqc_codes-sat-")
         workdir = tmp
     os.makedirs(workdir, exist_ok=True)
     ver = solver_version()
@@ -120,7 +120,7 @@ def run_leg(receipt, code, targets=None, workdir=None, timeout=600, quantities=Q
         for q in quantities:
             entry = receipt["facts"][q]
             ev = dict(leg="B", quantity=q, method="SAT (sequential-counter CNF), LRAT checked "
-                                                  "by qeccert.lrat", solver=ver)
+                                                  "by ftqc_codes.lrat", solver=ver)
             b = targets.get(q, entry["upper"])
             if b is None:
                 ev.update(status="skipped", reason="no target and no witnessed upper bound")

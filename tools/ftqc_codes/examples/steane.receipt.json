@@ -1,5 +1,5 @@
 {
- "schema": "qeccert-receipt-1",
+ "schema": "ftqc_codes-receipt-1",
  "code": {
   "name": "Steane",
   "n": 7,
@@ -153,7 +153,7 @@
   {
    "leg": "B",
    "quantity": "d_x",
-   "method": "SAT (sequential-counter CNF), LRAT checked by qeccert.lrat",
+   "method": "SAT (sequential-counter CNF), LRAT checked by ftqc_codes.lrat",
    "solver": "3.1.0",
    "status": "proved",
    "claim": "d_x >= 3",
@@ -170,7 +170,7 @@
   {
    "leg": "B",
    "quantity": "d_z",
-   "method": "SAT (sequential-counter CNF), LRAT checked by qeccert.lrat",
+   "method": "SAT (sequential-counter CNF), LRAT checked by ftqc_codes.lrat",
    "solver": "3.1.0",
    "status": "proved",
    "claim": "d_z >= 3",
@@ -187,7 +187,7 @@
   {
    "leg": "B",
    "quantity": "wmin_x",
-   "method": "SAT (sequential-counter CNF), LRAT checked by qeccert.lrat",
+   "method": "SAT (sequential-counter CNF), LRAT checked by ftqc_codes.lrat",
    "solver": "3.1.0",
    "status": "proved",
    "claim": "wmin_x >= 4",
@@ -204,7 +204,7 @@
   {
    "leg": "B",
    "quantity": "wmin_z",
-   "method": "SAT (sequential-counter CNF), LRAT checked by qeccert.lrat",
+   "method": "SAT (sequential-counter CNF), LRAT checked by ftqc_codes.lrat",
    "solver": "3.1.0",
    "status": "proved",
    "claim": "wmin_z >= 4",
@@ -220,16 +220,16 @@
   }
  ],
  "tool": {
-  "name": "qeccert",
+  "name": "ftqc_codes",
   "version": "0.1.0",
   "python": "3.14.4",
   "argv": [
    "certify",
-   "qeccert/examples/steane.code.json",
+   "ftqc_codes/examples/steane.code.json",
    "--legs",
    "A,B",
    "-o",
-   "qeccert/examples/steane.receipt.json"
+   "ftqc_codes/examples/steane.receipt.json"
   ]
  }
 }
