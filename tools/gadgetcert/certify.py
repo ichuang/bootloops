@@ -30,11 +30,12 @@ def _clean(d):
 
 
 def build(gadget, checks=(), close=None, refines=(), sector=False, cap=3_000_000, analysis=None):
-    """checks: [(kind, t)].  close: s or None.  refines: [(spec gadget, order, input weight)]."""
+    """checks: [(kind, t)] or [(kind, t, sector)].  close: s or None.  refines: [(spec gadget, order, input weight)]."""
     an = analysis or Analysis(gadget, cap)
     results = []
-    for kind, t in checks:
-        r = props.check(an, kind, int(t), sector)
+    for item in checks:
+        kind, t = item[0], item[1]
+        r = props.check(an, kind, int(t), item[2] if len(item) > 2 else sector)
         r["type"] = "check"
         results.append(r)
     if close is not None:
@@ -149,7 +150,9 @@ THEOREM = ("Let G be a gadget in which each listed part is a preparation fragmen
            "fault set of j <= w faults in G' has the effect of an accepted fault set of at most j "
            "faults in G with the same input error.  Hence a property that holds in G for all input "
            "weights r and fault counts s with r + s <= T holds in G' for r + s <= min(T, w), provided "
-           "its bound does not decrease when faults are added (prep, gate, ec and close all qualify).")
+           "its bound does not decrease when faults are added (prep, gate, ec and close all qualify), and "
+           "a refinement of G against any specification through order T is a refinement of G' "
+           "through order min(T, w).")
 
 
 def compose(target, parts, cap=3_000_000):
@@ -167,6 +170,31 @@ def compose(target, parts, cap=3_000_000):
         rec = parts.get(role)
         if rec is None:
             raise Refusal(f"no refinement receipt for part {role!r}")
+        want = library.prep(library.code_of(_code_json(g, p)), role, "spec")
+        if "composition" in rec:
+            # the implementation is itself a composed gadget: a bundle
+            # dict(composition=..., target=..., parts=...) whose conclusions include a
+            # refinement against this part's specification
+            verify_composition(rec["composition"], rec["target"], rec["parts"], cap)
+            comp = rec["composition"]
+            hit = [c for c in comp["conclusions"] if c["type"] == "refine"
+                   and c.get("specification_sha256") == want.sha256()]
+            if len(hit) != 1:
+                raise Refusal(f"part {role!r}: the composition does not conclude a refinement of "
+                              f"this part's specification")
+            inner = Gadget.from_json(rec["target"]["gadget"])
+            if inner.inputs or inner.decoders:
+                raise Refusal(f"part {role!r}: the implementation must be a preparation without decoders")
+            through = hit[0]["holds_through"]
+            if through < 0:
+                raise Refusal(f"part {role!r}: the refinement does not hold at any order")
+            rows.append(dict(role=role, implementation=comp["target"] + " with " + ", ".join(
+                                 f"{q['role']} := {q['implementation']}" for q in comp["parts"]),
+                             implementation_sha256=comp["target_sha256"],
+                             specification_sha256=want.sha256(), refines_through=through,
+                             receipt_sha256=receipt_sha(comp)))
+            w = through if w is None else min(w, through)
+            continue
         verify(rec, cap=cap)
         ref = [r for r in rec["results"] if r.get("type") == "refine"]
         if len(ref) != 1:
@@ -175,7 +203,6 @@ def compose(target, parts, cap=3_000_000):
         if impl.inputs or impl.decoders:
             raise Refusal(f"part {role!r}: the implementation must be a preparation without decoders")
         spec = Gadget.from_json(ref[0]["spec"])
-        want = library.prep(library.code_of(_code_json(g, p)), role, "spec")
         if spec.sha256() != want.sha256():
             raise Refusal(f"part {role!r}: the refinement is against a different specification")
         if ref[0]["input_weight"] != 0 or ref[0]["holds_through"] < 0:
@@ -184,10 +211,20 @@ def compose(target, parts, cap=3_000_000):
                          specification_sha256=spec.sha256(), refines_through=ref[0]["holds_through"],
                          receipt_sha256=receipt_sha(rec)))
         w = ref[0]["holds_through"] if w is None else min(w, ref[0]["holds_through"])
+    uniq = []
+    for row in rows:
+        if row not in uniq:
+            uniq.append(row)
+    rows = uniq
     concl = []
     for r in target["results"]:
         if r.get("type") in ("check", "close"):
             concl.append(dict(type=r["type"], kind=r.get("kind", "close"), weight=r.get("weight"),
+                              target_holds_through=r["holds_through"],
+                              holds_through=min(r["holds_through"], w)))
+        elif r.get("type") == "refine":
+            concl.append(dict(type="refine", kind="refines " + r["spec"]["name"], weight=None,
+                              specification_sha256=r["spec"]["sha256"],
                               target_holds_through=r["holds_through"],
                               holds_through=min(r["holds_through"], w)))
     return _clean(dict(schema=COMPOSITION, tool="gadgetcert", tool_version=VERSION,

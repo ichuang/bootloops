@@ -127,13 +127,42 @@ def close(an, s_max, sector=False, span_cap=1 << 16):
             worst = max([worst] + [h[0] for h in hits])
         return worst
 
+    # The code syndrome of the output after the decoders.  A decoder's correction has
+    # a code syndrome that is linear in its check values when (as for syndrome
+    # extraction) the checks are the block's own stabilizers; then the whole thing is a
+    # linear function of the signature and can be tested on the input columns alone.
+    linear, units = True, []
+    for off, mask, eff in an.dec:
+        width = mask.bit_length()
+        unit = [code_part(eff.get(1 << i, 0)) if (1 << i) in eff else None for i in range(width)]
+        if any(u is None for u in unit):
+            linear = False
+            break
+        for sy, e in eff.items():
+            acc = [0] * len(funcs)
+            for i in range(width):
+                if (sy >> i) & 1:
+                    acc = [a ^ b for a, b in zip(acc, unit[i])]
+            if tuple(acc) != code_part(e):
+                linear = False
+                break
+        units.append((off, unit))
+
+    def total_code_part(sg):
+        acc = list(code_part(sg >> an.shift))
+        d = sg >> an.nd
+        for off, unit in units:
+            for i, u in enumerate(unit):
+                if (d >> (off + i)) & 1:
+                    acc = [a ^ b for a, b in zip(acc, u)]
+        return acc
+
     in_cols = [s for row in an.in_sig for pair in row for s in pair]
-    independent = (all(not (s & an.DET) and not any(code_part(s >> an.shift)) for s in in_cols)
-                   and all(not any(code_part(e)) for _, _, eff in an.dec for e in eff.values()))
+    independent = linear and all(not (s & an.DET) and not any(total_code_part(s)) for s in in_cols)
     per, violation, note = [], None, None
     try:
         if independent:
-            method = "output code syndrome does not depend on the input or on the decoders"
+            method = "the code syndrome of the output after the decoders does not depend on the input"
             inputs = [0]
         else:
             from qeccert import gf2

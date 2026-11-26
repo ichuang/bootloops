@@ -65,7 +65,8 @@ def leader_table(checks, npos, cap=5_000_000):
 class Analysis:
     def __init__(self, gadget, cap=3_000_000):
         g = self.g = gadget
-        self.cap = cap
+        self.cap = cap                         # budget for fault-subset enumeration
+        self.small = min(cap, 5_000_000)       # budget for tables held in memory
         m = self.model = Model(g.circuit)
         c = g.circuit
         self._check_inputs()
@@ -291,10 +292,14 @@ class Analysis:
             if det_target == 0:
                 yield 0, ()
             return
-        if comb(len(cols), j - 1) * max(1, max(map(len, by_det.values()), default=1)) > 40 * self.cap:
-            raise Budget(f"{comb(len(cols), j - 1)} subsets of size {j - 1} exceed the budget")
+        # cost: the (j - 1)-subsets, plus one step per subset found.  Without detectors
+        # every j-subset is found; with detectors the number found is counted as it grows.
+        if comb(len(cols), j - 1) > self.cap or (not self.nd and comb(len(cols), j) > 40 * self.cap):
+            raise Budget(f"{comb(len(cols), j - 1)} subsets of size {j - 1} of {len(cols)} fault "
+                         f"effects exceed the budget")
         stack = [(0, 0, ())]
         n = len(cols)
+        found, limit = 0, 40 * self.cap
         while stack:
             start, acc, idx = stack.pop()
             if len(idx) == j - 1:
@@ -303,6 +308,9 @@ class Analysis:
                     for k in range(bisect_left(lst, start), len(lst)):
                         last = lst[k]
                         yield acc ^ cols[last], idx + (last,)
+                    found += len(lst)
+                    if found > limit:
+                        raise Budget(f"more than {limit} accepted subsets of size {j}")
                 continue
             for i in range(n - 1, start - 1, -1):
                 stack.append((i + 1, acc ^ cols[i], idx + (i,)))
@@ -338,7 +346,7 @@ class Analysis:
         out = {0: (0, [])}
         if not sector:
             for w in range(1, r + 1):
-                if comb(len(cells), w) * 3 ** w > self.cap:
+                if comb(len(cells), w) * 3 ** w > self.small:
                     raise Budget(f"too many input errors of weight {w}")
                 for sub in combinations(cells, w):
                     def rec(i, acc, lab):
@@ -360,7 +368,7 @@ class Analysis:
                     for c in sub:
                         acc ^= c[k]
                     one[t].setdefault(acc, (w, [(c[0], c[1], t) for c in sub]))
-        if len(one["X"]) * len(one["Z"]) > self.cap:
+        if len(one["X"]) * len(one["Z"]) > self.small:
             raise Budget("too many input errors")
         for ax, (wx, lx) in one["X"].items():
             for az, (wz, lz) in one["Z"].items():
@@ -446,7 +454,7 @@ class Weigher:
             elif self.sector:
                 for t, per, funcs in (("X", an.sx, blk["keys"]["X"]), ("Z", an.sz, blk["keys"]["Z"])):
                     tab = blk["tabs"].setdefault(t, {})
-                    if comb(len(ip), cur) > an.cap:
+                    if comb(len(ip), cur) > an.small:
                         raise Budget(f"weight table at weight {cur}")
                     for sub in combinations(ip, cur):
                         e = 0
@@ -463,7 +471,7 @@ class Weigher:
 
     def _paulis(self, ip, w, put):
         an = self.an
-        if comb(len(ip), w) * 3 ** w > an.cap:
+        if comb(len(ip), w) * 3 ** w > an.small:
             raise Budget(f"weight table at weight {w}")
         for sub in combinations(ip, w):
             def rec(i, acc):

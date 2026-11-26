@@ -45,7 +45,9 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   refinement receipt for each real preparation, gives a composition receipt: the
   gadget with the real preparations has the property through
   min(order of the property, orders of the refinements). The statement and its
-  conditions are printed in the receipt (`certify.THEOREM`).
+  conditions are printed in the receipt (`certify.THEOREM`). An implementation may
+  itself be a composed gadget (pass `dict(composition=, target=, parts=)` as the
+  part), which is how a 64-copy tree is reached from 16-copy trees.
 
 Weight is Pauli weight per block by default; `--sector` uses the larger of X weight
 and Z weight (the convention of arguments that treat the two sectors of a CSS code
@@ -77,8 +79,10 @@ separately). The two give different verdicts and the receipt says which was used
   ZX diagrams with their rewrite rules). This is the truncated circuit-level
   relation, decided by enumeration.
 - Large gadgets at high order: the cost is the number of accepted fault sets. A
-  transversal gate or teleportation step on the Golay code at r + s <= 3 takes about
-  a minute; a 16-copy purification tree at order 3 takes minutes.
+  transversal gate or an error-correction step on the Golay code at r + s <= 3 takes
+  one to two minutes; a 16-copy purification tree (3451 locations) against its
+  specification at order 3 takes about a minute. Sector weights on two Golay blocks
+  at input weight 3 are 2.7e8 input cases and are refused by the budget.
 
 ## INVOKE
 
@@ -115,7 +119,7 @@ gadget.
 
 ## GATES
 
-`python3 tools/gadgetcert/selftest.py` (about 12 s, 6687 checks; `--heavy` adds the
+`python3 tools/gadgetcert/selftest.py` (about 12 s, 6691 checks; `--heavy` adds the
 Golay gadgets at t = 3, about 2 minutes):
 
 - **Against a state-vector simulation**: seven small gadgets (teleportation and
@@ -138,7 +142,8 @@ Golay gadgets at t = 3, about 2 minutes):
   and fails at one fault with raw ones; sequential syndrome extraction fails at one
   fault.
 - Composition: Steane teleportation with XZ and ZX trees; the direct analysis of
-  the composed circuit agrees; a part that refines only through order 0 lowers the
+  the composed circuit agrees; a two-level composition agrees with the direct
+  analysis of the larger tree; a part that refines only through order 0 lowers the
   conclusion; missing, mismatched and inflated compositions are refused.
 - Receipt controls, each refused: witness with the fault removed or moved,
   inflated order, a positive claim without cases, edited circuit or decoder under a
@@ -174,7 +179,10 @@ fails on each. The last was a real bug found this way.
   syndrome cannot depend on the input (teleportation), or by enumerating the span
   of input errors (2^8 signatures for Steane); otherwise it reports "not decided".
 - A property that stops on its budget reports `holds_through` for the orders it
-  finished and a `note`.
+  finished and a `note`. Read the note before reading a low `holds_through` as a
+  failure: only a `violation` is one.
+- The composition theorem is an argument printed in the receipt and tested against
+  direct analysis on small gadgets. It is not machine-checked.
 
 ## What runs publicly
 

@@ -438,12 +438,15 @@ def t_props(heavy):
     # the error-correction pair
     r = props.close(Analysis(library.load("knill:steane,anc=spec")), 1)
     check("close: Knill with good ancillas, any input, through 1",
-          r["holds_through"] == 1 and "does not depend" in r["method"])
+          r["holds_through"] == 1 and "does not depend" in r["method"], str(r))
     r = props.close(Analysis(library.load("knill:steane,anc=raw")), 1)
     check("close: Knill with raw ancillas fails at one fault", r["holds_through"] == 0 and r["violation"])
     r = props.close(Analysis(library.load("steane_ec:steane,anc=spec")), 1)
-    check("close: Steane-type extraction, input span enumerated", r["holds_through"] == 1
-          and "enumerated" in r["method"], str(r))
+    check("close: Steane-type extraction, shown independent of the input", r["holds_through"] == 1
+          and "does not depend" in r["method"], str(r))
+    r2 = props.close(Analysis(library.load("seq_syndrome:steane")), 1)
+    check("close: sequential extraction corrects X only: decided by enumerating the input span",
+          r2["holds_through"] == -1 and "enumerated" in (r2["method"] or ""), str(r2)[:300])
     r = props.close(Analysis(library.load("idle:steane")), 1)
     check("close: a bare wire is not close for any input", r["holds_through"] == -1 and r["violation"])
     refuses("props: a gate property on a preparation is refused",
@@ -575,6 +578,32 @@ def t_compose():
     forged["conclusions"][0]["holds_through"] = 3
     refuses("compose: an inflated conclusion is refused",
             lambda: certify.verify_composition(forged, target, parts), "conclusions")
+    # two levels: a tree whose leaves are specifications, composed with real leaves, then
+    # used as the implementation of a part of the error-correction gadget
+    sc = library.code_of(code)
+    b = Builder("two_spec_leaves_then_X")
+    b.no_detectors()
+    leaves = b.par(*[(lambda: library.frag_prep(b, sc, "zero", "spec")) for _ in range(2)])
+    b.output(library._purify(b, sc, "zero", "X", leaves), sc)
+    top = certify.build(b.build(), refines=[(library.prep(code, "zero", "spec"), 1, 0)])
+    leaf = certify.build(library.load(f"prep:{code},zero,tree=X"),
+                         refines=[(library.prep(code, "zero", "spec"), 1, 0)])
+    inner = certify.compose(top, {"zero": leaf})
+    check("compose: a refinement is carried through a composition",
+          [c["type"] for c in inner["conclusions"]] == ["refine"]
+          and inner["conclusions"][0]["holds_through"] == min(top["results"][0]["holds_through"],
+                                                              leaf["results"][0]["holds_through"]))
+    bundle = dict(composition=inner, target=top, parts={"zero": leaf})
+    two = certify.compose(target, dict(plus=parts["plus"], zero=bundle))
+    direct3 = props.refine(Analysis(library.load(f"prep:{code},zero,tree=XX")),
+                           Analysis(library.prep(code, "zero", "spec")), 1)
+    check("compose: a composed implementation can itself be a part; the direct analysis agrees",
+          two["conclusions"][0]["holds_through"] == inner["conclusions"][0]["holds_through"]
+          <= direct3["holds_through"], f"{two['conclusions']} {direct3['holds_through']}")
+    bad_bundle = dict(composition=copy.deepcopy(inner), target=top, parts={"zero": leaf})
+    bad_bundle["composition"]["conclusions"][0]["holds_through"] = 3
+    refuses("compose: an inflated inner composition is refused",
+            lambda: certify.compose(target, dict(plus=parts["plus"], zero=bad_bundle)), "conclusions")
     refuses("compose: a gadget analysed without specification parts is refused",
             lambda: certify.compose(certify.build(library.load("knill:steane,anc=raw"), [("ec", 1)]), parts),
             "no part")
