@@ -336,6 +336,16 @@ def local(an, radius=None):
     if an.nd:
         return dict(type="local", local=False, coordinates=n,
                     reason="the gadget postselects; analyse its postselected parts as specifications")
+    from .columns import ColumnError, layout
+    try:
+        pos, _ = layout(g)
+    except ColumnError as err:
+        result = dict(type="local", local=False, coordinates=n, reason=str(err))
+        for loc in an.model.locations:
+            if loc.op is err.op:
+                result["fault"] = [loc.index, next(iter(loc.faults))]
+                break
+        return result
     base = sum(len(b.refs) for b in g.inputs)
     O, OX, OZ = [], [], []
     for c in range(n):
@@ -355,11 +365,11 @@ def local(an, radius=None):
         colmaps.append(cm)
     widths = [(off, (1 << w) - 1) for off, w in an.dec_layout]
 
-    def place(sig, want=None):
-        """(coordinate or None, residual, triggered decoder indices) or a reason string."""
+    def place(sig, coordinate):
+        """Check the entire signature against its assigned physical coordinate."""
         e = sig >> an.shift
         dbits = sig >> an.nd
-        c, trig = want, []
+        c, trig = coordinate, []
         for k, ((off, mask), cm) in enumerate(zip(widths, colmaps)):
             sy = (dbits >> off) & mask
             if not sy:
@@ -367,25 +377,14 @@ def local(an, radius=None):
             p = cm.get(sy)
             if p is None:
                 return f"decoder {g.decoders[k].name} sees check values of no single error"
-            if c is not None and p != c:
+            if p != c:
                 return "two coordinates are involved"
-            c = p
             trig.append(k)
             e ^= an.dec_per[k][p]
         if e == 0:
             return c, 0, trig
-        if c is not None:
-            return (c, e, trig) if e in O[c] else "the remaining error is not confined to that coordinate"
-        for cc in range(n):
-            if e in O[cc]:
-                return cc, e, trig
-        return "the remaining error is not confined to one coordinate"
+        return (c, e, trig) if e in O[c] else "the remaining error is not confined to that coordinate"
 
-    for i, sg in enumerate(an.cols):
-        r = place(sg)
-        if isinstance(r, str):
-            return dict(type="local", local=False, coordinates=n, reason=r,
-                        fault=[an.src[i][0], an.src[i][1]])
     gate = ec = True
     seen = [set() for _ in g.decoders]
     sector_gate = True
@@ -404,6 +403,17 @@ def local(an, radius=None):
                 if t != "Y":
                     for k in trig:
                         seen[k].add(t)
+    # Equal signatures from distinct physical positions must pass separately.
+    inputs = {i for b in g.inputs for i in b.in_locs}
+    for loc in an.model.locations:
+        if loc.index in inputs:
+            continue
+        coordinate = pos[loc.op.qs[0]]
+        for mode, eff in loc.faults.items():
+            result = place(an.sig(*eff), coordinate)
+            if isinstance(result, str):
+                return dict(type="local", local=False, coordinates=n, reason=result,
+                            fault=[loc.index, mode])
     sector = all(len(s) < 2 for s in seen) and sector_gate
     # the output's code syndrome is linear in the decoder check values iff the positions'
     # corrections respect every linear relation among the positions' check columns

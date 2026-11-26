@@ -59,22 +59,10 @@ KIND_OF = dict(prep_zero="prep", prep_plus="prep", cnot="gate", ec="ec", measure
 
 # ---------------------------------------------------------------------- physical two-level gadgets
 def positions(g):
-    """qubit -> position within its block, for gadgets whose blocks were allocated whole
-    (the library's): the qubits other than references, in order, n at a time.  Refuses a
-    gadget in which some noisy operation joins two positions."""
-    n = len((g.inputs + g.outputs)[0].qubits)
-    refs = {q for b in g.inputs for q in b.refs}
-    qs = [q for q in range(g.circuit.n) if q not in refs]
-    if len(qs) % n:
-        raise GadgetError("qubits do not come in whole blocks")
-    pos = {q: i % n for i, q in enumerate(qs)}
-    for k, t in enumerate(g.circuit.ticks):
-        if k < g.body_start:
-            continue
-        for op in t:
-            if op.noisy and len({pos[q] for q in op.qs}) != 1:
-                raise GadgetError(f"operation {op.text()} joins two positions")
-    return pos, n
+    from .columns import layout
+
+    pos, _ = layout(g)
+    return pos, len((g.inputs + g.outputs)[0].qubits)
 
 
 def _css(code):

@@ -58,6 +58,10 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   large to enumerate (QR-47, BCH-127): the radius is taken from the code's
   `ftqc_codes` receipt (`--code-receipt`, `library.radii`) and decoder tables are
   skipped (`--no-tables`).
+  Wire order fixes the physical coordinate for every fault mode. All gates and
+  classical controls in the body must respect those coordinates. The exception
+  for a fresh specified ancilla is checked against its complete preparation
+  circuit and its noisy boundary, before the ancilla couples to live data.
 - **levels** (`levels.py`): the outer level of a concatenated scheme. A qubit of the
   outer gadget stands for an inner block and a fault for a failed inner gadget;
   because the locality certificate counts coordinates, it already says "at most T2

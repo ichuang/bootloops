@@ -761,6 +761,22 @@ def t_local(heavy):
     r = props.local(Analysis(b.build()))
     check("local: a correction applied at the neighbouring position is refused",
           r["local"] is False and "not confined to that coordinate" in r["reason"], str(r)[:200])
+    b = Builder("measurement with temporary swap")
+    data = b.input(sc)
+    b.no_detectors()
+    for _ in range(2):
+        b.tick([("I", data[0])])
+        for i, j in ((0, 1), (1, 0), (0, 1)):
+            b.tick([("!CX", data[i], data[j])])
+    records = b.measure(data, "Z")
+    b.decoder("outcomes", records, sc.hz, "record")
+    swapped = Analysis(b.build())
+    faults = [(7, "X"), (8, "X")]
+    check("two faults on physical wire zero flip the decoded Z", all(
+        swapped.model.locations[i].op.qs == (data[0],) for i, _ in faults)
+        and swapped.effect(swapped.replay(faults)) != 0)
+    check("ideal temporary swaps invalidate the physical column certificate",
+          not props.local(swapped)["local"])
     # decoder positions numbered differently from the block's
     perm = [3, 0, 1, 2, 6, 4, 5]
     b = Builder("permuted_decoder")
