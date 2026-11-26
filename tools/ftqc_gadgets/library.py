@@ -15,8 +15,11 @@ Gadget specs (CODE is a ftqc_codes spec without commas, e.g. steane, golay, or r
   knill:CODE[,anc=METHOD]      teleportation error correction: |+_L>,|0_L> ancillas by METHOD,
                                CX to make the encoded Bell pair, Bell measurement of the input
                                against one half, two record decoders
-  steane_ec:CODE[,anc=METHOD]  syndrome extraction with |+_L> and |0_L> ancillas and two
+  steane_ec:CODE[,anc=METHOD][,rounds=K]
+                               syndrome extraction with |+_L> and |0_L> ancillas and two
                                Pauli-frame decoders on the data block
+  measure:CODE[,x|z]           destructive transversal measurement with a record decoder (no
+                               output block: correct means the decoded outcome is right)
   seq_syndrome:CODE            the Z checks measured one after another, each with one bare
                                ancilla, and a Pauli-frame decoder for X errors (negative
                                control: an X fault between two checks is miscorrected)
@@ -141,22 +144,73 @@ def knill(code, anc="raw", ideal=False, idles=False):
     return b.build(idles)
 
 
-def steane_ec(code, anc="raw", ideal=False, idles=False):
+def steane_ec(code, anc="raw", ideal=False, idles=False, rounds=1):
+    """rounds > 1 repeats the extraction; each later round decodes its check values
+    relative to the frame the previous round left (the parity of the two rounds'
+    outcomes), as a frame-tracking implementation does."""
     code = code_of(code)
-    b = Builder(f"steane_ec({code.name},anc={anc}" + (",ideal" if ideal else "") + ")", ideal)
+    b = Builder(f"steane_ec({code.name},anc={anc}" + (",ideal" if ideal else "")
+                + (f",rounds={rounds}" if rounds != 1 else "") + ")", ideal)
     A = b.input(code, "data")
     b.no_detectors()
     m = "ideal" if ideal else anc
-    P, Z = b.par(lambda: frag_prep(b, code, "plus", m), lambda: frag_prep(b, code, "zero", m))
-    b.tick([("CX", a, p) for a, p in zip(A, P)])          # X errors of the data reach P
-    r1 = b.tick([("M", p) for p in P] + [("CX", z, a) for z, a in zip(Z, A)])[:code.n]
-    r2 = b.tick([("MX", z) for z in Z])
-    b.decoder("x_errors", r1, code.hz, "X", A)
-    b.decoder("z_errors", r2, code.hx, "Z", A)
+    last = None
+    for k in range(rounds):
+        P, Z = b.par(lambda: frag_prep(b, code, "plus", m), lambda: frag_prep(b, code, "zero", m))
+        b.tick([("CX", a, p) for a, p in zip(A, P)])          # X errors of the data reach P
+        r1 = b.tick([("M", p) for p in P] + [("CX", z, a) for z, a in zip(Z, A)])[:code.n]
+        r2 = b.tick([("MX", z) for z in Z])
+        if rounds == 1:
+            b.decoder("x_errors", r1, code.hz, "X", A)
+            b.decoder("z_errors", r2, code.hx, "Z", A)
+        else:
+            for nm, recs, old, H, kind in (("x_errors", r1, last and last[0], code.hz, "X"),
+                                           ("z_errors", r2, last and last[1], code.hx, "Z")):
+                bits = [[recs[p] for p in gf2.supp(row)] + ([old[p] for p in gf2.supp(row)] if old else [])
+                        for row in H]
+                b.syndrome_decoder(f"{nm}_{k + 1}", bits, H, kind, A)
+        last = (r1, r2)
     if ideal:
         b.wires(A)
     b.output(A, code, "data")
     return b.build(idles)
+
+
+def measure(code, basis="Z"):
+    """Destructive transversal measurement of an input block, decoded.  No output block:
+    the effect is zero exactly when the decoded logical outcomes are the right ones."""
+    code = code_of(code)
+    basis = basis.upper()
+    if basis not in ("X", "Z"):
+        raise GadgetError("measurement basis is X or Z")
+    b = Builder(f"measure({code.name},{basis})")
+    A = b.input(code, "data")
+    b.no_detectors()
+    recs = b.measure(A, basis)
+    b.decoder("outcomes", recs, code.hz if basis == "Z" else code.hx, "record")
+    return b.build()
+
+
+def radii(gadget, code_receipt):
+    """Radius of each decoder of a gadget from an ftqc_codes receipt of its block code: a
+    decoder whose checks are H_Z separates X patterns up to (m - 1) // 2, m the smaller of
+    the proven lower bounds on d_x and on the lightest X stabilizer (two patterns with the
+    same check values differ by a nonzero element of ker H_Z, a logical or a stabilizer);
+    likewise for H_X with d_z."""
+    from ftqc_codes import certify as cc
+    cc.verify(code_receipt)
+    code = ftqc_codes.CSSCode.from_json(code_receipt["code"])
+    f = code_receipt["facts"]
+    lo = {q: f[q]["lower"] for q in ("d_x", "d_z", "wmin_x", "wmin_z")}
+    out = {}
+    for d in gadget.decoders:
+        if d.checks == list(code.hz):
+            out[d.name] = (min(lo["d_x"], lo["wmin_x"]) - 1) // 2
+        elif d.checks == list(code.hx):
+            out[d.name] = (min(lo["d_z"], lo["wmin_z"]) - 1) // 2
+        else:
+            raise GadgetError(f"decoder {d.name}: its checks are not H_X or H_Z of the receipt's code")
+    return out
 
 
 def seq_syndrome(code, idles=False):
@@ -222,7 +276,8 @@ def load(spec):
     idles, ideal = "idles" in flags, "ideal" in flags
     flags -= {"idles", "ideal"}
     anc = next((f[4:] for f in flags if f.startswith("anc=")), "raw")
-    flags = {f for f in flags if not f.startswith("anc=")}
+    rounds = int(next((f[7:] for f in flags if f.startswith("rounds=")), "1"))
+    flags = {f for f in flags if not f.startswith("anc=") and not f.startswith("rounds=")}
     try:
         if fam == "prep":
             rest = [p for p in parts[1:] if p not in ("idles", "ideal")]
@@ -238,7 +293,9 @@ def load(spec):
         if fam == "seq_syndrome" and not flags:
             return seq_syndrome(parts[0], idles)
         if fam == "steane_ec" and not flags:
-            return steane_ec(parts[0], anc, ideal, idles)
+            return steane_ec(parts[0], anc, ideal, idles, rounds)
+        if fam == "measure" and flags <= {"x", "z", "X", "Z"}:
+            return measure(parts[0], (sorted(flags) or ["Z"])[0])
     except IndexError:
         raise GadgetError(f"missing arguments in {spec!r}") from None
     raise GadgetError(f"unknown gadget {spec!r}; see ftqc_gadgets.library")

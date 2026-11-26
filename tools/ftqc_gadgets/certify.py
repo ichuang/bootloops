@@ -29,9 +29,13 @@ def _clean(d):
     return json.loads(json.dumps(d))
 
 
-def build(gadget, checks=(), close=None, refines=(), sector=False, cap=3_000_000, analysis=None):
-    """checks: [(kind, t)] or [(kind, t, sector)].  close: s or None.  refines: [(spec gadget, order, input weight)]."""
-    an = analysis or Analysis(gadget, cap)
+def build(gadget, checks=(), close=None, refines=(), sector=False, cap=3_000_000, analysis=None,
+          local=None, tables=True):
+    """local: True, an integer radius or {decoder: radius} adds the coordinate-locality
+    certificate (props.local).  tables=False skips decoder tables (large codes; only the
+    locality certificate is then available).
+    checks: [(kind, t)] or [(kind, t, sector)].  close: s or None.  refines: [(spec gadget, order, input weight)]."""
+    an = analysis or Analysis(gadget, cap, tables)
     results = []
     for item in checks:
         kind, t = item[0], item[1]
@@ -46,8 +50,14 @@ def build(gadget, checks=(), close=None, refines=(), sector=False, cap=3_000_000
         r = props.refine(an, Analysis(spec, cap), int(order), int(rin))
         r.update(type="refine", spec=spec.to_json())
         results.append(r)
+    if local is not None and local is not False:
+        r = props.local(an, None if local is True else local)
+        if local is not True:
+            r["radius_request"] = local
+        r["lemma"] = props.LEMMA
+        results.append(r)
     return _clean(dict(schema=SCHEMA, tool="ftqc_gadgets", tool_version=VERSION,
-                       gadget=gadget.to_json(), stats=an.stats(), results=results))
+                       gadget=gadget.to_json(), stats=an.stats(), tables=bool(tables), results=results))
 
 
 def receipt_sha(receipt):
@@ -64,7 +74,7 @@ def verify(receipt, full=False, cap=3_000_000):
         raise Refusal(f"not a {SCHEMA} receipt")
     try:
         g = Gadget.from_json(receipt["gadget"])
-        an = Analysis(g, cap)
+        an = Analysis(g, cap, receipt.get("tables", True))
     except (GadgetError, ValueError) as e:
         raise Refusal(f"gadget: {e}") from None
     done = ["gadget hash, input preamble, decoder checks, detectors"]
@@ -134,6 +144,21 @@ def verify(receipt, full=False, cap=3_000_000):
                         if again[k] != r[k]:
                             raise Refusal(f"{tag}: re-enumeration gives a different {k}")
                     done.append(f"{tag}: re-enumerated")
+            elif typ == "local":
+                given = {d["name"]: d["radius"] for d in r.get("decoders", []) if d.get("source") == "given"}
+                request = r.get("radius_request", given or None)
+                again = _clean(props.local(an, request))
+                if "radius_request" in r:
+                    again["radius_request"] = request
+                elif given and again.get("local"):
+                    # Legacy receipts recorded the number, without its proof.
+                    # Only compare their old fields after proving it afresh.
+                    for row in again["decoders"]:
+                        row.pop("proof", None)
+                again["lemma"] = props.LEMMA
+                if again != r:
+                    raise Refusal(f"{tag}: the locality certificate does not recompute")
+                done.append(f"{tag}: physical fault columns and decoder bounds recomputed")
             else:
                 raise Refusal(f"{tag}: unknown result type")
         except (KeyError, TypeError, ValueError, IndexError) as e:
@@ -263,6 +288,18 @@ def summary(receipt):
            f"locations, {st['columns']} distinct fault effects, {st['detectors']} detectors, "
            f"{st['decoder_checks']} decoder checks"]
     for r in receipt["results"]:
+        if r["type"] == "local":
+            if not r["local"]:
+                out.append(f"  not coordinate-local: {r['reason']}"
+                           + (f" (fault {r['fault']})" if r.get("fault") else "")
+                           + (f" (input {r['input_error']})" if r.get("input_error") else ""))
+            else:
+                thr = "any number of" if r["through"] is None else f"at most {r['through']}"
+                props_ = [k for k in ("gate", "ec", "close") if r[k]]
+                out.append(f"  coordinate-local on {r['coordinates']} coordinates: {', '.join(props_)} "
+                           f"hold when faults and input errors touch {thr} coordinates"
+                           + ("; also with X and Z counted separately" if r["sector"] else ""))
+            continue
         if r["type"] == "check":
             line = (f"  {r['kind']} ({r['weight']} weight), r + s <= {r['t']}: holds through "
                     f"{r['holds_through']}")

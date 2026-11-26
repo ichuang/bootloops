@@ -35,35 +35,50 @@ class Budget(Exception):
 
 
 def leader_table(checks, npos, cap=5_000_000):
-    """Coset leaders of a parity-check matrix: {syndrome: position mask of a
-    lightest pattern with that syndrome}, lightest first, ties by position order.
-    Returns (table, unique_through): every pattern of weight <= unique_through is its
-    own coset's only pattern of that weight or less."""
-    col = [sum(1 << i for i, r in enumerate(checks) if (r >> p) & 1) for p in range(npos)]
-    need = 1 << gf2.rank(checks)
-    tab, w, clash = {0: 0}, 0, None
-    while len(tab) < need and w < npos:
-        w += 1
-        if comb(npos, w) > cap:
-            raise Budget(f"decoder table needs patterns of weight {w} on {npos} positions")
-        for pos in combinations(range(npos), w):
-            s = m = 0
-            for p in pos:
-                s ^= col[p]
-                m |= 1 << p
-            if s in tab:
-                if clash is None:
-                    clash = w
+    """Coset leaders of a parity-check matrix (ftqc_codes.hier.leader_table), with this
+    package's Budget exception when the table is too large."""
+    from ftqc_codes import hier
+    try:
+        return hier.leader_table(checks, npos, cap)
+    except ValueError as e:
+        raise Budget(str(e)) from None
+
+
+class _HierTable:
+    """Correction effects of a hierarchical decoder, computed on demand."""
+
+    def __init__(self, rule, checks, per):
+        import ftqc_codes
+        from ftqc_codes import hier
+        outer = ftqc_codes.CSSCode.from_json(rule["outer"])
+        inner = ftqc_codes.CSSCode.from_json(rule["inner"])
+        self.h = hier.Hier(outer, inner, rule["sector"])
+        if self.h.checks != list(checks):
+            raise GadgetError("a hierarchical decoder's checks are not those of the concatenated code")
+        self.per, self.cache = per, {}
+
+    def get(self, values):
+        e = self.cache.get(values, -2)
+        if e == -2:
+            pat = self.h.decode(values)
+            if pat is None:
+                e = None
             else:
-                tab[s] = m
-    if clash is None and len(tab) >= need and w < npos:
-        # every syndrome is taken; one more pattern of any weight must clash
-        clash = w + 1
-    return tab, (w if clash is None else clash - 1)
+                e = 0
+                for p in gf2.supp(pat):
+                    e ^= self.per[p]
+            if len(self.cache) < 2_000_000:
+                self.cache[values] = e
+        return e
+
+    def pattern(self, values):
+        return self.h.decode(values)
 
 
 class Analysis:
-    def __init__(self, gadget, cap=3_000_000):
+    def __init__(self, gadget, cap=3_000_000, tables=True):
+        """tables=False skips the decoder lookup tables (needed for enumeration, not for
+        the locality leg); a table that would exceed its budget is skipped as well."""
         g = self.g = gadget
         self.cap = cap                         # budget for fault-subset enumeration
         self.small = min(cap, 5_000_000)       # budget for tables held in memory
@@ -141,8 +156,14 @@ class Analysis:
         # ---- decoders
         self.dec = []
         self.dec_info = []
+        self.dec_cols, self.dec_per = [], []           # per decoder: check column and effect of each position
         for d, (off, width) in zip(g.decoders, self.dec_layout):
-            tab, uniq = leader_table(d.checks, d.npos)
+            tab = uniq = None
+            if tables and d.rule is None:
+                try:
+                    tab, uniq = leader_table(d.checks, d.npos)
+                except Budget:
+                    pass
             per = []
             for p in range(d.npos):
                 if d.kind == "record":
@@ -151,16 +172,26 @@ class Analysis:
                     per.append(self._canon(m.syndrome(1 << d.targets[p], 0)))
                 else:
                     per.append(self._canon(m.syndrome(0, 1 << d.targets[p])))
-            eff = {}
-            for s, lead in tab.items():
-                e = 0
-                for p in gf2.supp(lead):
-                    e ^= per[p]
-                eff[s] = e
+            self.dec_per.append(per)
+            self.dec_cols.append([sum(1 << i for i, r in enumerate(d.checks) if (r >> p) & 1)
+                                  for p in range(d.npos)])
+            eff = None
+            if d.rule is not None:
+                if d.rule.get("type") != "hier":
+                    raise GadgetError(f"decoder {d.name}: unknown rule")
+                eff = _HierTable(d.rule, d.checks, per)
+            if tab is not None:
+                eff = {}
+                for s, lead in tab.items():
+                    e = 0
+                    for p in gf2.supp(lead):
+                        e ^= per[p]
+                    eff[s] = e
             self.dec.append((off, (1 << width) - 1, eff))
             self.dec_info.append(dict(name=d.name, kind=d.kind, positions=d.npos,
-                                      checks=width, syndromes=len(tab), unique_through=uniq,
-                                      table=tab))
+                                      checks=width, syndromes=None if tab is None else len(tab),
+                                      unique_through=uniq, table=tab,
+                                      **({"rule": "hierarchical"} if d.rule is not None else {})))
         self._effect_cache = {}
         self._sum_cache = {}
 
@@ -231,6 +262,9 @@ class Analysis:
             e = sig >> self.shift
             d = sig >> self.nd
             for off, mask, eff in self.dec:
+                if eff is None:
+                    raise Budget("a decoder has no lookup table (too many syndromes): enumeration "
+                                 "is not available for this gadget, use the locality leg")
                 c = eff.get((d >> off) & mask)
                 if c is None:
                     e = -1

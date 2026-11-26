@@ -1,7 +1,7 @@
 # ftqc_codes — GUIDE
 
 KIND: package (Python, stdlib only for the default tier; `gf2.py`, `codes.py`,
-`minweight.py`, `certify.py`, `cnf.py`, `lrat.py`, `sat.py`, `bch.py`, `cuts.py`, `concat.py`, `leangen.py`,
+`minweight.py`, `certify.py`, `cnf.py`, `lrat.py`, `sat.py`, `bch.py`, `cuts.py`, `concat.py`, `hier.py`, `leangen.py`,
 `selftest.py`, `examples/`; flat shim `tools/qeccert.py` preserves legacy `import qeccert` callers). Battery class: partial (the exact leg, the CNF
 direction test, the LRAT checker and all planted controls run from the clone;
 the SAT leg needs `cadical`, the Lean leg needs `lake` and a built Lean-QEC,
@@ -52,6 +52,14 @@ Six legs prove lower bounds, with separate lineages:
   k = 1 code", then applies the product bound d >= d(inner) * d(outer) to the
   bounds in the two factor receipts. The structural check is repeated by
   `verify`; the factor bounds are only as good as the factor receipts.
+- **Hierarchical decoding** (`hier.py`, not a distance leg): the decoder of a
+  concatenated code that decodes every inner block and then the outer word
+  (`hier.Hier`), and `hier.certificate(outer_receipt, inner_receipt)`: in each
+  sector it corrects every error with at most t2 columns holding more than t1
+  errors, t1 and t2 read from the two receipts as (m - 1) // 2 with m the smaller
+  of the proven distance and lightest-stabilizer bounds. The proof is printed in
+  the certificate. `ftqc_gadgets` uses the decoder for gadgets on concatenated
+  codes and the radius for its locality certificates.
 
 ## USE-WHEN
 
@@ -128,6 +136,11 @@ legacy `QECCERT_LAKE` also honoured).
 ## GATES
 
 `python3 tools/ftqc_codes/selftest.py` (default tier, a few seconds):
+
+- Hierarchical decoding of Steane over Steane, both sectors: one arbitrary column
+  (two choices of column, all 128 patterns) with up to two single errors elsewhere,
+  all 201,728 cases corrected; one arbitrary column with one error in every other
+  column, sampled; a weight-4 error on two columns that is not corrected.
 
 - GF(2) kernel/rank identities on 200 random matrices.
 - Leg A against full enumeration on 300 random (code, subspace) pairs,

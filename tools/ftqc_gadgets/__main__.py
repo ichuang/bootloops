@@ -1,6 +1,7 @@
 """Command line:  python3 -m ftqc_gadgets <command> ...   (with tools/ on PYTHONPATH)
 
   analyze SPEC [--check KIND:T]... [--close S] [--refines SPEC2:ORDER[:R]]... [--sector]
+               [--local [--radius R | --code-receipt CODE.json] [--no-tables]]
                [-o receipt.json] [--cap N]
   equiv   SPEC1 SPEC2 --order W [--input-weight R]
   verify  RECEIPT.json [--full]
@@ -42,6 +43,10 @@ def main(argv=None):
     a.add_argument("--close", type=int)
     a.add_argument("--refines", action="append", default=[])
     a.add_argument("--sector", action="store_true")
+    a.add_argument("--local", action="store_true", help="coordinate-locality certificate")
+    a.add_argument("--radius", type=int, help="decoder radius for --local (default: from the tables)")
+    a.add_argument("--code-receipt", help="ftqc_codes receipt of the block code: decoder radii for --local")
+    a.add_argument("--no-tables", action="store_true", help="skip decoder tables (large codes)")
     a.add_argument("-o", "--out")
     a.add_argument("--cap", type=int, default=3_000_000)
     q = sub.add_parser("equiv")
@@ -115,10 +120,17 @@ def main(argv=None):
                 raise GadgetError(f"--check takes KIND:T, got {item!r}")
             checks.append((kind, int(t)))
         refs = [(library.load(s), o, r) for s, o, r in map(_split_ref, args.refines)]
-        rec = certify.build(g, checks, args.close, refs, args.sector, args.cap)
+        loc = None
+        if args.local:
+            loc = True if args.radius is None else args.radius
+            if args.code_receipt:
+                with open(args.code_receipt) as f:
+                    loc = library.radii(g, json.load(f))
+        rec = certify.build(g, checks, args.close, refs, args.sector, args.cap, local=loc,
+                            tables=not args.no_tables)
         emit(rec, args.out)
         print(certify.summary(rec))
-        failed = any(r["violation"] for r in rec["results"])
+        failed = any(r.get("violation") or r.get("local") is False for r in rec["results"])
         return 1 if failed else 0
     except certify.Refusal as e:
         print("REFUSED:", e, file=sys.stderr)

@@ -4,6 +4,7 @@ from .cirq_bridge import cirq_available, from_cirq_circuit, to_cirq_circuit
 from .ftqc_bridge import (
     audit_clifford_hmr_with_ftqc_audit,
     ftqc_audit_available,
+    ftqc_compose_available,
     ftqc_zx_available,
     kmx_clifford_to_ftqc_audit_ticks,
     price_circuit_with_zx_contract,
@@ -19,6 +20,7 @@ __all__ = [
     "external_kickmix_available",
     "from_cirq_circuit",
     "ftqc_audit_available",
+    "ftqc_compose_available",
     "ftqc_zx_available",
     "kmx_clifford_to_ftqc_audit_ticks",
     "kmx_from_qasm3",

@@ -2,7 +2,7 @@
 
 Certified verification and simplification toolkit for **measurement-based uncomputation (MBUC)**, **spooky & parallel spooky pebbling**, and **superposition-masked quantum arithmetic**.
 
-See [`GUIDE.md`](GUIDE.md) for full documentation, refusal codes, known hazards, and citations, and [`../FTQC.md`](../FTQC.md) for how `ftqc_uncompute` connects to [`ftqc_codes`](../ftqc_codes/GUIDE.md), [`ftqc_audit`](../ftqc_audit/GUIDE.md), [`ftqc_gadgets`](../ftqc_gadgets/GUIDE.md), [`ftqc_extractors`](../ftqc_extractors/README.md), and [`ftqc_zx`](../ftqc_zx/GUIDE.md).
+See [`GUIDE.md`](GUIDE.md) for full documentation, refusal codes, known hazards, and citations, and [`../FTQC.md`](../FTQC.md) for how `ftqc_uncompute` connects to [`ftqc_codes`](../ftqc_codes/GUIDE.md), [`ftqc_audit`](../ftqc_audit/GUIDE.md), [`ftqc_gadgets`](../ftqc_gadgets/GUIDE.md), [`ftqc_extractors`](../ftqc_extractors/README.md), [`ftqc_zx`](../ftqc_zx/GUIDE.md), and [`ftqc_compose`](../ftqc_compose/GUIDE.md).
 
 ## Quickstart
 

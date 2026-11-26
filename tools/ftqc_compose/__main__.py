@@ -1,0 +1,96 @@
+"""Generate and replay content-bound deterministic composition receipts."""
+
+import argparse
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+from .supports import family_result
+
+
+def canonical(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def digest(value):
+    return hashlib.sha256(canonical(value).encode()).hexdigest()
+
+
+def receipt(spec):
+    from .contracts import Violation
+
+    try:
+        result = evaluate(spec)
+    except Violation as failure:
+        result = {
+            "status": "counterexample",
+            "scope": "accepted-diagonal-pauli",
+            "failed_obligation": "leaf simulation",
+            "witness": failure.evidence,
+        }
+    return {"schema": "ftqc_compose-1", "input_sha256": digest(spec), "result": result}
+
+
+def evaluate(spec):
+    if spec["kind"] == "local-stochastic":
+        from .stochastic import stochastic_result
+
+        return stochastic_result(spec)
+    if spec["kind"] == "distilled-logical-t":
+        from .logical_t import logical_t_result
+
+        return logical_t_result(spec)
+    if spec["kind"] == "gross-residual":
+        from .gross_residual import gross_result
+
+        return gross_result(spec)
+    if spec["kind"] == "level":
+        from .level import level_result
+
+        return level_result(spec)
+    if spec["kind"] == "hgp-repeat":
+        from .hgp import repeated_result
+
+        return repeated_result(spec)
+    if spec["kind"] == "family":
+        result = family_result(spec)
+    elif spec["kind"] == "contract":
+        from .contracts import contract_result
+
+        result = contract_result(spec)
+    else:
+        raise ValueError("unknown study kind")
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    check = commands.add_parser("check")
+    check.add_argument("spec", type=Path)
+    check.add_argument("-o", type=Path)
+    verify = commands.add_parser("verify")
+    verify.add_argument("spec", type=Path)
+    verify.add_argument("receipt", type=Path)
+    args = parser.parse_args()
+    try:
+        result = receipt(json.loads(args.spec.read_text()))
+        if args.command == "verify":
+            if canonical(result) != canonical(json.loads(args.receipt.read_text())):
+                raise ValueError("receipt differs from recomputed evidence")
+            print("verified receipt:", result["result"]["status"])
+            return 0
+        content = json.dumps(result, indent=2, sort_keys=True) + "\n"
+        if args.o:
+            args.o.write_text(content)
+        else:
+            print(content, end="")
+        return int(result["result"]["status"] == "counterexample")
+    except (ValueError, TypeError, KeyError, AttributeError, OSError) as error:
+        print(f"ftqc_compose: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

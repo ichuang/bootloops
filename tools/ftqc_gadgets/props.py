@@ -133,6 +133,9 @@ def close(an, s_max, sector=False, span_cap=1 << 16):
     # linear function of the signature and can be tested on the input columns alone.
     linear, units = True, []
     for off, mask, eff in an.dec:
+        if not isinstance(eff, dict):
+            linear = False                     # a decoder without a plain table
+            break
         width = mask.bit_length()
         unit = [code_part(eff.get(1 << i, 0)) if (1 << i) in eff else None for i in range(width)]
         if any(u is None for u in unit):
@@ -159,6 +162,9 @@ def close(an, s_max, sector=False, span_cap=1 << 16):
 
     in_cols = [s for row in an.in_sig for pair in row for s in pair]
     independent = linear and all(not (s & an.DET) and not any(total_code_part(s)) for s in in_cols)
+    if not linear and any(not isinstance(eff, dict) for _, _, eff in an.dec):
+        return dict(holds_through=-1, per=[], violation=None, method=None,
+                    note="not decided: a decoder of this gadget has no plain lookup table")
     per, violation, note = [], None, None
     try:
         if independent:
@@ -295,3 +301,194 @@ def judge_refine(impl, spec, witness, cap_order=None):
             if spec.effect(v ^ s1) == e:
                 return False
     return True
+
+
+# ---------------------------------------------------------------------- locality
+LEMMA = ("Call a signature local at coordinate c if no detector fires, each decoder's check "
+         "values are zero or those of a single error at position c, and after removing that "
+         "position's correction the syndrome is that of a Pauli on the output qubits at position c "
+         "(every output block).  Suppose every fault of every location is local at some coordinate, "
+         "and every input error at position p is local at p.  Let a fault set and an input error "
+         "touch a set C of coordinates.  Signatures add, so each decoder sees the check values of "
+         "an error pattern supported on C.  If |C| is at most the radius within which the decoder's "
+         "lightest pattern is unique, the decoder returns exactly that pattern, its correction "
+         "cancels what the pattern contributed, and what is left is the syndrome of a Pauli "
+         "supported on C in each output block.  Hence: the output is within weight |C| of the "
+         "ideal state, logical action included, however many faults lie inside the |C| coordinates "
+         "(gate).  If in addition what is left of each input error is zero, only the coordinates "
+         "of faults remain (ec), and since the output's code syndrome is then a linear function "
+         "of the signature that vanishes on input errors, for any input it is the code syndrome "
+         "of a Pauli on the fault coordinates (close).  With X and Z counted separately the same "
+         "argument applies to each sector when no decoder responds to input errors of both types.")
+
+
+def local(an, radius=None):
+    """Coordinate-locality certificate.  radius: {decoder name: r} or one integer, the
+    radius within which each decoder's lightest pattern is unique; by default the value
+    found when the decoder's table was built.  Returns a dict; `local` is False with a
+    witness when some fault or input error is not confined to one coordinate."""
+    from ftqc_codes import gf2
+    g = an.g
+    sizes = {len(b.qubits) for b in g.inputs + g.outputs} | {d.npos for d in g.decoders}
+    if len(sizes) != 1:
+        return dict(type="local", local=False, reason="blocks and decoders do not share one set of coordinates")
+    n = sizes.pop()
+    if an.nd:
+        return dict(type="local", local=False, coordinates=n,
+                    reason="the gadget postselects; analyse its postselected parts as specifications")
+    from .columns import ColumnError, layout
+    try:
+        pos, _ = layout(g)
+    except ColumnError as err:
+        result = dict(type="local", local=False, coordinates=n, reason=str(err))
+        for loc in an.model.locations:
+            if loc.op is err.op:
+                result["fault"] = [loc.index, next(iter(loc.faults))]
+                break
+        return result
+    base = sum(len(b.refs) for b in g.inputs)
+    O, OX, OZ = [], [], []
+    for c in range(n):
+        xs = [an.sx[base + k * n + c] for k in range(len(g.outputs))]
+        zs = [an.sz[base + k * n + c] for k in range(len(g.outputs))]
+        O.append(gf2.Echelon(xs + zs))
+        OX.append(gf2.Echelon(xs))
+        OZ.append(gf2.Echelon(zs))
+    colmaps = []
+    for d, cols in zip(g.decoders, an.dec_cols):
+        cm = {}
+        for p, v in enumerate(cols):
+            if v == 0 or v in cm:
+                return dict(type="local", local=False, coordinates=n,
+                            reason=f"decoder {d.name} cannot tell single errors apart")
+            cm[v] = p
+        colmaps.append(cm)
+    widths = [(off, (1 << w) - 1) for off, w in an.dec_layout]
+
+    def place(sig, coordinate):
+        """Check the entire signature against its assigned physical coordinate."""
+        e = sig >> an.shift
+        dbits = sig >> an.nd
+        c, trig = coordinate, []
+        for k, ((off, mask), cm) in enumerate(zip(widths, colmaps)):
+            sy = (dbits >> off) & mask
+            if not sy:
+                continue
+            p = cm.get(sy)
+            if p is None:
+                return f"decoder {g.decoders[k].name} sees check values of no single error"
+            if p != c:
+                return "two coordinates are involved"
+            trig.append(k)
+            e ^= an.dec_per[k][p]
+        if e == 0:
+            return c, 0, trig
+        return (c, e, trig) if e in O[c] else "the remaining error is not confined to that coordinate"
+
+    gate = ec = True
+    seen = [set() for _ in g.decoders]
+    sector_gate = True
+    for b, row in enumerate(an.in_sig):
+        for p, (sx, sz) in enumerate(row):
+            for t, sg, ech in (("X", sx, OX), ("Z", sz, OZ), ("Y", sx ^ sz, None)):
+                r = place(sg, p)
+                if isinstance(r, str):
+                    return dict(type="local", local=False, coordinates=n, reason="input error: " + r,
+                                input_error=[[b, p, t]])
+                _, res, trig = r
+                if res:
+                    ec = False
+                    if ech is not None and res not in ech[p]:
+                        sector_gate = False
+                if t != "Y":
+                    for k in trig:
+                        seen[k].add(t)
+    # Equal signatures from distinct physical positions must pass separately.
+    inputs = {i for b in g.inputs for i in b.in_locs}
+    for loc in an.model.locations:
+        if loc.index in inputs:
+            continue
+        coordinate = pos[loc.op.qs[0]]
+        for mode, eff in loc.faults.items():
+            result = place(an.sig(*eff), coordinate)
+            if isinstance(result, str):
+                return dict(type="local", local=False, coordinates=n, reason=result,
+                            fault=[loc.index, mode])
+    sector = all(len(s) < 2 for s in seen) and sector_gate
+    # the output's code syndrome is linear in the decoder check values iff the positions'
+    # corrections respect every linear relation among the positions' check columns
+    try:
+        W = an.weigher()
+        lin = all(b["keys"] is not None for b in W.blocks)
+    except GadgetError:
+        W, lin = None, False
+    if lin:
+        funcs = [f for b in W.blocks for t in "XZ" for f in b["keys"][t]]
+        nf = len(funcs)
+        for cols, per in zip(an.dec_cols, an.dec_per):
+            aug = []
+            for v, e in zip(cols, per):
+                k = 0
+                for i, f in enumerate(funcs):
+                    if (e & f).bit_count() & 1:
+                        k |= 1 << i
+                aug.append(k | (v << nf))
+            if gf2.rank(aug) != gf2.rank(cols):
+                lin = False
+    decs, through = [], None
+    # The lightest-pattern decoder returns every weight <= r pattern exactly
+    # iff no two such patterns share a syndrome, i.e. ker(H) has no nonzero
+    # word of weight <= 2r. Re-prove this when a table was omitted. A
+    # hierarchical decoder uses a different algorithm and needs its own bound.
+    from ftqc_codes.hier import kernel_radius
+    kernel_proofs = {}
+    for index, (d, info) in enumerate(zip(g.decoders, an.dec_info)):
+        r = radius.get(d.name) if isinstance(radius, dict) else radius
+        supplied = r is not None
+        bound = info["unique_through"]
+        proof = "leader table"
+        if d.rule is not None:
+            # With at most t1 total errors every inner column decodes exactly.
+            bound = an.dec[index][2].h.t1
+            proof = "hierarchical inner leader tables"
+        if not supplied:
+            r = bound
+        if type(r) is not int or not 0 <= r <= d.npos:
+            return dict(type="local", local=False, coordinates=n,
+                        reason=f"no valid integer radius for decoder {d.name}")
+        evidence = {}
+        if bound is None:
+            key = (tuple(d.checks), d.npos, r)
+            if key not in kernel_proofs:
+                kernel_proofs[key] = kernel_radius(d.checks, d.npos, r, an.cap)
+            bound, evidence = kernel_proofs[key]
+            proof = "minimum weight of check kernel"
+        if r > bound:
+            return dict(type="local", local=False, coordinates=n,
+                        reason=f"radius {r} exceeds proved radius {bound} for decoder {d.name}")
+        row = dict(name=d.name, radius=r, source="given" if supplied else "table")
+        if supplied or d.rule is not None:
+            row["proof"] = dict(method=proof, **evidence)
+        decs.append(row)
+        through = r if through is None else min(through, r)
+    return dict(type="local", local=True, coordinates=n, fault_effects=len(an.cols), decoders=decs,
+                through=through, gate=gate, ec=ec, close=bool(ec and lin), sector=sector)
+
+
+def independent_of_input(an, names=None):
+    """Which decoders' check values no input error can change (names: restrict to these).
+    For error correction repeated on one block this is the statement that a later round
+    is driven by the faults of the rounds before it and not by what the block arrived with."""
+    out = {}
+    for d, (off, w) in zip(an.g.decoders, an.dec_layout):
+        if names is not None and d.name not in names:
+            continue
+        mask = ((1 << w) - 1) << (an.nd + off)
+        hit = None
+        for b, row in enumerate(an.in_sig):
+            for p, (sx, sz) in enumerate(row):
+                for t, sg in (("X", sx), ("Z", sz)):
+                    if hit is None and sg & mask:
+                        hit = [b, p, t]
+        out[d.name] = dict(independent=hit is None, input_error=None if hit is None else [hit])
+    return out

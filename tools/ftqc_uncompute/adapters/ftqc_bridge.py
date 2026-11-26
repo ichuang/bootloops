@@ -32,6 +32,11 @@ def ftqc_zx_available() -> bool:
     return importlib.util.find_spec("ftqc_zx") is not None
 
 
+def ftqc_compose_available() -> bool:
+    _ensure_tools_on_syspath()
+    return importlib.util.find_spec("ftqc_compose") is not None
+
+
 def kmx_clifford_to_ftqc_audit_ticks(
     circuit: KickMixCircuit,
     *,
@@ -155,11 +160,11 @@ def price_circuit_with_zx_contract(
     zx_contract: dict[str, Any],
     *,
     t_factory_wire_ticks: int = 5000,
-    t_factory_escape_hi: str = "1e-12",
+    t_factory_escape_hi: str | Fraction = "1e-12",
 ) -> dict[str, Any]:
     """Compute outward-rounded physical FTQC spacetime volume and logical failure budget
     by combining logical gate/HMR counts from `circuit` with a certified `ftqc_zx-contract-v1`
-    EC/Clifford gadget contract.
+    EC/Clifford gadget contract and an `ftqc_compose` logical-T half-diamond bound (rational or Decimal str).
     """
     if zx_contract.get("schema") != "ftqc_zx-contract-v1":
         raise ValueError(f"Expected schema 'ftqc_zx-contract-v1', got {zx_contract.get('schema')!r}")
@@ -175,7 +180,13 @@ def price_circuit_with_zx_contract(
 
     wt_per_ec = Decimal(str(zx_contract["enclosures"]["expected_wire_ticks_per_shot_hi"]))
     esc_per_ec = Decimal(str(zx_contract["enclosures"]["conditional_escape_hi"]))
-    esc_per_t = Decimal(t_factory_escape_hi)
+    if isinstance(t_factory_escape_hi, Fraction):
+        esc_per_t = ctx.divide(Decimal(t_factory_escape_hi.numerator), Decimal(t_factory_escape_hi.denominator))
+    elif "/" in str(t_factory_escape_hi):
+        n_s, d_s = str(t_factory_escape_hi).split("/", 1)
+        esc_per_t = ctx.divide(Decimal(int(n_s)), Decimal(int(d_s)))
+    else:
+        esc_per_t = Decimal(str(t_factory_escape_hi))
 
     ec_volume = ctx.multiply(Decimal(cliff_rounds + total_t), wt_per_ec)
     factory_volume = ctx.multiply(Decimal(total_t), Decimal(t_factory_wire_ticks))

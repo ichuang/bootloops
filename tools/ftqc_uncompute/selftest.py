@@ -287,11 +287,16 @@ def _leg_l6_receipts_and_bridges() -> str:
             cat4, _ = ftqc_zx.synth_cat_state(4)
             zxc = ftqc_zx.build_gadget_contract(cat4, p_phys="1/1000")
             ex_dqi = KickMixCircuit.from_kmx((_PKG_DIR / "examples" / "dqi_rs_tiny_mbuc.kmx").read_text(encoding="utf-8"))
-            priced = adapters.price_circuit_with_zx_contract(ex_dqi, zxc)
+            priced = adapters.price_circuit_with_zx_contract(ex_dqi, zxc, t_factory_escape_hi="21/2000")
             assert Decimal(priced["total_wire_ticks_upper"]) > Decimal(0)
             bridge_notes.append("ftqc_zx live")
         except ModuleNotFoundError:
             bridge_notes.append("ftqc_zx partial-local")
+    if adapters.ftqc_compose_available():
+        import ftqc_compose  # type: ignore[import-not-found]
+
+        _ = ftqc_compose
+        bridge_notes.append("ftqc_compose live")
     return ", ".join(bridge_notes)
 
 

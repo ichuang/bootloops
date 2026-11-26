@@ -486,6 +486,77 @@ def t_concat():
     refuses("control: concat claim above the product", lambda: certify.verify(bad), "arithmetic")
 
 
+# ---------------------------------------------------------------- 5e. hierarchical decoding
+def t_hier():
+    import itertools
+    import random
+    from ftqc_codes import hier
+    st = codes.steane()
+    big = codes.concatenate(st, st)
+    for sector in "XZ":
+        h = hier.Hier(st, st, sector)
+        check(f"hier {sector}: radii 1 and 1; checks are the concatenated code's",
+              (h.t1, h.t2) == (1, 1) and h.checks == (big.hz if sector == "X" else big.hx))
+        stab = gf2.Echelon(big.hx if sector == "X" else big.hz)
+
+        def good(x):
+            p = h.decode(h.check_values(x))
+            return p is not None and (p ^ x) in stab
+        # one arbitrary column (all 128 patterns), one error in each of up to two others
+        ok = n = 0
+        for a in (0, 4):
+            others = [c for c in range(7) if c != a]
+            for pat in range(128):
+                base = pat << (7 * a)
+                cases = [base]
+                cases += [base | 1 << (7 * c + q) for c in others for q in range(7)]
+                for c1, c2 in itertools.combinations(others, 2):
+                    cases += [base | 1 << (7 * c1 + q1) | 1 << (7 * c2 + q2)
+                              for q1 in range(7) for q2 in range(7)]
+                for x in cases:
+                    n += 1
+                    ok += good(x)
+        check(f"hier {sector}: one arbitrary column (two choices, all 128 patterns) and up to two single errors elsewhere, all corrected",
+              ok == n and n == 2 * 128 * (1 + 42 + 15 * 49), f"{ok}/{n}")
+        rnd = random.Random(4)
+        ok = n = 0
+        for _ in range(4000):
+            a = rnd.randrange(7)
+            x = rnd.randrange(128) << (7 * a)
+            for c in range(7):
+                if c != a and rnd.random() < 0.8:
+                    x |= 1 << (7 * c + rnd.randrange(7))
+            n += 1
+            ok += good(x)
+        check(f"hier {sector}: one arbitrary column and one error in every other column (sampled)", ok == n)
+        # two bad columns can defeat it, and weight 4 is where that starts
+        fail = None
+        for q in itertools.combinations(range(14), 4):
+            x = sum(1 << p for p in q)
+            if len(h.bad_columns(x)) == 2 and not good(x):
+                fail = x
+                break
+        check(f"hier {sector}: some weight-4 error on two columns is not corrected", fail is not None)
+        check(f"hier {sector}: bad columns are counted from the pattern",
+              h.bad_columns(0b11 | 1 << 7) == [0] and h.bad_columns(0b1) == [])
+        # every error of weight <= 3 has at most one bad column
+        ok = all(good(sum(1 << p for p in q)) for q in itertools.combinations(range(49), 3)
+                 if rnd.random() < 0.15)
+        check(f"hier {sector}: sampled weight-3 errors are corrected", ok)
+    cert = hier.certificate(RECEIPTS["golay"], RECEIPTS["steane"])
+    check("hier: certificate from receipts (Golay over Steane: t1 = 1, t2 = 3, 161 qubits)",
+          cert["n"] == 161 and cert["sectors"]["X"] == dict(t1=1, t2=3) and "Step 3" in cert["proof"])
+    refuses("hier: an inner code with k = 2 is refused",
+            lambda: hier.certificate(RECEIPTS["steane"], RECEIPTS["toric:3"]), "k = 1")
+    inflated = copy.deepcopy(RECEIPTS["steane"])
+    for quantity in ("d_x", "wmin_x"):
+        inflated["facts"][quantity].update(lower=15, upper=None, exact=False, witness=None, partner=None)
+        inflated["evidence"].append(dict(leg="A", quantity=quantity, status="proved", claim=f"{quantity} >= 15"))
+    refuses("hier: claimed radii must follow from the actual parity checks",
+            lambda: hier.certificate(inflated, RECEIPTS["steane"]), "proved kernel radius")
+    tab, u = hier.leader_table(codes.golay().hz, 23)
+    check("hier: Golay table has 2048 entries, unique through 3", len(tab) == 2048 and u == 3)
+
 # ---------------------------------------------------------------- 6. SAT leg (needs cadical)
 def t_sat(heavy):
     if not sat.find_cadical():
@@ -626,7 +697,7 @@ def main():
     heavy, lean = "--heavy" in sys.argv, "--lean" in sys.argv
     t0 = time.monotonic()
     for fn, args in ((t_gf2, ()), (t_minweight, ()), (t_families, ()), (t_controls, ()),
-                     (t_cnf, ()), (t_lrat, ()), (t_bch, ()), (t_cuts, ()), (t_concat, ()), (t_sat, (heavy,)), (t_cli, ()), (t_lean, (lean,))):
+                     (t_cnf, ()), (t_lrat, ()), (t_bch, ()), (t_cuts, ()), (t_concat, ()), (t_hier, ()), (t_sat, (heavy,)), (t_cli, ()), (t_lean, (lean,))):
         t = time.monotonic()
         fn(*args)
         print(f"      {fn.__name__:12s} {time.monotonic() - t:6.2f} s")

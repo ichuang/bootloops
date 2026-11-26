@@ -8,4 +8,7 @@ and `ftqc_codes`.
     python3 -m ftqc_gadgets analyze knill:steane,anc=spec --check ec:1 --close 1   # from tools/
     python3 tools/ftqc_gadgets/selftest.py                                         # battery, from the repository root
 
+The coordinate-locality certificate (`--local`) and `levels.py` extend the same
+questions to large codes and to the outer level of a concatenated scheme.
+
 See `GUIDE.md`.

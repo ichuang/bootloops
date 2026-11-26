@@ -126,8 +126,12 @@ class Decoder:
                  to be flipped (transversal measurement followed by classical decoding);
         X, Z     targets[p] is a qubit: a Pauli of that type is applied there as a frame."""
 
-    def __init__(self, name, checks, bits, kind, targets):
+    def __init__(self, name, checks, bits, kind, targets, rule=None):
         self.name, self.checks, self.kind = name, list(checks), kind
+        # rule: None for the lightest pattern with the observed check values, or
+        # dict(type="hier", sector, outer=code json, inner=code json) for hierarchical
+        # decoding of a concatenated code (ftqc_codes.hier), whose checks these must be
+        self.rule = rule
         self.bits = [sorted(int(i) for i in b) for b in bits]
         self.targets = [int(t) for t in targets]
         self.npos = len(self.targets)
@@ -140,13 +144,16 @@ class Decoder:
                 raise GadgetError(f"decoder {name}: a check refers to a missing position")
 
     def to_json(self):
-        return dict(name=self.name, checks=[gf2.supp(r) for r in self.checks], bits=self.bits,
-                    kind=self.kind, targets=self.targets)
+        d = dict(name=self.name, checks=[gf2.supp(r) for r in self.checks], bits=self.bits,
+                 kind=self.kind, targets=self.targets)
+        if self.rule is not None:
+            d["rule"] = self.rule
+        return d
 
     @staticmethod
     def from_json(d):
         return Decoder(d["name"], [gf2.from_supp(r) for r in d["checks"]], d["bits"],
-                       d["kind"], d["targets"])
+                       d["kind"], d["targets"], d.get("rule"))
 
 
 class Gadget:
