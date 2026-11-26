@@ -20,6 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
+    "gross_circuit": ("rounds target", ""),
     "gross_z": ("target", ""),
     "t_bounds": (
         "a b logical_x logical_z rounds resource",
@@ -72,6 +73,10 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     if backend == "sat" and kind not in ("circuit", "t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "gross_circuit":
+            from .gross_noisy import report
+
+            return report(s, budget)
         if kind == "gross_z":
             return gross_certificate(s, budget)
         if kind == "t_bounds":
@@ -158,6 +163,9 @@ def main():
         "schedule", help="expand a conditional T gadget to physical fault locations"
     )
     export.add_argument("spec", type=Path)
+    export.add_argument(
+        "--probe", choices=["X", "Z"], help="gross circuit readout basis"
+    )
     export.add_argument("--arm", choices=("gate", "X", "Y"), default="gate")
     export.add_argument("-o", type=Path)
     meas = sub.add_parser(
@@ -192,6 +200,20 @@ def main():
             from .algebra import bits
 
             validate(s)
+            if s["kind"] == "gross_circuit":
+                from .gross_probes import experiment
+
+                if args.probe is None or args.arm != "gate":
+                    raise ValueError("gross circuit export requires --probe X or Z")
+                data = experiment(s["rounds"], args.probe).to_json()
+                text = json.dumps(data, separators=(",", ":")) + "\n"
+                if args.o:
+                    args.o.write_text(text)
+                else:
+                    print(text, end="")
+                return 0
+            if args.probe is not None:
+                raise ValueError("--probe applies to gross_circuit schedules")
             if (
                 s["kind"] not in ("t_gate", "t_bounds")
                 or s["resource"] != "ideal-encoded-T"

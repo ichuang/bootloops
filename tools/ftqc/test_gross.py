@@ -153,3 +153,41 @@ class NoisyCycleTests(unittest.TestCase):
                 self.assertEqual(fast.replay([(site, label)]), (0, sig))
         with self.assertRaisesRegex(ValueError, "random"):
             RecordModel(Circuit([[("RX", 0)], [("M", 0)]], detectors=[[0]], outputs=[]))
+
+
+class CircuitDistanceTests(unittest.TestCase):
+    def test_projected_exclusion(self):
+        from itertools import combinations
+        from random import Random
+        from operator import xor
+        from functools import reduce
+        from faultcert.projected import exclude
+
+        rng = Random(2026)
+        for _ in range(50):
+            cols = sorted(set(rng.randrange(1, 64) for _ in range(9)))
+            for w in range(5):
+                sums = (
+                    reduce(xor, subset, 0)
+                    for r in range(1, w + 1)
+                    for subset in combinations(cols, r)
+                )
+                harmful = any(v and not v & 15 for v in sums)
+                ok, _, hit = exclude(cols, 4, w, 100000)
+                self.assertEqual(ok, not harmful)
+                if hit:
+                    self.assertLessEqual(len(hit), w)
+                    self.assertTrue(reduce(xor, hit))
+                    self.assertEqual(reduce(xor, hit) & 15, 0)
+
+    def test_short_rounds_and_tampering(self):
+        from .__main__ import receipt, verify
+
+        s = dict(schema=1, kind="gross_circuit", rounds=2, target=3)
+        r = receipt(s)
+        self.assertEqual((r["result"]["lower"], r["result"]["upper"]), (2, 2))
+        self.assertEqual(r["result"]["status"], "counterexample")
+        verify(s, r)
+        r["result"]["witness"]["faults"][0][0] += 1
+        with self.assertRaises(ValueError):
+            verify(s, r)
