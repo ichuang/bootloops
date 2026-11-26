@@ -110,6 +110,8 @@ The [ftqc_audit package](../../tools/ftqc_audit/GUIDE.md) checks circuit-level f
 
 The [ftqc_extractors package](../../tools/ftqc_extractors/GUIDE.md) verifies HGP and gross-code extractors and scheduled logical measurements. Its SAT backend uses the [ftqc_codes](../../tools/ftqc_codes/GUIDE.md) CNF encoder and LRAT checker.
 
+The [ftqc_gadgets package](../../tools/ftqc_gadgets/GUIDE.md) checks gate and error-correction properties on unknown inputs, fault equivalence, refinement, and composition of gadget receipts.
+
 ## License
 
 MIT License. Copyright (c) 2026 Anthropic, PBC. Created by Matthew D. Schwartz; code written by Claude (Anthropic) under his supervision. Documentation is licensed CC BY 4.0. See LICENSE, LICENSE-CONTENT and NOTICE at the repository root; third-party components keep their own licenses (THIRD_PARTY.md).
