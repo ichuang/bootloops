@@ -1,23 +1,23 @@
 # Fault-tolerant quantum computing in BootLoops
 
-Choose a tool by the claim you need to prove. A distance can count qubits in a code or faulty locations in a circuit. A gadget proof can instead ask how much error survives correction on an unknown input, or whether an implementation can replace a reference circuit. The five packages on the `ftqc_integration` branch make these questions executable in one checkout.
+The six tools on `ftqc_integration` cover different parts of a fault-tolerance argument. Start with the object you want to certify and identify what the next step needs from its receipt.
 
-| Question | Tool | Evidence |
+| Tool | Input and question | Evidence |
 |---|---|---|
-| What can the memory code protect? | [`ftqc_codes`](ftqc_codes/GUIDE.md) | CSS code parameters, logical Pauli witnesses, and bounds on code distance from the check matrices. |
-| Which faults can a particular Clifford circuit hide? | [`ftqc_audit`](ftqc_audit/GUIDE.md) | Detector and observable flips per physical location, replayable fault sets, circuit-distance bounds and strict fault-tolerance checks for preparations. |
-| What does an encoded gate or correction gadget guarantee for an unknown input? | [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) | Bounds on residual errors with input errors and internal faults counted separately. Refinement and composition receipts justify replacing a specified sub-gadget with an implementation. |
-| What does a gadget guarantee one level up, where a qubit is an inner code block? | [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) (`--local`, `levels.py`) with [`ftqc_codes`](ftqc_codes/GUIDE.md) (`hier.py`) | A coordinate-locality certificate ("at most T bad columns, hence correct") whose radius comes from the outer code's receipt, a levels receipt joining it to the inner gadgets' receipts, and a direct test on the physical two-level gadget with hierarchical decoding. |
-| Does an extractor measure the intended logical observable and preserve the other logical qubits? | [`ftqc_extractors`](ftqc_extractors/README.md) | HGP and gross-code measurement proofs, static and scheduled distance bounds, and conditional logical T proofs with explicit magic-state assumptions. |
-| Can a proposed Clifford circuit replace a reference under a given fault model? | [`ftqc_zx`](ftqc_zx/GUIDE.md) | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic bounds for a specified noise model. |
+| [ftqc_codes](ftqc_codes/GUIDE.md) | Given CSS check matrices, which logical errors can the memory detect? | Code parameters, bounds on X and Z distance, witnesses and hierarchical decoding guarantees. |
+| [ftqc_extractors](ftqc_extractors/GUIDE.md) | Does an HGP or gross-code extractor measure the intended logical observable and preserve the spectators? | Static and scheduled distance bounds, logical readout and frame checks, and logical T gate receipts with a specified resource input. |
+| [ftqc_audit](ftqc_audit/GUIDE.md) | Which physical faults can evade a Clifford circuit’s detectors? | Detector and observable flips per location, replayable fault sets, circuit-distance intervals and preparation checks. |
+| [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, refinement receipts for component substitution and two-level checks on concatenated codes. |
+| [ftqc_zx](ftqc_zx/GUIDE.md) | Can a candidate replace a reference circuit under the specified noise model? | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic gadget contracts. |
+| [ftqc_compose](ftqc_compose/GUIDE.md) | Do the output and fault guarantees of one operation meet the next operation’s input requirements? | Typed joins, residual data and frame checks, level reduction and local-stochastic error bounds for a composed study. |
 
 ## Where the tools connect
 
-- **Code to circuit.** The audit, gadget and extractor packages import code constructions or binary linear algebra from `ftqc_codes`. The audit and extractor SAT backends also use its CNF and LRAT routines. A static distance counts the minimum weight of a logical Pauli. To obtain a circuit distance, specify preparations, gates, idle ticks, measurements, detectors and protected outputs.
-- **Circuit to encoded gadget.** `ftqc_gadgets` uses the audit circuit and fault propagator. The gadget layer adds reference qubits for unknown encoded inputs, decoder rules, and tests of the ideal logical action. Its `fc:SPEC` input runs a circuit from the audit library as a preparation gadget. Composition requires a refinement receipt for each substituted part.
-- **Level to level.** `ftqc_gadgets` certifies an outer gadget by showing that every fault acts within one coordinate; the certificate counts coordinates, so anything may happen inside a bad one. The decoder radius comes from the outer code's `ftqc_codes` receipt, and `ftqc_codes.hier` supplies the hierarchical decoder and what it corrects. A levels receipt lists one inner receipt per kind of outer operation, quotes the level-reduction step and names what is assumed. It gives no probability; a bound on how often a column is bad comes from elsewhere, for instance an `ftqc_zx` contract.
-- **Extractor to audit.** The extractor package exports the physical X and Z probes of a gross-code measurement as native audit circuits. For HGP schedules its audit bridge can replay faults in the enclosing circuit or export the verified-cat preparation. The extractor defines which logical results and spectators to protect. [HGP bridge](ftqc_extractors/AUDIT.md) · [Gross-code probes and proof](ftqc_extractors/GROSS_CIRCUIT.md)
-- **ZX design and verification.** `ftqc_zx` has its own circuit representation and verification engine. It can check a candidate against an ideal specification under a selected noise model. To compare a ZX result with a location-fault study, match the gates and idles, input codespace, detector or flag handling, output frame and fault-counting convention. Each tool's verifier consumes its own evidence format.
+- **From a code to a noisy circuit.** The audit, gadget and extractor packages reuse code constructions or binary linear algebra from `ftqc_codes`. A static distance counts data qubits supporting a logical Pauli. To count faulty circuit locations, the study also specifies preparations, gates, idles, measurements, detectors and protected outputs.
+- **From extractor to audit to composition.** The extractor defines the measured logical and its spectators, and exports physical X and Z probes as native audit circuits. The compose gross-code checker replays the extractor distance receipt and uses the audit fault model to calculate the residual data Pauli after applying the split-record frame. The HGP bridge also supports replay in the enclosing circuit and export of verified-cat preparations. [HGP bridge](ftqc_extractors/AUDIT.md) · [Gross-code probes](ftqc_extractors/GROSS_CIRCUIT.md) · [Residual checker](ftqc_compose/GUIDE.md#gross-code-residual-data-and-frame)
+- **From a Clifford schedule to a concatenated gadget.** `ftqc_gadgets` uses the audit fault propagator and adds encoded Bell inputs, reference qubits and decoders. Its two-level checker binds inner receipts to signed logical operations and outer faults to physical columns. It verifies the decoder radius and records any specified ancillas and the rectangle argument assumed by the reduction. [Gadget guide](ftqc_gadgets/GUIDE.md)
+- **From gadgets to a circuit-wide noise bound.** `ftqc_compose` checks ordered wires, residual filters and bad fault supports. Its level-reduction checker substitutes physical supports into a logical circuit. A local-stochastic bound also needs a joint fault-support model. A two-level gadget receipt can inform the local claim; a Definition 4.8 hypothesis supplied to compose remains an explicit premise. [Composition guide](ftqc_compose/GUIDE.md#level-reduction)
+- **Comparing a ZX design with a location-fault study.** Run the ZX verifier on the proposed circuit and its reference. To use its result in another argument, match the gates and idles, input codespace, flag or detector handling, output frame and fault-counting convention. The ZX contract has its own verifier and noise model. [ZX guide](ftqc_zx/GUIDE.md)
 
 ## Follow a gross-code measurement into the audit tool
 
@@ -47,9 +47,9 @@ python3 -m ftqc_gadgets verify "$out/gadget.json" --full
 python3 -m ftqc_zx equiv steane_5anc steane_spec --w 3 --noise-model circuit_css --code steane_7_1_3
 ```
 
-## One level up: QR-47 as an outer code
+## QR-47 as an outer code
 
-The quadratic-residue code [[47,1,11]] corrects five errors, too many to enumerate. The locality certificate shows instead that every fault of Steane-type correction acts within one coordinate, and takes the radius from the code's receipt.
+The [[47,1,11]] quadratic-residue code supplies a candidate decoding radius of five. With lookup tables disabled, the gadget verifier proves that radius from the actual decoder check matrix and checks that each fault stays in its assigned physical column.
 
 ```sh
 python3 -m ftqc_codes certify qr:47 -o "$out/qr47.json"
@@ -59,12 +59,22 @@ python3 -m ftqc_gadgets verify "$out/outer.json"
 
 The report states that the gate, error-correction and any-input properties hold when faults and input errors touch at most five coordinates. Read with a coordinate as a column of inner blocks, that is the outer half of a two-level argument; `ftqc_gadgets/levels.py` joins it to the inner receipts.
 
-## Reproduce the integration checks
+## Carry a distillation bound into a logical T gate
 
-From BootLoops, run the five registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+The research study feeds the correcting 15-to-1 factory into an explicit CSS encoder and the extractor’s HGP logical T gate. Compose replays the gate receipt and verifies the four adaptive measurement branches. For the banked correlated factory model, ideal encoding and gate execution give a logical-channel half-diamond distance of at most 21/2000. A single encoder fault can produce an accepted logical Z, so the noisy study accounts for factory, encoder and gate faults separately.
+
+Replay the eight-qubit example from the **research repository root**. The companion 450-qubit example and both gross-code residual studies run as part of the full replay. [Composition studies](https://github.mit.edu/ichuang/RESEARCH-extractors-proof-system-2026/tree/main/studies/compose)
 
 ```sh
-python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx
+PYTHONPATH=bootloops/tools python3 -m ftqc_compose verify studies/compose/distilled-t-hgp8.json studies/compose/distilled-t-hgp8-receipt.json
+```
+
+## Reproduce the integration checks
+
+From BootLoops, run the six registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+
+```sh
+python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx ftqc_compose
 ```
 
 From the research repository root with its pinned BootLoops submodule initialized, run the command below to verify the saved inputs, evidence hashes, bounds and witnesses. The twelve-round search also requires a C++17 compiler with unsigned 128-bit integers. [Research studies and replay instructions](https://github.mit.edu/ichuang/RESEARCH-extractors-proof-system-2026/tree/main/studies)
