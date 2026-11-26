@@ -13,7 +13,10 @@ from .proof import solve, replay_sat
 
 from .t_verify import analyze as analyze_t
 
+from .t_source import source_record
+
 FIELDS = {
+    "t_source": ("a b logical_x logical_z rounds target resource",""),
     "t_gate": ("a b logical_x logical_z rounds target resource","trailing_identity"),
     "hgp": ("a b", ""),
     "column": ("a b column word vertices ports edges target", "paths"),
@@ -57,6 +60,8 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     if backend == "sat" and kind not in ("circuit","t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "t_source":
+            return source_record(s,reverse)
         if kind == "t_gate":
             return analyze_t(s,backend,budget,seconds,reverse)
         if kind == "hgp":
