@@ -915,6 +915,36 @@ def t_levels(heavy):
     refuses("levels: an outer gadget that is not local is refused",
             lambda: levels.reduction(certify.build(library.load("cnot:steane,leaky"), local=True), inner),
             "locality")
+    idle = certify.build(library.idle("steane"), [("gate", 1)])
+    refuses("one-block idle cannot fill a CNOT role",
+            lambda: levels.reduction(outer, dict(inner, cnot=idle)), "arity")
+    swapped = dict(inner, measure_x=inner["measure_z"], measure_z=inner["measure_x"])
+    refuses("X and Z measurement roles cannot be exchanged",
+            lambda: levels.reduction(outer, swapped), "logical relation")
+    def single_gate(name):
+        b = Builder("single-qubit gates")
+        data = b.input(library.code_of("steane"))
+        b.tick([(name, q) for q in data])
+        b.output(data, library.code_of("steane"))
+        return b.build()
+    h = single_gate("H")
+    oh = certify.build(h, local=True)
+    refuses("transversal H needs an inner H", lambda: levels.reduction(oh, inner), "no inner receipt for h")
+    refuses("identity and H have different signed Choi relations",
+            lambda: levels.reduction(oh, dict(inner, h=idle)), "logical relation")
+    lv_h = levels.reduction(oh, dict(inner, h=certify.build(h, [("gate", 1)])))
+    check("a verified logical Hadamard fills the H role", lv_h["inner"][-1]["logical_action"]["operation"] == "h")
+    refuses("even an ideal unsupported outer phase gate needs an implementation",
+            lambda: levels.reduction(certify.build(single_gate("!S"), local=True), inner), "unsupported outer operation S")
+    # Transversal S squared gives a logical Z with the identity's unsigned Choi group.
+    b = Builder("signed identity")
+    data = b.input(library.code_of("steane"))
+    for gate in ("S", "S"):
+        b.tick([(gate, q) for q in data])
+    b.output(data, library.code_of("steane"))
+    oi = certify.build(library.idle("steane"), local=True)
+    refuses("a logical Pauli sign cannot be hidden in an idle receipt",
+            lambda: levels.reduction(oi, dict(inner, idle=certify.build(b.build(), [("gate", 1)]))), "wrong sign")
     bad = copy.deepcopy(lv)
     bad["conclusion"]["bad_columns_tolerated"] = 2
     refuses("levels: an inflated conclusion is refused", lambda: levels.verify_reduction(bad, outer, inner),

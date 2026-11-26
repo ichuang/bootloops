@@ -268,3 +268,11 @@ correction: E. Knill (2005). Syndrome extraction with encoded ancillas: A. Stean
 (1997). Fault model and simulator: ftqc_audit. Codes: ftqc_codes.
 
 New receipts use `ftqc_gadgets-receipt-1` and `ftqc_gadgets-composition-1`. The verifier also reads archived `gadgetcert-receipt-1` and `gadgetcert-composition-1` receipts.
+
+Two-level reduction binds each inner operation to its signed logical action on
+canonical encoded Bell inputs. Input and output order identifies the CNOT
+control and target. The receipt gives the measurement parity and any tracked
+Pauli-frame parities as raw record indices. Idles, Hadamards, preparations and
+destructive X/Z measurements have distinct roles. Unimplemented operations are
+refused even if marked ideal in the outer body. Input-error placeholders and
+matched fresh ancilla specifications have their own boundary contracts.

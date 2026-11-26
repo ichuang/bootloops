@@ -29,6 +29,8 @@ from ftqc_codes import gf2, hier
 from ftqc_codes.codes import concatenate
 
 from . import certify, library, props
+from .columns import layout
+from .roles import logical_action
 from .effects import Analysis
 from .gadget import Decoder, Gadget, GadgetError, logical_x
 
@@ -53,14 +55,12 @@ STATEMENT = (
     "as specifications) are hypotheses as well: an outer ancilla must refine its specification "
     "with bad columns in place of faults.")
 
-ROLE_OF = {"R": "prep_zero", "RX": "prep_plus", "CX": "cnot", "M": "measure_z", "MX": "measure_x"}
-KIND_OF = dict(prep_zero="prep", prep_plus="prep", cnot="gate", ec="ec", measure_z="ec", measure_x="ec")
+ROLE_OF = {"I": "idle", "H": "h", "R": "prep_zero", "RX": "prep_plus", "CX": "cnot", "M": "measure_z", "MX": "measure_x"}
+KIND_OF = dict(idle="gate", h="gate", prep_zero="prep", prep_plus="prep", cnot="gate", ec="ec", measure_z="ec", measure_x="ec")
 
 
 # ---------------------------------------------------------------------- physical two-level gadgets
 def positions(g):
-    from .columns import layout
-
     pos, _ = layout(g)
     return pos, len((g.inputs + g.outputs)[0].qubits)
 
@@ -223,7 +223,7 @@ class Direct:
 
 
 # ---------------------------------------------------------------------- reduction receipts
-def supports(receipt, kind):
+def supports(receipt, kind, prep_spec=None):
     """Largest T such that the receipt establishes property `kind` for r + s <= T
     (Pauli weight), from an enumeration, a locality certificate or a composition;
     -1 if it does not.  A refinement of a preparation specification counts as `prep`."""
@@ -232,7 +232,7 @@ def supports(receipt, kind):
         for c in receipt["conclusions"]:
             if c["kind"] == kind and c.get("weight") in ("pauli", None):
                 best = max(best, c["holds_through"])
-            if kind == "prep" and c["type"] == "refine":
+            if kind == "prep" and c["type"] == "refine" and c["specification_sha256"] == prep_spec:
                 best = max(best, c["holds_through"])
         return best
     for r in receipt.get("results", []):
@@ -240,7 +240,8 @@ def supports(receipt, kind):
             best = max(best, r["holds_through"])
         elif r["type"] == "close" and kind == "close" and r.get("weight", "pauli") == "pauli":
             best = max(best, r["holds_through"])
-        elif r["type"] == "refine" and kind == "prep" and r["input_weight"] == 0:
+        elif (r["type"] == "refine" and kind == "prep" and r["input_weight"] == 0
+              and r["spec"]["sha256"] == prep_spec):
             best = max(best, r["holds_through"])
         elif r["type"] == "local" and r["local"] and r.get(kind if kind != "prep" else "none"):
             best = max(best, 10 ** 6 if r["through"] is None else r["through"])
@@ -266,14 +267,27 @@ def reduction(outer_receipt, inner, cap=3_000_000):
         raise certify.Refusal("the outer receipt carries no positive locality certificate")
     loc = loc[0]
     g = Gadget.from_json(outer_receipt["gadget"])
-    # noiseless operations belong to parts given as specifications; they are listed as
-    # assumptions, not matched with inner gadgets
-    used = sorted({ROLE_OF[op.name] for k, t in enumerate(g.circuit.ticks) if k >= g.body_start
-                   for op in t if op.noisy and op.name in ROLE_OF} | {"ec"})
+    input_wires = {q for b in g.inputs for q in b.refs + b.qubits}
+    if not 0 <= g.body_start <= len(g.circuit.ticks) or any(
+            op.noisy or not set(op.qs) <= input_wires
+            for tick in g.circuit.ticks[:g.body_start] for op in tick):
+        raise certify.Refusal("outer preamble must only prepare the ideal input and its references")
+    _, exempt = layout(g)
+    # Input-boundary idles represent input errors, not outer instructions.
+    locs = g.circuit.locations()
+    exempt.update(locs[i][2] for block in g.inputs for i in block.in_locs)
+    used = {"ec"}
+    for tick in g.circuit.ticks[g.body_start:]:
+        for op in tick:
+            if op in exempt:
+                continue
+            if op.name not in ROLE_OF:
+                raise certify.Refusal(f"unsupported outer operation {op.name}")
+            used.add(ROLE_OF[op.name])
     assumed = sorted({f"{p['role']} ancilla as its specification" for p in g.parts
                       if p.get("method") == "spec"})
     rows, t1, code_sha = [], None, None
-    for role in used:
+    for role in sorted(used):
         rec = inner.get(role)
         if rec is None:
             raise certify.Refusal(f"no inner receipt for {role}")
@@ -285,26 +299,27 @@ def reduction(outer_receipt, inner, cap=3_000_000):
         else:
             certify.verify(rec, cap=cap)
             evid = base = rec
-        need = [KIND_OF[role]] + (["close"] if role == "ec" else [])
-        got = {k: supports(evid, k) for k in need}
-        through = min(got.values())
-        if through < 0:
-            raise certify.Refusal(f"{role}: the receipt does not establish {' and '.join(need)}")
         bg = Gadget.from_json(base["gadget"])
-        if evid is base and any(p.get("method") == "spec" for p in bg.parts):
-            raise certify.Refusal(f"{role}: the inner gadget was analysed with specified parts; pass its "
-                                  f"composition with real parts as dict(composition=, target=, parts=)")
-        if role.startswith("measure") and bg.outputs:
-            raise certify.Refusal(f"{role}: a decoded measurement has no output block")
         code = _block_code(base)
         if code is None or len(logical_x(code)) != 1:
             raise certify.Refusal(f"{role}: the inner gadget must act on blocks of a code with k = 1")
+        prep_spec = (library.prep(code, role[5:], "spec").sha256()
+                     if role in ("prep_plus", "prep_zero") else None)
+        need = [KIND_OF[role]] + (["close"] if role == "ec" else [])
+        got = {k: supports(evid, k, prep_spec) for k in need}
+        through = min(got.values())
+        if through < 0:
+            raise certify.Refusal(f"{role}: the receipt does not establish {' and '.join(need)}")
+        if evid is base and any(p.get("method") == "spec" for p in bg.parts):
+            raise certify.Refusal(f"{role}: the inner gadget was analysed with specified parts; pass its "
+                                  f"composition with real parts as dict(composition=, target=, parts=)")
+        action = logical_action(bg, role, code)
         sha = (code.n, tuple(code.hx), tuple(code.hz))
         if code_sha is None:
             code_sha = sha
         elif sha != code_sha:
             raise certify.Refusal(f"{role}: the inner receipts are not all about the same code")
-        rows.append(dict(role=role, gadget=bg.name, properties=got, through=through,
+        rows.append(dict(role=role, gadget=bg.name, logical_action=action, properties=got, through=through,
                          receipt_sha256=certify.receipt_sha(evid)))
         t1 = through if t1 is None else min(t1, through)
     return certify._clean(dict(
