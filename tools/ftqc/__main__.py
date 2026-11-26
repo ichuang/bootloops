@@ -160,12 +160,33 @@ def main():
     export.add_argument("spec", type=Path)
     export.add_argument("--arm", choices=("gate", "X", "Y"), default="gate")
     export.add_argument("-o", type=Path)
+    meas = sub.add_parser(
+        "measurement",
+        help="export the ideal gross-code merge/split protocol and merged checks",
+    )
+    meas.add_argument("spec", type=Path)
+    meas.add_argument("-o", type=Path)
     check = sub.add_parser("verify")
     check.add_argument("spec", type=Path)
     check.add_argument("receipt", type=Path)
     args = parser.parse_args()
     try:
         s = json.loads(args.spec.read_text())
+        if args.command == "measurement":
+            from .gross import measurement
+
+            validate(s)
+            if s["kind"] != "gross_z":
+                raise ValueError(
+                    "measurement export requires an unprimed gross Z input"
+                )
+            data = dict(input_sha256=digest(s), **measurement())
+            text = json.dumps(data, indent=2) + "\n"
+            if args.o:
+                args.o.write_text(text)
+            else:
+                print(text, end="")
+            return 0
         if args.command == "schedule":
             from .t_schedule import TSchedule
             from .algebra import bits

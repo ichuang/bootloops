@@ -92,3 +92,32 @@ class CoverTests(unittest.TestCase):
         axis["cover"] = css_cover.encode(b"")
         with self.assertRaisesRegex(ValueError, "incomplete"):
             verify(s, r)
+
+
+class PortFrameTests(unittest.TestCase):
+    def test_every_ideal_x_record(self):
+        from .algebra import parity, transpose
+        from .gross import measurement, port_frame
+
+        _, _, ports, labels = gross_z()
+        paths, cycles = port_frame(ports, 144, len(labels))
+        edges = transpose([row >> 144 for row in ports], len(labels))
+        for potential in range(0, 1 << len(ports), 2):
+            record = sum(parity(potential, edge) << j for j, edge in enumerate(edges))
+            self.assertFalse(any(parity(record, c) for c in cycles))
+            self.assertEqual(
+                sum(parity(record, p) << j for j, p in enumerate(paths)), potential
+            )
+        export = measurement()
+        self.assertEqual(export["logical_z_record_parity"], list(range(12)))
+        self.assertEqual(export["merged_code"]["n"], 162)
+
+    def test_omitting_gauge_six_admits_a_light_logical(self):
+        from .gross_distance import witness_mask
+
+        _, (n, x, z), _, _ = gross_z()
+        support = list(bits(x[-1]))
+        self.assertEqual(len(support), 4)
+        witness_mask(support, n, z, x[:-1])
+        with self.assertRaisesRegex(ValueError, "not a nontrivial logical"):
+            witness_mask(support, n, z, x)
