@@ -1,4 +1,5 @@
 """Generate and replay content-bound deterministic composition receipts."""
+
 import argparse
 import hashlib
 import json
@@ -19,6 +20,10 @@ def digest(value):
 def receipt(spec):
     if spec["kind"] == "family":
         result = family_result(spec)
+    elif spec["kind"] == "contract":
+        from .contracts import contract_result
+
+        result = contract_result(spec)
     else:
         raise ValueError("unknown study kind")
     return dict(schema="ftqc_compose-1", input_sha256=digest(spec), result=result)

@@ -1,7 +1,7 @@
 """Antichains represent upward-closed bad events on named physical locations."""
+
 from collections import Counter
 from itertools import combinations, product
-
 
 
 def fields(obj, *keys):
@@ -10,7 +10,9 @@ def fields(obj, *keys):
 
 
 def names(items):
-    if not isinstance(items, list) or any(not isinstance(i, str) or not i for i in items):
+    if not isinstance(items, list) or any(
+        not isinstance(i, str) or not i for i in items
+    ):
         raise ValueError("location IDs must be nonempty strings in a list")
     if len(items) != len(set(items)):
         raise ValueError("duplicate location ID")
@@ -46,15 +48,20 @@ class Family:
 
     def describe(self):
         counts = Counter(map(len, self.terms))
-        return dict(sites=sorted(self.sites), minimal=[sorted(t) for t in self.terms],
-                    enumerator={str(k): v for k, v in sorted(counts.items())})
+        return dict(
+            sites=sorted(self.sites),
+            minimal=[sorted(t) for t in self.terms],
+            enumerator={str(k): v for k, v in sorted(counts.items())},
+        )
 
     def union(self, other):
         return Family(self.sites | other.sites, [*self.terms, *other.terms])
 
     def product(self, other):
         disjoint([self, other])
-        return Family(self.sites | other.sites, (x | y for x in self.terms for y in other.terms))
+        return Family(
+            self.sites | other.sites, (x | y for x in self.terms for y in other.terms)
+        )
 
 
 def disjoint(families):
@@ -69,6 +76,8 @@ def disjoint(families):
 
 def leaf(node):
     fields(node, "op", "sites", "minimal")
+    if node["op"] != "family":
+        raise ValueError("expected an explicit support family")
     if not isinstance(node["minimal"], list):
         raise ValueError("minimal must be a list of supports")
     return Family(names(node["sites"]), [names(t) for t in node["minimal"]])
@@ -89,8 +98,11 @@ def evaluate(node):
         if inner.keys() != outer.sites:
             raise ValueError("substitution must cover every outer site exactly once")
         sites = disjoint(inner.values())
-        terms = (frozenset().union(*choice) for t in outer.terms
-                 for choice in product(*(inner[k].terms for k in sorted(t))))
+        terms = (
+            frozenset().union(*choice)
+            for t in outer.terms
+            for choice in product(*(inner[k].terms for k in sorted(t)))
+        )
         return Family(sites, terms)
     raise ValueError(f"unknown family operation {op!r}")
 
@@ -120,5 +132,9 @@ def family_result(spec):
         for sites in combinations(sorted(family.sites), size):
             if family.bad(frozenset(sites)) != predicate(node, set(sites)):
                 raise ValueError("family disagrees with Boolean semantics")
-    return dict(status="verified", interpretation="exact minimal supports of expression",
-                checked_subsets=2**len(family.sites), **family.describe())
+    return dict(
+        status="verified",
+        interpretation="exact minimal supports of expression",
+        checked_subsets=2 ** len(family.sites),
+        **family.describe(),
+    )
