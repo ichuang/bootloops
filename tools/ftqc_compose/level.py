@@ -155,6 +155,7 @@ def level_result(spec):
     blocks = {}
     vertices = []
     owners = {}
+    ideal_sites = set()
     premises = []
     for v in spec["vertices"]:
         fields(v, "id", "inputs", "outputs", "gadget")
@@ -167,6 +168,8 @@ def level_result(spec):
         if not set(v["inputs"]) <= live.keys() or outs & wires:
             raise ValueError("missing, reused, or out-of-order bundle")
         r = local(v["gadget"])
+        if v["gadget"]["op"] in ("bit-wire", "majority", "vote3"):
+            ideal_sites.update(r["family"].sites)
         join([live.pop(i) for i in v["inputs"]], r["inputs"])
         if len(outs) != len(r["outputs"]):
             raise ValueError("output arity mismatch")
@@ -214,6 +217,7 @@ def level_result(spec):
         "scope": SCOPE,
         "rule": "Theorem 4.11",
         "logical_vertices": vertices,
+        "ideal_physical_sites": sorted(ideal_sites),
         "logical_faults": "general, with environment",
         "conclusion": "avoiding physical faults simulate some avoiding logical fault",
         "premises": premises,

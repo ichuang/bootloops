@@ -33,6 +33,10 @@ def receipt(spec):
 
 
 def evaluate(spec):
+    if spec["kind"] == "local-stochastic":
+        from .stochastic import stochastic_result
+
+        return stochastic_result(spec)
     if spec["kind"] == "level":
         from .level import level_result
 
