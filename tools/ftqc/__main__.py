@@ -143,12 +143,52 @@ def main():
     run.add_argument("--backend", choices=["exact", "sat"], default="exact")
     run.add_argument("--budget", type=int, default=2000000)
     run.add_argument("--seconds", type=int, default=60)
+    export = sub.add_parser(
+        "schedule", help="expand a conditional T gadget to physical fault locations"
+    )
+    export.add_argument("spec", type=Path)
+    export.add_argument("--arm", choices=("gate", "X", "Y"), default="gate")
+    export.add_argument("-o", type=Path)
     check = sub.add_parser("verify")
     check.add_argument("spec", type=Path)
     check.add_argument("receipt", type=Path)
     args = parser.parse_args()
     try:
         s = json.loads(args.spec.read_text())
+        if args.command == "schedule":
+            from .t_schedule import TSchedule
+            from .algebra import bits
+
+            validate(s)
+            if (
+                s["kind"] not in ("t_gate", "t_bounds")
+                or s["resource"] != "ideal-encoded-T"
+            ):
+                raise ValueError("schedule export requires a conditional T input")
+            circuit = TSchedule(s, {"gate": None, "X": 0, "Y": 1}[args.arm])
+            data = dict(
+                input_sha256=digest(s),
+                arm=args.arm,
+                operations=circuit.ops,
+                sign_by_reported_x=circuit.read_sign,
+                meters=[
+                    dict(
+                        start=start,
+                        stop=end,
+                        x_support=list(bits(x)),
+                        z_support=list(bits(z)),
+                        readout=list(bits(r)),
+                        flags=flags,
+                    )
+                    for start, end, x, z, r, flags in circuit.parts
+                ],
+            )
+            text = json.dumps(data, indent=2) + "\n"
+            if args.o:
+                args.o.write_text(text)
+            else:
+                print(text, end="")
+            return 0
         if args.command == "verify":
             verify(s, json.loads(args.receipt.read_text()))
             print("verified")

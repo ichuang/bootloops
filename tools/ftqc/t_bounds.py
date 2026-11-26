@@ -7,6 +7,7 @@ only the compiled meter topology and perfect terminal syndrome boundaries.
 from collections import Counter
 from .algebra import bits, hgp_parameters, seed
 from .t_faults import FaultCircuit
+from .magic import check_readout_classifier
 from .proof import verify_witness
 
 
@@ -61,6 +62,7 @@ def inspect_round(m, part, repetitions):
 def structural(s):
     if s["resource"] != "ideal-encoded-T":
         raise ValueError("structural bounds require a supplied ideal resource")
+    check_readout_classifier()
     rounds = s["rounds"]
     verification = s.get("verification_rounds", 1)
     base = hgp_parameters(*seed(s["a"]), *seed(s["b"]))
