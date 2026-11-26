@@ -1,6 +1,6 @@
 """Command line:  python3 -m qeccert <command> ...   (with tools/ on PYTHONPATH)
 
-  certify SPEC [-o receipt.json] [--legs A,B,C] [--target q=v ...] [--max-combos N]
+  certify SPEC [-o receipt.json] [--legs A,B,C,D] [--target q=v ...] [--max-combos N]
   verify  RECEIPT.json [--full]
   spec    SPEC [-o code.json]          write the code's matrices as JSON
   families                             list family constructors
@@ -72,11 +72,14 @@ def main(argv=None):
             print(certify.summary(rec))
             return 0
         legs = [x.strip().upper() for x in a.legs.split(",") if x.strip()]
-        if set(legs) - {"A", "B", "C"}:
-            raise codes.SpecError("--legs takes a subset of A,B,C")
+        if set(legs) - {"A", "B", "C", "D"}:
+            raise codes.SpecError("--legs takes a subset of A,B,C,D")
         code = codes.load(a.spec)
         targets = _targets(a.target)
         rec = certify.build(code, targets, a.max_combos, legs)
+        if "D" in legs:
+            from . import bch
+            bch.run_leg(rec, code)
         if "B" in legs:
             from . import sat
             sat.run_leg(rec, code, targets, a.workdir, a.sat_timeout)

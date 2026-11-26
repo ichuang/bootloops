@@ -241,6 +241,8 @@ FAMILIES = {
     "toric": (toric, "toric:L, [[2L^2,2,L]]"),
     "planar": (planar, "planar:L, unrotated [[L^2+(L-1)^2,1,L]]"),
     "rotated_surface": (rotated_surface, "rotated_surface:D, [[D^2,1,D]]"),
+    "cyclic": (None, "cyclic:N,l1,l2,..., self-dual CSS code from the cyclic code with zero "
+                     "cosets l1, l2, ... (BCH codes: cyclic:127,1,3,5,7,9)"),
     "bb": (None, "bb:L,M,A,B with A,B like x3+y1+y2, e.g. bb:6,6,x3+y1+y2,y3+x1+x2"),
 }
 
@@ -272,6 +274,12 @@ def load(spec):
         if len(parts) != 4:
             raise SpecError("bb needs L,M,A,B")
         return bb(parts[0], parts[1], parts[2].split("+"), parts[3].split("+"))
+    if fam == "cyclic":
+        from . import bch
+        parts = arg.split(",")
+        if len(parts) < 2:
+            raise SpecError("cyclic needs N,leader[,leader...]")
+        return bch.cyclic_css(parts[0], parts[1:])
     if fam not in FAMILIES:
         raise SpecError(f"unknown family {fam!r}; known: {sorted(FAMILIES) + sorted(NAMED)}")
     fn = FAMILIES[fam][0]

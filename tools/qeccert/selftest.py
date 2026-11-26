@@ -305,6 +305,67 @@ def t_lrat():
     rejects("lrat rejects truncated binary", binary[:-2])
 
 
+# ---------------------------------------------------------------- 5b. BCH leg
+def t_bch():
+    from qeccert import bch
+    rnd = random.Random(7)
+    check("bch irreducible test", bch._irreducible(0b10011) and not bch._irreducible(0b10101))
+    # the bound never exceeds the true minimum weight, on random cyclic codes
+    for n in (7, 15, 21, 31):
+        m = bch.mult_order_2(n)
+        cosets = sorted({min((z * pow(2, i, n)) % n for i in range(m)) for z in range(n)})
+        p, alpha = bch.root_of_unity(n)
+        for _ in range(12):
+            pick = [c for c in cosets if rnd.random() < 0.45]
+            Z = set()
+            for c in pick:
+                Z |= {(c * pow(2, i, n)) % n for i in range(m)}
+            if not Z or len(Z) == n:
+                continue
+            coeffs = [1]
+            for z in sorted(Z):
+                a = bch._ppowmod(alpha, z, p)
+                nxt = [0] * (len(coeffs) + 1)
+                for i, c in enumerate(coeffs):
+                    nxt[i + 1] ^= c
+                    nxt[i] ^= bch._pmulmod(c, a, p)
+                coeffs = nxt
+            g = sum(c << i for i, c in enumerate(coeffs))
+            basis = codes.cyclic_span(g, n)
+            r = bch.code_bound(basis, n)
+            check(f"bch n={n}: zero set recovered", r["zeros"] == len(Z)
+                  and set(r["zero_coset_leaders"]) == set(pick))
+            true = minweight.min_weight(basis, n)["lower"]
+            check(f"bch n={n}: bound <= true minimum weight", r["bound"] <= true,
+                  f"zeros {pick}: bound {r['bound']} > {true}")
+    for spec, d in (("cyclic:31,1,3", 5), ("cyclic:63,1,3,5", 7), ("cyclic:15,1", 3)):
+        code = codes.load(spec)
+        rec = certify.build(code, legs=())
+        bch.run_leg(rec, code)
+        check(f"bch {spec}: designed distance {d}", rec["facts"]["d"]["lower"] == d)
+        full = certify.build(code, max_combos=100_000)      # finds a witness, may not close
+        bch.run_leg(full, code)
+        check(f"bch {spec}: bound meets an enumerated witness",
+              full["facts"]["d"]["lower"] == d and full["facts"]["d"]["exact"])
+    code = codes.load("golay")
+    rec = certify.build(code)
+    bch.run_leg(rec, code)
+    check("bch golay: weaker bound does not lower the proven one",
+          rec["facts"]["d"]["lower"] == 7 and
+          any(e["leg"] == "D" and e["claim"] == "d_x >= 5" for e in rec["evidence"]))
+    code = codes.load("toric:3")
+    rec = certify.build(code, legs=())
+    bch.run_leg(rec, code)
+    check("bch control: non-cyclic code is skipped by name",
+          all(e["status"] == "skipped" and "odd length" in e["reason"] or "cyclic" in e["reason"]
+              for e in rec["evidence"] if e["leg"] == "D"))
+    code = codes.load("rotated_surface:3")
+    rec = certify.build(code, legs=())
+    bch.run_leg(rec, code)
+    check("bch control: odd-length non-cyclic code is skipped by name",
+          all(e["status"] == "skipped" for e in rec["evidence"] if e["leg"] == "D"))
+
+
 # ---------------------------------------------------------------- 6. SAT leg (needs cadical)
 def t_sat(heavy):
     if not sat.find_cadical():
@@ -438,7 +499,7 @@ def main():
     heavy, lean = "--heavy" in sys.argv, "--lean" in sys.argv
     t0 = time.monotonic()
     for fn, args in ((t_gf2, ()), (t_minweight, ()), (t_families, ()), (t_controls, ()),
-                     (t_cnf, ()), (t_lrat, ()), (t_sat, (heavy,)), (t_cli, ()), (t_lean, (lean,))):
+                     (t_cnf, ()), (t_lrat, ()), (t_bch, ()), (t_sat, (heavy,)), (t_cli, ()), (t_lean, (lean,))):
         t = time.monotonic()
         fn(*args)
         print(f"      {fn.__name__:12s} {time.monotonic() - t:6.2f} s")

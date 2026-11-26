@@ -1,7 +1,7 @@
 # qeccert — GUIDE
 
 KIND: package (Python, stdlib only for the default tier; `gf2.py`, `codes.py`,
-`minweight.py`, `certify.py`, `cnf.py`, `lrat.py`, `sat.py`, `leangen.py`,
+`minweight.py`, `certify.py`, `cnf.py`, `lrat.py`, `sat.py`, `bch.py`, `leangen.py`,
 `selftest.py`, `examples/`). Battery class: partial (the exact leg, the CNF
 direction test, the LRAT checker and all planted controls run from the clone;
 the SAT leg needs `cadical`, the Lean leg needs `lake` and a built Lean-QEC,
@@ -19,7 +19,7 @@ the upper end has a witness word that is checked by dot products alone, the
 lower end names the leg that proved it. A value is reported as exact only when
 a proven lower bound meets a witnessed upper bound.
 
-Three legs prove lower bounds, with separate lineages:
+Four legs prove lower bounds, with separate lineages:
 
 - **A, exact enumeration** (`minweight.py`): Brouwer-Zimmermann information-set
   enumeration over disjoint column sets, integer arithmetic only.
@@ -32,6 +32,12 @@ Three legs prove lower bounds, with separate lineages:
   against a Lean-QEC checkout, ending in
   `theorem <name>_dist : d ≤ <css>.toBSM.distance`. The receipt records the
   axioms the theorem depends on, as printed by `#print axioms`.
+
+- **D, BCH bound** (`bch.py`), for cyclic codes of odd length: the generator
+  polynomial and its zero set are computed exactly in GF(2^m), and the longest
+  run of zeros in arithmetic progression gives the bound. The BCH theorem is
+  cited, not machine-checked, and the evidence entry says so. This leg reaches
+  lengths the others cannot (the BCH-127 codes take 0.1 s).
 
 ## USE-WHEN
 
@@ -65,6 +71,7 @@ With `tools/` on `PYTHONPATH` (or from `tools/`):
     python3 -m qeccert certify golay -o golay.json
     python3 -m qeccert certify qr:47 --legs A,B --workdir out/ -o qr47.json
     python3 -m qeccert certify code.json --legs A,B,C --target d=6 --workdir out/
+    python3 -m qeccert certify cyclic:127,1,3,5,7,9 --legs A,D --max-combos 200000
     python3 -m qeccert verify golay.json [--full]
     python3 -m qeccert spec bb72 -o bb72.json
     python3 -m qeccert families
@@ -72,7 +79,8 @@ With `tools/` on `PYTHONPATH` (or from `tools/`):
 `SPEC` is a JSON file (`{"name", "n", "hx": ["0101..."], "hz": [...]}`, rows as
 0/1 strings of length n, coordinate 0 first) or `family[:args]`: `steane`,
 `golay`, `qr:P`, `toric:L`, `planar:L`, `rotated_surface:D`,
-`bb:L,M,x3+y1+y2,y3+x1+x2`, and the named instances `bb18 bb54 gb54 bb70 bb72
+`bb:L,M,x3+y1+y2,y3+x1+x2`, `cyclic:N,l1,l2,...` (self-dual CSS code from the cyclic
+code with zero cosets l1, l2, ...; BCH codes), and the named instances `bb18 bb54 gb54 bb70 bb72
 bb90 bb108 bb144` (parameters as in the Lean-QEC examples).
 
 `--target q=v` (q in `d`, `d_x`, `d_z`, `wmin_x`, `wmin_z`) stops leg A once
@@ -112,6 +120,10 @@ default), `QECCERT_LAKE` (default `lake` on PATH, then `~/.elan/bin/lake`).
   rejects a missing hint, a non-unit hint, a RAT hint, a deleted or unknown
   hint, a non-increasing id, a fresh variable, a satisfiable CNF, a truncated
   proof.
+- BCH leg: the zero set is recovered for random cyclic codes of length 7, 15,
+  21, 31 and the bound never exceeds the true minimum weight; designed
+  distances of three BCH codes match enumeration; a weaker BCH bound does not
+  lower a proven one; non-cyclic codes are skipped by name.
 - SAT leg (needs cadical): all four bounds of five codes proved with a checked
   proof and equal to leg A; a target one above the truth comes back refuted
   with a verified word; a proof with a used lemma removed, and a proof replayed
