@@ -1,5 +1,15 @@
 """ftqc_uncompute — Measurement-based uncomputation, spooky pebbling, and superposition masking."""
 
+from . import adapters
+from .certify import (
+    RECEIPT_SCHEMA,
+    ReceiptRefusalError,
+    build_receipt_for_kmx,
+    build_receipt_for_spec_dict,
+    parse_strict_json,
+    verify_receipt_file,
+)
+from .cli import main
 from .gf2 import GF2Field, anf_and, anf_const, anf_degree, anf_eval, anf_not, anf_var, anf_xor
 from .hmr import HMRFinding, HMRVerificationResult, verify_hmr_circuit
 from .ir_dag import ArithDAG, DAGNode, RegDecl, lift_scoped_kmx_to_dag
@@ -55,6 +65,14 @@ from .pebbling import (
     solve_optimal_pebbling_astar,
     validate_pebbling_schedule,
 )
+from .suggest import (
+    RULE_IDS,
+    RewriteSuggestion,
+    apply_dag_rewrites,
+    apply_kmx_rewrites,
+    suggest_for_dag,
+    suggest_for_kmx,
+)
 
 __all__ = [
     "ArithDAG",
@@ -79,9 +97,14 @@ __all__ = [
     "PebbleStep",
     "PebbleValidationResult",
     "Qubit",
+    "RECEIPT_SCHEMA",
+    "RULE_IDS",
+    "ReceiptRefusalError",
     "RegDecl",
     "RegisterSpec",
+    "RewriteSuggestion",
     "TrajectoryResult",
+    "adapters",
     "anf_and",
     "anf_const",
     "anf_degree",
@@ -89,6 +112,10 @@ __all__ = [
     "anf_not",
     "anf_var",
     "anf_xor",
+    "apply_dag_rewrites",
+    "apply_kmx_rewrites",
+    "build_receipt_for_kmx",
+    "build_receipt_for_spec_dict",
     "carry_runway_mask_bound",
     "clopper_pearson_upper_bound",
     "coherent_trace_distance_bound",
@@ -105,13 +132,18 @@ __all__ = [
     "kss_binomial_parameter_m",
     "kss_parallel_depth_lower_bound",
     "lift_scoped_kmx_to_dag",
+    "main",
+    "parse_strict_json",
     "simulate_trajectories",
     "solve_optimal_pebbling_astar",
+    "suggest_for_dag",
+    "suggest_for_kmx",
     "uniform_residue_mask_bound",
     "validate_pebbling_schedule",
     "verify_channel_kraus",
     "verify_hmr_circuit",
     "verify_mask_spec",
+    "verify_receipt_file",
     "verify_streaming_fibonacci_ladder",
     "z_pow_synthesis_cost",
 ]
