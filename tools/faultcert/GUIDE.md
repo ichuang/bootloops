@@ -113,8 +113,8 @@ Exit codes: 0 ok; 1 refusal (receipt fails, legs disagree, Stim disagrees);
 
 ## GATES
 
-`python3 tools/faultcert/selftest.py` (about 2 s; 5122 checks without Stim,
-5175 with Stim and the heavy tier):
+`python3 tools/faultcert/selftest.py` (about 2 s; 5126 checks without Stim,
+5179 with Stim and the heavy tier):
 
 - Stabilizer simulator on GHZ, Bell, and reset-and-reuse circuits.
 - **Model against a dense state-vector simulation**: 60 random circuits on 2 to
