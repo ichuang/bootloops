@@ -1,0 +1,207 @@
+{
+  "kind": "pebbling_schedule",
+  "length": 12,
+  "max_pebbles": 6,
+  "name": "regev_squaring_chain_ell12",
+  "steps": [
+    {
+      "ghost": [],
+      "pebble": [
+        1
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [
+        1
+      ],
+      "pebble": [
+        2
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [
+        2
+      ],
+      "pebble": [
+        3
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [
+        3
+      ],
+      "pebble": [
+        4
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [
+        4
+      ],
+      "pebble": [
+        5
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        6
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [
+        6
+      ],
+      "pebble": [
+        7
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [
+        7
+      ],
+      "pebble": [
+        8
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        9
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [
+        9
+      ],
+      "pebble": [
+        10
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        11
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        12
+      ],
+      "unpebble": []
+    },
+    {
+      "ghost": [],
+      "pebble": [],
+      "unpebble": [
+        12
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        9
+      ],
+      "unpebble": [
+        11
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        6
+      ],
+      "unpebble": [
+        10
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        1,
+        7
+      ],
+      "unpebble": [
+        9
+      ]
+    },
+    {
+      "ghost": [
+        1
+      ],
+      "pebble": [
+        2
+      ],
+      "unpebble": [
+        8
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        3
+      ],
+      "unpebble": [
+        7
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        4
+      ],
+      "unpebble": [
+        6
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [],
+      "unpebble": [
+        5
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [],
+      "unpebble": [
+        4
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [
+        1
+      ],
+      "unpebble": [
+        3
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [],
+      "unpebble": [
+        2
+      ]
+    },
+    {
+      "ghost": [],
+      "pebble": [],
+      "unpebble": [
+        1
+      ]
+    }
+  ]
+}

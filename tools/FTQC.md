@@ -1,6 +1,6 @@
 # Fault-tolerant quantum computing in BootLoops
 
-Choose a tool by the claim you need to prove. A distance can count qubits in a code or faulty locations in a circuit. A gadget proof can instead ask how much error survives correction on an unknown input, or whether an implementation can replace a reference circuit. The five packages on the `ftqc_integration` branch make these questions executable in one checkout.
+Choose a tool by the claim you need to prove. A distance can count qubits in a code or faulty locations in a circuit. A gadget proof can instead ask how much error survives correction on an unknown input, or whether an implementation can replace a reference circuit. Above the fault-tolerance layer, logical reversible arithmetic can trade Toffolis and workspace qubits for mid-circuit Hadamard-Measure-Reset (`HMR`), spooky pebbling, or superposition masks. The six packages on this branch make these questions executable in one checkout.
 
 | Question | Tool | Evidence |
 |---|---|---|
@@ -9,6 +9,7 @@ Choose a tool by the claim you need to prove. A distance can count qubits in a c
 | What does an encoded gate or correction gadget guarantee for an unknown input? | [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) | Bounds on residual errors with input errors and internal faults counted separately. Refinement and composition receipts justify replacing a specified sub-gadget with an implementation. |
 | Does an extractor measure the intended logical observable and preserve the other logical qubits? | [`ftqc_extractors`](ftqc_extractors/README.md) | HGP and gross-code measurement proofs, static and scheduled distance bounds, and conditional logical T proofs with explicit magic-state assumptions. |
 | Can a proposed Clifford circuit replace a reference under a given fault model? | [`ftqc_zx`](ftqc_zx/GUIDE.md) | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic bounds for a specified noise model. |
+| Does a logical arithmetic circuit with HMR, spooky pebbling, or superposition masking preserve quantum coherence, and what rewrites simplify it? | [`ftqc_uncompute`](ftqc_uncompute/GUIDE.md) | Symbolic HMR phase-cancellation and branch-injectivity proofs, Fiat-Shamir trajectory Clopper-Pearson bounds, spooky pebbling & mask certificates (`ftqc_uncompute-receipt-1`), and auto-verified `R1`–`R7` simplifications. |
 
 ## Where the tools connect
 
@@ -16,6 +17,7 @@ Choose a tool by the claim you need to prove. A distance can count qubits in a c
 - **Circuit to encoded gadget.** `ftqc_gadgets` uses the audit circuit and fault propagator. The gadget layer adds reference qubits for unknown encoded inputs, decoder rules, and tests of the ideal logical action. Its `fc:SPEC` input runs a circuit from the audit library as a preparation gadget. Composition requires a refinement receipt for each substituted part.
 - **Extractor to audit.** The extractor package exports the physical X and Z probes of a gross-code measurement as native audit circuits. For HGP schedules its audit bridge can replay faults in the enclosing circuit or export the verified-cat preparation. The extractor defines which logical results and spectators to protect. [HGP bridge](ftqc_extractors/AUDIT.md) · [Gross-code probes and proof](ftqc_extractors/GROSS_CIRCUIT.md)
 - **ZX design and verification.** `ftqc_zx` has its own circuit representation and verification engine. It can check a candidate against an ideal specification under a selected noise model. To compare a ZX result with a location-fault study, match the gates and idles, input codespace, detector or flag handling, output frame and fault-counting convention. Each tool's verifier consumes its own evidence format.
+- **Logical uncomputation to physical gadgets.** `ftqc_uncompute` certifies logical KickMix `.kmx` circuits, spooky pebbling schedules, and superposition-masked arithmetic (`ftqc_uncompute-receipt-1`), exports Clifford+`HMR` subcircuits (`MX` + `R` + `Z_IF`) directly into `ftqc_audit.Circuit` for physical fault-distance checks, and consumes `ftqc_zx-contract-v1` gadget contracts to price physical QEC wire-tick savings across `R1`–`R7` uncomputation rewrites.
 
 ## Follow a gross-code measurement into the audit tool
 
@@ -47,10 +49,10 @@ python3 -m ftqc_zx equiv steane_5anc steane_spec --w 3 --noise-model circuit_css
 
 ## Reproduce the integration checks
 
-From BootLoops, run the five registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+From BootLoops, run the six registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
 
 ```sh
-python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx
+python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx ftqc_uncompute
 ```
 
 From the research repository root with its pinned BootLoops submodule initialized, run the command below to verify the saved inputs, evidence hashes, bounds and witnesses. The twelve-round search also requires a C++17 compiler with unsigned 128-bit integers. [Research studies and replay instructions](https://github.mit.edu/ichuang/RESEARCH-extractors-proof-system-2026/tree/main/studies)

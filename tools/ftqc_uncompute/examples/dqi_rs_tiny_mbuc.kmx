@@ -1,0 +1,54 @@
+# @meta description=Synthetic GF(2^3) DQI-style syndrome phase kick + 0-Toffoli del_gf2_mul
+REGISTER r0 "x"
+APPEND_TO_REGISTER q0 r0
+APPEND_TO_REGISTER q1 r0
+APPEND_TO_REGISTER q2 r0
+REGISTER r1 "y"
+APPEND_TO_REGISTER q3 r1
+APPEND_TO_REGISTER q4 r1
+APPEND_TO_REGISTER q5 r1
+INFO_TAG "@enter:init_gf2_mul"
+CCX q0 q3 q6
+CCX q1 q5 q6
+CCX q2 q4 q6
+CCX q0 q4 q7
+CCX q1 q3 q7
+CCX q1 q5 q7
+CCX q2 q4 q7
+CCX q2 q5 q7
+CCX q0 q5 q8
+CCX q1 q4 q8
+CCX q2 q3 q8
+CCX q2 q5 q8
+INFO_TAG "@exit:init_gf2_mul"
+Z q6
+Z_POW q7 0.5
+INFO_TAG "@enter:del_gf2_mul"
+HMR q6 b0
+HMR q7 b1
+HMR q8 b2
+CZ q0 q3 if b0
+CZ q0 q4 if b1
+CZ q0 q5 if b2
+CZ q1 q3 if b1
+CZ q1 q4 if b2
+BIT_STORE0 b3
+BIT_INVERT b3 if b0
+BIT_INVERT b3 if b1
+CZ q1 q5 if b3
+BIT_STORE0 b3
+CZ q2 q3 if b2
+BIT_STORE0 b3
+BIT_INVERT b3 if b0
+BIT_INVERT b3 if b1
+CZ q2 q4 if b3
+BIT_STORE0 b3
+BIT_STORE0 b3
+BIT_INVERT b3 if b1
+BIT_INVERT b3 if b2
+CZ q2 q5 if b3
+BIT_STORE0 b3
+BIT_STORE0 b0
+BIT_STORE0 b1
+BIT_STORE0 b2
+INFO_TAG "@exit:del_gf2_mul"

@@ -51,8 +51,10 @@ The registered packages, grouped as the index groups them:
 - **Fault-tolerant quantum computing** — `ftqc_codes` certifies CSS code parameters,
   `ftqc_audit` checks faults in scheduled circuits, and `ftqc_gadgets` verifies
   encoded operations and their composition. `ftqc_extractors` checks logical
-  measurements and `ftqc_zx` verifies and synthesizes Clifford gadgets with ZX
-  methods. [Interfaces, proof assumptions and examples](../../tools/FTQC.md)
+  measurements, `ftqc_zx` verifies and synthesizes Clifford gadgets with ZX
+  methods, and `ftqc_uncompute` certifies and simplifies logical reversible
+  arithmetic using Hadamard-Measure-Reset (`HMR`), spooky pebbling, and
+  superposition masking. [Interfaces, proof assumptions and examples](../../tools/FTQC.md)
 - **Operations** — Turnstile (admission control for long jobs on a shared machine:
   priority token, RAM and CPU-width ledgers; formerly Bigram-queue) ships under
   [`../../ops/`](../../ops/README.md), not `tools/`, and has its own page outside the

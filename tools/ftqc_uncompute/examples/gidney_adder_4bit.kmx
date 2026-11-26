@@ -1,0 +1,46 @@
+# @meta description=4-bit Gidney ripple-carry adder using HMR carry uncomputation
+REGISTER r0 "a"
+APPEND_TO_REGISTER q0 r0
+APPEND_TO_REGISTER q1 r0
+APPEND_TO_REGISTER q2 r0
+APPEND_TO_REGISTER q3 r0
+REGISTER r1 "b"
+APPEND_TO_REGISTER q4 r1
+APPEND_TO_REGISTER q5 r1
+APPEND_TO_REGISTER q6 r1
+APPEND_TO_REGISTER q7 r1
+INFO_TAG "@enter:iadd_gidney"
+CCX q0 q4 q8
+CX q8 q1
+CX q8 q5
+CCX q1 q5 q9
+CX q8 q9
+CX q9 q2
+CX q9 q6
+CCX q2 q6 q10
+CX q9 q10
+CX q10 q7
+CX q3 q7
+CX q9 q10
+INFO_TAG "@enter:del_and"
+HMR q10 b0
+CZ q2 q6 if b0
+BIT_STORE0 b0
+INFO_TAG "@exit:del_and"
+CX q9 q2
+CX q2 q6
+CX q8 q9
+INFO_TAG "@enter:del_and"
+HMR q9 b0
+CZ q1 q5 if b0
+BIT_STORE0 b0
+INFO_TAG "@exit:del_and"
+CX q8 q1
+CX q1 q5
+INFO_TAG "@enter:del_and"
+HMR q8 b0
+CZ q0 q4 if b0
+BIT_STORE0 b0
+INFO_TAG "@exit:del_and"
+CX q0 q4
+INFO_TAG "@exit:iadd_gidney"
