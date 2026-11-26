@@ -4,7 +4,13 @@ from .model import propagate, PAULI_1
 
 
 class RecordModel:
-    def __init__(self, circuit):
+    def __init__(self, circuit, *, response_records=()):
+        """Append displacement bits for raw records after the observables.
+
+        A displacement is relative to the same fault-free measurement branch.
+        Raw outcomes may be random. All declared checks still have to be
+        deterministic. Existing callers request only checks and observables.
+        """
         if circuit.outputs or circuit.detectors is None:
             raise ValueError(
                 "explicit record detectors and empty quantum output required"
@@ -16,6 +22,11 @@ class RecordModel:
         self.mask = (1 << self.nd) - 1
         self.detectors = circuit.detectors
         self.parities = [*circuit.detectors, *circuit.observables]
+        deterministic = (1 << len(self.parities)) - 1
+        for k in response_records:
+            if type(k) is not int or not 0 <= k < len(circuit.meas):
+                raise ValueError("invalid raw response record")
+            self.parities.append([k])
         records = [0] * len(circuit.meas)
         for j, ids in enumerate(self.parities):
             for k in ids:
@@ -54,7 +65,7 @@ class RecordModel:
                     sx[q] ^= sx[target]
                     sz[target] ^= sz[q]
                 elif g in ("R", "RX"):
-                    if sz[q] if g == "R" else sx[q]:
+                    if (sz[q] if g == "R" else sx[q]) & deterministic:
                         raise ValueError("random declared parity")
                     sx[q] = sz[q] = 0
                 elif g != "I":

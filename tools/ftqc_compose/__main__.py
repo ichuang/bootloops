@@ -37,6 +37,10 @@ def evaluate(spec):
         from .stochastic import stochastic_result
 
         return stochastic_result(spec)
+    if spec["kind"] == "gross-residual":
+        from .gross_residual import gross_result
+
+        return gross_result(spec)
     if spec["kind"] == "level":
         from .level import level_result
 
