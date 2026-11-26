@@ -1,6 +1,6 @@
 # Gross-code unprimed Z measurement
 
-`gross_z` implements the unprimed logical Z setting of the 103-ancilla partial extractor of Cross, He, Rall and Yoder. The full apparatus can select eight measurements. This setting uses 18 additional code coordinates. Both the original and the merged CSS codes have exact static distance 12. The measurement export gives ideal commuting Pauli operations and a Pauli frame for the split. A noisy syndrome-extraction circuit would need a separate location-fault analysis. [Construction, §4.1 and Fig. 9](https://arxiv.org/abs/2407.18393v4) · [Partial extractor interpretation, §4.4](https://arxiv.org/abs/2503.10390v2)
+`gross_z` implements the unprimed logical Z setting of the 103-ancilla partial extractor of Cross, He, Rall and Yoder. The full apparatus can select eight measurements. This setting uses 18 additional code coordinates. Both the original and the merged CSS codes have exact static distance 12. The measurement export gives ideal commuting Pauli operations and a Pauli frame for the split. The compiled noisy measurement has exact circuit distances seven and ten at seven and twelve rounds. [Noisy schedule and receipts](GROSS_CIRCUIT.md) [Construction, §4.1 and Fig. 9](https://arxiv.org/abs/2407.18393v4) · [Partial extractor interpretation, §4.4](https://arxiv.org/abs/2503.10390v2)
 
 ```sh
 # From the BootLoops root

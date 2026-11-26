@@ -193,3 +193,7 @@ J. Preskill (2006). SAT leg: qeccert, CaDiCaL (A. Biere et al.), LRAT
 ## HGP extractors and logical T circuits
 
 The [FTQC comparison guide](../ftqc/FAULTCERT.md) shows how to analyze an actual HGP meter's cat preparation here and how to use this package's forward propagator to replay a logical fault in the enclosing circuit.
+
+## Repeated gross-code syndrome extraction
+
+Run `python3 -m faultcert records CIRCUIT.json` on an exported CSS probe with explicit detectors and record-only endpoints. The report checks through weight two. Supply repeatable `--fault LOCATION:LABEL` arguments for forward replay, or `--stim` for an independent comparison of all single-fault signatures. FTQC combines both probes with the bounded projected-support search and the readout check to certify the gross-code measurement. [Run and interpret the gross-code experiment](../ftqc/GROSS_CIRCUIT.md)

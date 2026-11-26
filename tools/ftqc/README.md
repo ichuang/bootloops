@@ -23,6 +23,7 @@ The example measures a weight-two logical Z on an eight-qubit HGP block. Two rou
 
 | Input kind | What the receipt establishes |
 |---|---|
+| `gross_circuit` | Circuit-level fault distance of the explicit noisy BB144 logical Z measurement, including the split frame and surviving logicals. |
 | `gross_z` | Ideal unprimed logical Z measurement and exact static distances for the BB144 memory and its merged code. |
 | `hgp` | Block length, logical dimension and base Pauli distance from the two classical seed matrices. |
 | `column` | Whether a specified single-column Z surgery on HGP memory meets a target static code distance. |
@@ -38,3 +39,5 @@ The default exact backend and receipt replay run with the packages in this check
 ## Measure a gross-code logical Z
 
 The 12 port checks of the unprimed Z setting select one logical observable of the [[144,12,12]] bivariate bicycle memory. FTQC exports the ideal measurements, split-frame rule and merged CSS checks. The distance receipt proves that the resulting [[162,11,12]] code preserves distance 12 in both Pauli sectors. Its four lower bounds and four weight-12 witnesses can be replayed without an external solver. [Run the gross-code example](GROSS.md)
+
+With noisy syndrome extraction, the seven-round schedule has exact circuit distance 7 and the twelve-round schedule has exact distance 10. FTQC exports both CSS probes to faultcert and verifies the lower bounds and matching physical faults. [Noisy schedule and replay instructions](GROSS_CIRCUIT.md)
