@@ -85,7 +85,7 @@
   "cwd": "package"
  },
  "ftqc": {
-  "cmd": "python3 -m unittest ftqc.test_algebra ftqc.test_extractor ftqc.test_receipts",
+  "cmd": "python3 -m unittest ftqc.test_algebra ftqc.test_extractor ftqc.test_receipts ftqc.test_magic",
   "cwd": "root"
  },
  "galois": {
