@@ -77,8 +77,17 @@ def positions(g):
     return pos, n
 
 
+def _css(code):
+    """Any code record (n, hx, hz as position masks) as an ftqc_codes CSS code."""
+    code = library.code_of(code)
+    if isinstance(code, ftqc_codes.CSSCode):
+        return code
+    return ftqc_codes.CSSCode(code.name, code.n, list(code.hx), list(code.hz))
+
+
 def hierarchical(g, outer, inner):
     """The same gadget with every decoder replaced by the hierarchical one."""
+    outer, inner = _css(outer), _css(inner)
     cc = concatenate(outer, inner)
     decs = []
     for d in g.decoders:
@@ -95,14 +104,14 @@ def hierarchical(g, outer, inner):
 
 def two_level(family, outer, inner, **kw):
     """library.<family> on the concatenated code, with hierarchical decoders."""
-    outer, inner = library.code_of(outer), library.code_of(inner)
+    outer, inner = _css(outer), _css(inner)
     cc = concatenate(outer, inner)
     return hierarchical(getattr(library, family)(cc, **kw), outer, inner)
 
 
 class Direct:
     def __init__(self, gadget, outer, inner, cap=3_000_000):
-        self.g, self.outer, self.inner = gadget, library.code_of(outer), library.code_of(inner)
+        self.g, self.outer, self.inner = gadget, _css(outer), _css(inner)
         self.m, self.N = self.inner.n, self.outer.n
         self.an = an = Analysis(gadget, cap)
         pos, n = positions(gadget)

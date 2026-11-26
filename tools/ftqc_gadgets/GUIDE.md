@@ -49,6 +49,31 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   itself be a composed gadget (pass `dict(composition=, target=, parts=)` as the
   part), which is how a 64-copy tree is reached from 16-copy trees.
 
+- **local** (`--local`): the coordinate-locality certificate. Every fault and every
+  input error is shown to act within one coordinate (position) of each block, by a
+  check that is linear in the size of the gadget. A lemma printed in the receipt
+  (`props.LEMMA`) then gives `gate`, `ec` and `close` whenever faults and input
+  errors together touch at most T coordinates, T the decoders' radius, however many
+  faults lie inside those coordinates. This is the route for codes whose t is too
+  large to enumerate (QR-47, BCH-127): the radius is taken from the code's
+  `ftqc_codes` receipt (`--code-receipt`, `library.radii`) and decoder tables are
+  skipped (`--no-tables`).
+- **levels** (`levels.py`): the outer level of a concatenated scheme. A qubit of the
+  outer gadget stands for an inner block and a fault for a failed inner gadget;
+  because the locality certificate counts coordinates, it already says "at most T2
+  bad columns, hence correct". `levels.reduction` joins that certificate to one
+  inner receipt per kind of operation the outer circuit uses and records what is
+  quoted (the level-reduction step) and what is assumed (outer ancillas given as
+  specifications). `levels.two_level` builds the same gadget on the concatenated
+  code with hierarchical decoders (`ftqc_codes.hier`), and `levels.Direct` tests the
+  statement on it: fault sets with at most t2 columns holding more than t1 faults
+  must act ideally, exhaustively at low weight and by sampling above, with a search
+  for the first failure one bad column further.
+- **independent_of_input**: which decoders' check values no input error can change.
+  For repeated error correction (`steane_ec:CODE,rounds=2`) the later rounds have
+  this property and the first does not: after one round, what a block does next is
+  driven by that round's faults and ancillas, not by what the block arrived with.
+
 Weight is Pauli weight per block by default; `--sector` uses the larger of X weight
 and Z weight (the convention of arguments that treat the two sectors of a CSS code
 separately). The two give different verdicts and the receipt says which was used.
@@ -95,10 +120,13 @@ With `tools/` on `PYTHONPATH` (or from `tools/`):
     python3 -m ftqc_gadgets compose ec.json zero=zero.json plus=plus.json -o composed.json
     python3 -m ftqc_gadgets equiv cnot:steane cnot:steane,ideal --order 2 --input-weight 1
     python3 -m ftqc_gadgets verify r.json --full
+    python3 -m ftqc_codes certify qr:47 -o qr47.json
+    python3 -m ftqc_gadgets analyze steane_ec:qr:47,anc=spec --local --code-receipt qr47.json --no-tables
 
 Library gadgets (`library.py`): `prep:CODE,STATE[,raw|spec|tree=SEQ]`,
 `cnot:CODE[,leaky]`, `idle:CODE`, `knill:CODE[,anc=METHOD]`,
-`steane_ec:CODE[,anc=METHOD]`, `seq_syndrome:CODE`, `fc:ftqc_audit_SPEC`; suffixes
+`steane_ec:CODE[,anc=METHOD][,rounds=K]`, `measure:CODE[,x|z]`, `seq_syndrome:CODE`,
+`fc:ftqc_audit_SPEC`; suffixes
 `,ideal` and `,idles`. CODE is a ftqc_codes spec without commas, or `rep3`.
 
 Your own gadget, in Python:
@@ -119,8 +147,8 @@ gadget.
 
 ## GATES
 
-`python3 tools/ftqc_gadgets/selftest.py` (about 12 s, 6691 checks; `--heavy` adds the
-Golay gadgets at t = 3, about 2 minutes):
+`python3 tools/ftqc_gadgets/selftest.py` (about 16 s, 6782 checks; `--heavy` adds the
+Golay gadgets at t = 3 and larger two-level tests, about 5 minutes):
 
 - **Against a state-vector simulation**: seven small gadgets (teleportation and
   syndrome-extraction error correction on the 3-qubit code, a transversal CX,
@@ -149,6 +177,31 @@ Golay gadgets at t = 3, about 2 minutes):
   inflated order, a positive claim without cases, edited circuit or decoder under a
   stale hash, edited statistics, forged case count (`--full`), a refinement witness
   the specification matches.
+
+- Locality: on eleven library gadgets the certificate's radius and properties are the
+  expected ones and enumeration agrees through that radius; random sets of many
+  faults inside few coordinates stay within the bound; a CX inside a block,
+  sequential extraction, raw ancillas, a correction applied one position over, and a
+  decoder whose positions are numbered differently from the block's are each refused
+  with the offending fault or input error; without decoder tables and with radii
+  from a code receipt the certificate is the same.
+- Two levels: on Steane over Steane (49 qubits per block), decoded measurement,
+  transversal CX and Steane-type correction built physically with hierarchical
+  decoders: every set of at most one (measurement: two) faults or input errors and
+  thousands of sampled sets with one bad column act ideally; with two bad columns a
+  failing set is found; the outer certificate tolerates one coordinate. Reduction
+  receipts: missing, mismatched, weaker and inflated hypotheses are refused or
+  lower the conclusion.
+- Repeated correction: second-round decoders are independent of the input, first-round
+  ones are not, with a replayable input error.
+
+Ten further defects were planted in the locality and two-level code (hierarchical
+decoder ignoring the inner step, an error allowed to leave its coordinate, an input
+error allowed at another coordinate, the largest decoder radius taken, `ec` claimed
+with input errors left, correction not applied, bad columns miscounted, a given
+radius unchecked, later rounds reading only their own outcomes, the any-input
+property dropped from a reduction). The battery fails on each; four needed a new
+control first.
 
 Eleven defects were planted during development (decoder correction applied as the
 wrong kind, decoders ignored, syndrome left in a non-canonical basis, input X and Z
@@ -181,6 +234,18 @@ fails on each. The last was a real bug found this way.
 - A property that stops on its budget reports `holds_through` for the orders it
   finished and a `note`. Read the note before reading a low `holds_through` as a
   failure: only a `violation` is one.
+- **The locality lemma, like composition, is an argument.** It is printed in the
+  receipt and tested against enumeration and against direct two-level analysis.
+  What the tool computes is that its hypotheses hold for the circuit.
+- **A levels receipt is not a threshold proof.** It certifies "few bad columns,
+  hence correct" for the outer gadget and the inner properties level reduction
+  needs. The step between them is quoted from the literature for the fixed pattern
+  of error correction, and outer ancillas are listed as assumed.
+- **Radii from code receipts assume lightest-pattern decoding and need the lightest
+  stabilizer to be heavier than the distance** (true for the quadratic-residue and
+  BCH codes here, false for surface codes, where `library.radii` returns a small
+  radius by design).
+- Without decoder tables (`--no-tables`) only the locality certificate is available.
 - The composition theorem is an argument printed in the receipt and tested against
   direct analysis on small gadgets. It is not machine-checked.
 

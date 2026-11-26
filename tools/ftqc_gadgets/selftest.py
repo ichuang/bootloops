@@ -857,6 +857,9 @@ def t_levels(heavy):
           g2.sha256() == g.sha256() and g2.decoders[0].rule["type"] == "hier")
     check("two levels: the hierarchical rule is part of the gadget's hash",
           library.measure(ftqc_codes_concat(), "Z").sha256() != g.sha256())
+    lite = Code("steane_lite", 7, list(library.code_of("steane").hx), list(library.code_of("steane").hz))
+    check("two levels: a plain code record is accepted for either level",
+          levels.two_level("measure", lite, lite, basis="Z").decoders[0].rule["sector"] == "X")
     refuses("two levels: a gadget that joins two positions is refused",
             lambda: levels.positions(library.load("cnot:steane,leaky")), "joins two positions", exc=GadgetError)
     # reduction receipts
