@@ -41,3 +41,15 @@ Each example is a complete JSON input. 'a' and 'b' are lists of binary strings, 
 edge-extractor measures the two vertex checks Z(data)Z(edge) of the one-edge graph twice, retires the edge in X, and updates the Pauli frame. The product of the first two records measures logical Z on data 0 and 2. Its two parity detectors compare the vertex readings across rounds. edge-hook appends two identical CX gates on data 4 and 5. Their ideal action cancels. A Z on the target after the first gate spreads back through the second and evades the terminal syndrome. The smaller repeat-z example measures parity with a single meter; its banked LRAT exercises the checker on a cold clone.
 
 The canonical benchmark is an implicit full architecture at phenomenological noise level. Gate-level receipts cover explicit schedules and their declared boundaries. Each receipt binds to a SHA-256 of the canonical input JSON. The exact checker redoes finite searches during replay. The SAT checker accepts the LRAT fragment supported by qeccert. Search time and proof size grow rapidly with threshold and schedule size. Resource limits yield open obligations.
+
+## Addressable logical T
+
+See [T_PROOFS.md](T_PROOFS.md) for the exact channel identity, fault contract, hardware assumptions and structural proof. Use the same check and verify commands with examples/t-gate.json and examples/t-hook.json. The exact and SAT backends both handle t_gate. A gate receipt has three cases: the T output and the two arms of a subsequent signed logical X measurement. A counterexample means at least one case failed the requested lower bound.
+
+Inputs specify the HGP seeds, the anticommuting logical_x and logical_z masks on each block, rounds, target and resource. The contract for t_gate and t_bounds is ideal-encoded-T. verification_rounds defaults to one. representatives optionally supplies a pair of equivalent physical masks per measurement round. An experimental trailing_identity CNOT sequence must be checked as identity on every involved qubit. The t_bounds kind omits target and returns checked lower and upper bounds per case. The t_source kind takes resource=in-situ-all-plus and verifies the accepted preparation and resulting raw-Z counterexample. The 225-qubit benchmark uses the published classical seed with our selected single-site port. BootLoops works from the input matrices without requiring the source repository.
+
+    export PYTHONPATH=tools
+    python3 -m ftqc check tools/ftqc/examples/t-gate.json -o /tmp/t.json
+    python3 -m ftqc verify tools/ftqc/examples/t-gate.json /tmp/t.json
+
+The physical adapter is a verified-cat parity meter with direct access to the listed sites. Implementing the protocol on a particular fixed coupler network requires compiling and checking its routing and storage locations.

@@ -15,9 +15,18 @@ from .t_verify import analyze as analyze_t
 
 from .t_source import source_record
 
+from .t_bounds import structural
+
 FIELDS = {
-    "t_source": ("a b logical_x logical_z rounds target resource",""),
-    "t_gate": ("a b logical_x logical_z rounds target resource","trailing_identity"),
+    "t_bounds": (
+        "a b logical_x logical_z rounds resource",
+        "verification_rounds representatives",
+    ),
+    "t_source": ("a b logical_x logical_z rounds target resource", ""),
+    "t_gate": (
+        "a b logical_x logical_z rounds target resource",
+        "trailing_identity verification_rounds representatives",
+    ),
     "hgp": ("a b", ""),
     "column": ("a b column word vertices ports edges target", "paths"),
     "canonical": ("n polynomial edges", "assembly"),
@@ -57,13 +66,15 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     ):
         raise ValueError("invalid search options")
     kind = s["kind"]
-    if backend == "sat" and kind not in ("circuit","t_gate"):
+    if backend == "sat" and kind not in ("circuit", "t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "t_bounds":
+            return structural(s)
         if kind == "t_source":
-            return source_record(s,reverse)
+            return source_record(s, reverse)
         if kind == "t_gate":
-            return analyze_t(s,backend,budget,seconds,reverse)
+            return analyze_t(s, backend, budget, seconds, reverse)
         if kind == "hgp":
             result = dict(
                 status="proved", **hgp_parameters(*seed(s["a"]), *seed(s["b"]))
@@ -109,8 +120,8 @@ def verify(s, r):
     result = r["result"]
     if result["status"] not in ("proved", "counterexample"):
         raise ValueError("receipt contains an open obligation")
-    if r["backend"] == "sat" and s['kind']=='t_gate':
-        if digest(result)!=digest(analyze_t(s,'sat',r['budget'],60,True,result)):
+    if r["backend"] == "sat" and s["kind"] == "t_gate":
+        if digest(result) != digest(analyze_t(s, "sat", r["budget"], 60, True, result)):
             raise ValueError("T-gate SAT receipt mismatch")
         return
     if r["backend"] == "sat":
