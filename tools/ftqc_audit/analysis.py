@@ -9,8 +9,8 @@ undetected_harm    least number of faults that fire no detector and leave a harm
                    residual (the "fault distance" of a preparation)
 
 Leg A is exact enumeration (meet in the middle on the detector signature).
-Leg B hands the same statement to SAT through qeccert.cnf and has the LRAT proof
-re-checked by qeccert.lrat.
+Leg B hands the same statement to SAT through ftqc_codes.cnf and has the LRAT proof
+re-checked by ftqc_codes.lrat.
 """
 from itertools import combinations
 

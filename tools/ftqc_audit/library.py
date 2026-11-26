@@ -2,8 +2,8 @@
 
 cat:N[,verify]            cat state by a CX chain; `verify` adds one ancilla that
                           measures Z_0 Z_{N-1} (catches the weight-2 hook of the chain)
-css_prep:CODE             non-fault-tolerant |0_L> of a qeccert CSS code: |+> on an
-                          information set, CX fan-out (CODE is a qeccert spec, e.g. golay)
+css_prep:CODE             non-fault-tolerant |0_L> of a ftqc_codes CSS code: |+> on an
+                          information set, CX fan-out (CODE is a ftqc_codes spec, e.g. golay)
 surface:D,R[,BASIS[,bad]] rotated surface code memory, R rounds of syndrome extraction,
                           BASIS z (default) or x; `bad` swaps the CX orders of the X and Z
                           checks so that hook errors line up with the logical operators
@@ -50,21 +50,21 @@ def cat(n, verify=False):
     return c
 
 
-def _qeccert():
+def _ftqc_codes():
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if here not in sys.path:
         sys.path.insert(0, here)
-    import qeccert
-    from qeccert import gf2
-    return qeccert, gf2
+    import ftqc_codes
+    from ftqc_codes import gf2
+    return ftqc_codes, gf2
 
 
 def css_prep(spec):
     """|0_L> of a CSS code: the +1 eigenstate of the X stabilizers and of all Z-type
     operators in ker(H_X) (stabilizers and logical Z).  Circuit: put the rows of H_X in
     systematic form, prepare |+> on the pivots and |0> elsewhere, fan out with CX."""
-    qeccert, gf2 = _qeccert()
-    code = qeccert.load(spec) if isinstance(spec, str) else spec
+    ftqc_codes, gf2 = _ftqc_codes()
+    code = ftqc_codes.load(spec) if isinstance(spec, str) else spec
     n = code.n
     rows, piv = gf2.systematic(code.hx, n, list(range(n)))
     layers = [[("RX", q) if q in piv else ("R", q) for q in range(n)]]
@@ -87,10 +87,10 @@ def css_prep(spec):
 def surface(d, rounds, basis="z", bad=False):
     """Rotated surface code memory experiment.  Data qubits r*d + c; one ancilla per
     check; each round: prepare ancillas, four CX ticks, measure ancillas."""
-    qeccert, gf2 = _qeccert()
+    ftqc_codes, gf2 = _ftqc_codes()
     d, rounds = int(d), int(rounds)
     basis = basis.lower()
-    code = qeccert.load(f"rotated_surface:{d}")
+    code = ftqc_codes.load(f"rotated_surface:{d}")
     n = d * d
     row0 = gf2.from_supp(range(d))                       # first row of the grid
     # a row is an X-type logical iff it commutes with every Z check
@@ -170,4 +170,4 @@ def load(spec):
             return surface(parts[0], parts[1], parts[2] if len(parts) > 2 else "z", "bad" in parts)
     except IndexError:
         raise CircuitError(f"missing arguments for {fam}") from None
-    raise CircuitError(f"unknown gadget {fam!r}; see faultcert.library")
+    raise CircuitError(f"unknown gadget {fam!r}; see ftqc_audit.library")

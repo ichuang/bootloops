@@ -25,15 +25,21 @@ def available():
 
 def to_stim(circuit, model, noisy=True):
     lines = []
+    count = 0
     for tick in circuit.ticks:
         after = []
         for op in tick:
             q = " ".join(map(str, op.qs))
             nz = noisy and op.noisy
             if op.name in ("M", "MX"):
+                count += 1
                 lines.append(f"{op.name}({P}) {q}" if nz else f"{op.name} {q}")
             else:
-                lines.append(f"{op.name} {q}")
+                if op.name == "Z_IF":
+                    lines.append(f"CZ rec[{op.record - count}] {q}")
+                else:
+                    gate = "S_DAG" if op.name == "SDG" else op.name
+                    lines.append(f"{gate} {q}")
                 if nz:
                     after.append(("DEPOLARIZE2" if op.name == "CX" else "DEPOLARIZE1") + f"({P}) {q}")
         lines += after
@@ -46,10 +52,12 @@ def to_stim(circuit, model, noisy=True):
     return "\n".join(lines) + "\n"
 
 
-def compare(circuit, model, distance_lower=None):
+def compare(circuit, model, distance_lower=None, search_logical=True):
     """Returns an evidence dict; status 'agrees', 'DISAGREES' or 'skipped'."""
     why = available()
     ev = dict(leg="S", method="Stim detector error model and logical-error search")
+    if not search_logical:
+        ev["method"] = "Stim detector error model"
     if why:
         ev.update(status="skipped", reason=why)
         return ev
@@ -79,7 +87,7 @@ def compare(circuit, model, distance_lower=None):
         ev.update(status="DISAGREES",
                   reason=f"{len(ours - theirs)} signatures only here, {len(theirs - ours)} only in Stim")
         return ev
-    if circuit.observables:
+    if circuit.observables and search_logical:
         try:
             found = sc.search_for_undetectable_logical_errors(
                 dont_explore_detection_event_sets_with_size_above=6,

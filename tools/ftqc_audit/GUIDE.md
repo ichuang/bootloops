@@ -1,6 +1,6 @@
-# faultcert — GUIDE
+# ftqc_audit — GUIDE
 
-KIND: package (Python, stdlib only; imports `qeccert` from this repository for
+KIND: package (Python, stdlib only; imports `ftqc_codes` from this repository for
 the SAT leg and for code constructions; `circuit.py`, `stab.py`, `model.py`,
 `analysis.py`, `certify.py`, `library.py`, `stimleg.py`, `selftest.py`).
 Battery class: partial (everything exact runs from the clone; the SAT leg needs
@@ -9,12 +9,12 @@ line otherwise).
 
 ## PURPOSE
 
-Circuit-level fault properties of Clifford gadgets, as receipts. `qeccert`
+Circuit-level fault properties of Clifford gadgets, as receipts. `ftqc_codes`
 says what a code's distance is; this package says what faults inside a circuit
-do. Input: a circuit of preparations, H, CX, idles and measurements in ticks,
+do. Input: a circuit of preparations, H, phase gates, CX, record-controlled Z, idles and measurements in ticks,
 optionally with declared detectors, logical observables and output qubits.
 Fault model: one fault is one location misbehaving (any non-identity Pauli
-after a preparation, idle, H or CX; a flipped outcome at a measurement), and
+after a preparation, idle or unitary gate; a flipped outcome at a measurement), and
 the weight of a fault set is its number of locations.
 
 Outputs:
@@ -41,15 +41,15 @@ effect of a fault set is the XOR of the effects of its members, and the set of
 effects one location can produce is closed under XOR. "At most j faults"
 therefore means "a sum of at most j columns" of a GF(2) matrix whose columns
 are the distinct single-location effects. Circuit distance is a minimum-weight
-problem of the same shape as code distance, which is why `qeccert`'s CNF
+problem of the same shape as code distance, which is why `ftqc_codes`'s CNF
 encoding and LRAT checker are reused unchanged.
 
 Legs:
 
 - **A, enumeration** (`analysis.py`): meet in the middle on the detector
   signature; exact up to the weight the cap allows.
-- **B, SAT** (`certify._leg_b`): the statement as a `qeccert.cnf.Formula`;
-  CaDiCaL's LRAT proof is re-checked by `qeccert.lrat`; a SAT answer is turned
+- **B, SAT** (`certify._leg_b`): the statement as a `ftqc_codes.cnf.Formula`;
+  CaDiCaL's LRAT proof is re-checked by `ftqc_codes.lrat`; a SAT answer is turned
   into a fault set and replayed.
 - **S, Stim** (`stimleg.py`): the circuit is exported with the same noise and
   detectors; Stim must accept the detectors as deterministic, its detector
@@ -73,9 +73,8 @@ Legs:
 - All-orders statements. Everything here is "for all fault sets of at most j
   locations" with j small; a probability bound still needs an argument such as
   a cone or counting theorem on top.
-- Non-Clifford gates, and classically controlled operations (decoders and
-  adaptive corrections inside the circuit). Postselection is supported as
-  "no detector fires".
+- General adaptive programs, decoders and non-Clifford unitaries. The supported
+  feed-forward operation applies Z using one earlier reported bit.
 - Leakage, coherent errors, correlated faults across locations.
 - Large circuits at high weight: leg A enumerates subsets of the distinct
   fault effects (a few thousand of them for a distance-5 surface patch), so it
@@ -86,25 +85,26 @@ Legs:
 
 With `tools/` on `PYTHONPATH` (or from `tools/`):
 
-    python3 -m faultcert analyze surface:3,2 --legs A,B,S -o r.json
-    python3 -m faultcert analyze surface:3,2,z,bad
-    python3 -m faultcert analyze cat:4,verify --strict 2 --heavier 1,2
-    python3 -m faultcert analyze mycircuit.json --max-weight 5 --strict 2
-    python3 -m faultcert verify r.json --full
-    python3 -m faultcert export css_prep:golay --stim
+    python3 -m ftqc_audit analyze surface:3,2 --legs A,B,S -o r.json
+    python3 -m ftqc_audit analyze surface:3,2,z,bad
+    python3 -m ftqc_audit analyze cat:4,verify --strict 2 --heavier 1,2
+    python3 -m ftqc_audit analyze mycircuit.json --max-weight 5 --strict 2
+    python3 -m ftqc_audit verify r.json --full
+    python3 -m ftqc_audit export css_prep:golay --stim
 
 Circuit JSON: `{"name", "n", "ticks": [[["RX",0],["R",1]], [["CX",0,1]], ...],
 "detectors": [[measurement indices], ...] | null, "observables": [[...]],
 "outputs": [qubits]}`. Operations: `R` (|0>), `RX` (|+>), `I`, `H`, `CX c t`,
+`S`, `SDG`, `Z_IF q r` (Z on q when zero-based record r from a previous tick is 1),
 `M` (Z), `MX` (X); prefix a name with `!` to make that operation noiseless.
 Measurements are numbered in order of appearance. `detectors: null` means
 "discover them": every outcome parity that is deterministic in the noiseless
 circuit. A circuit that declares observables must declare its detectors.
 
 Library gadgets (`library.py`): `cat:N[,verify]`, `css_prep:CODE` (CODE a
-qeccert spec), `surface:D,R[,z|x[,bad]]`.
+ftqc_codes spec), `surface:D,R[,z|x[,bad]]`.
 
-Library use: `from faultcert import load, build, verify, Model`;
+Library use: `from ftqc_audit import load, build, verify, Model`;
 `Model(circuit).replay([(location, "XZ"), ...])` gives the (detectors,
 observables, syndrome) signature of any fault set.
 
@@ -113,7 +113,7 @@ Exit codes: 0 ok; 1 refusal (receipt fails, legs disagree, Stim disagrees);
 
 ## GATES
 
-`python3 tools/faultcert/selftest.py` (about 2 s; 5126 checks without Stim,
+`python3 tools/ftqc_audit/selftest.py` (about 2 s; 5126 checks without Stim,
 5179 with Stim and the heavy tier):
 
 - Stabilizer simulator on GHZ, Bell, and reset-and-reuse circuits.
@@ -187,5 +187,15 @@ Tolerance by Construction" (arXiv:2506.17181); their fault equivalence is not
 implemented here. Tableau updates follow S. Aaronson and D. Gottesman (2004).
 Detector error models and the cross-check leg: Stim (C. Gidney, Quantum 5, 497,
 2021). Strict fault tolerance of preparations: P. Aliferis, D. Gottesman,
-J. Preskill (2006). SAT leg: qeccert, CaDiCaL (A. Biere et al.), LRAT
+J. Preskill (2006). SAT leg: ftqc_codes, CaDiCaL (A. Biere et al.), LRAT
 (Cruz-Filipe, Heule, Hunt, Kaufmann, Schneider-Kamp 2017).
+
+## HGP extractors and logical T circuits
+
+The [ftqc_extractors comparison guide](https://github.com/ichuang/bootloops/blob/ftqc_extractors/tools/ftqc_extractors/AUDIT.md) shows how to analyze an actual HGP meter's cat preparation here and how to use this package's forward propagator to replay a logical fault in the enclosing circuit.
+
+## Repeated gross-code syndrome extraction
+
+Run `python3 -m ftqc_audit records CIRCUIT.json` on an exported CSS probe with explicit detectors and record-only endpoints. The report checks through weight two. Supply repeatable `--fault LOCATION:LABEL` arguments for forward replay, or `--stim` for an independent comparison of all single-fault signatures. ftqc_extractors combines both probes with the bounded projected-support search and the readout check to certify the gross-code measurement. [Run and interpret the gross-code experiment](https://github.com/ichuang/bootloops/blob/ftqc_extractors/tools/ftqc_extractors/GROSS_CIRCUIT.md)
+
+Receipts use `ftqc_audit-receipt-1`. The verifier also accepts archived `faultcert-receipt-1` evidence.

@@ -1,4 +1,4 @@
-"""Command line:  python3 -m qeccert <command> ...   (with tools/ on PYTHONPATH)
+"""Command line:  python3 -m ftqc_codes <command> ...   (with tools/ on PYTHONPATH)
 
   certify SPEC [-o receipt.json] [--legs A,B,C,D,E] [--target q=v ...] [--max-combos N]
   verify  RECEIPT.json [--full]
@@ -30,7 +30,7 @@ def _targets(items):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="qeccert", description=__doc__,
+    ap = argparse.ArgumentParser(prog="ftqc_codes", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("certify")

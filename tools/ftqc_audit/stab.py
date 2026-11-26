@@ -132,6 +132,18 @@ class Sim:
                 nm, q = op.name, op.qs[0]
                 if nm == "H":
                     self.h(q)
+                elif nm in ("S", "SDG"):
+                    for g in self.gens:
+                        b = 1 << q
+                        if g.x & b:
+                            if bool(g.z & b) != (nm == "SDG"):
+                                g.s ^= 1
+                            g.z ^= b
+                elif nm == "Z_IF":
+                    control, _ = self.outcomes[op.record]
+                    for g in self.gens:
+                        if g.x >> q & 1:
+                            g.s ^= control
                 elif nm == "CX":
                     self.cx(op.qs[0], op.qs[1])
                 elif nm == "R":

@@ -3,6 +3,7 @@
 Operations (name, qubits...):
     R q      prepare |0>            RX q     prepare |+>
     I q      idle                   H q      Hadamard
+    S q, SDG q   phase and inverse phase     Z_IF q r    Z controlled by record r
     CX c t   controlled-X           M q      measure Z          MX q   measure X
 
 A tick is a list of operations on disjoint qubits.  Measurements are numbered
@@ -10,7 +11,7 @@ in order of appearance.  An operation may be marked noiseless (for ideal
 encoders or ideal final readout); every other operation is a fault location.
 
 Fault model.  One fault = one location misbehaving:
-  after R, RX, I, H        any non-identity Pauli on the qubit
+  after R, RX, I, H, S, SDG, Z_IF   any non-identity Pauli on the qubit
   after CX                 any non-identity Pauli on the two qubits
   at M, MX                 the reported outcome is flipped
 The weight of a fault set is the number of locations in it.
@@ -18,7 +19,7 @@ The weight of a fault set is the number of locations in it.
 import hashlib
 import json
 
-ONE_Q = {"R", "RX", "I", "H", "M", "MX"}
+ONE_Q = {"R", "RX", "I", "H", "M", "MX", "S", "SDG", "Z_IF"}
 ALIASES = {"P0": "R", "PZ": "R", "P": "R", "P+": "RX", "PX": "RX", "PP": "RX",
            "CNOT": "CX", "MZ": "M"}
 
@@ -28,13 +29,17 @@ class CircuitError(ValueError):
 
 
 class Op:
-    __slots__ = ("name", "qs", "noisy")
+    __slots__ = ("name", "qs", "noisy", "record")
 
-    def __init__(self, name, qs, noisy=True):
+    def __init__(self, name, qs, noisy=True, record=None):
         self.name, self.qs, self.noisy = name, tuple(qs), noisy
+        self.record = record
+
+    def args(self):
+        return (*self.qs, self.record) if self.record is not None else self.qs
 
     def text(self):
-        return ("" if self.noisy else "!") + self.name + " " + " ".join(map(str, self.qs))
+        return ("" if self.noisy else "!") + self.name + " " + " ".join(map(str, self.args()))
 
 
 class Circuit:
@@ -50,6 +55,7 @@ class Circuit:
         self.name = name
         self.ticks = []
         top = -1
+        prior_records = 0
         for k, tick in enumerate(ticks):
             seen, row = set(), []
             for op in tick:
@@ -58,7 +64,17 @@ class Circuit:
                     noisy = not nm.startswith("!")
                     nm = nm.lstrip("!").upper()
                     nm = ALIASES.get(nm, nm)
-                    op = Op(nm, [int(q) for q in op[1:]], noisy)
+                    if nm == "Z_IF":
+                        if len(op) != 3 or type(op[2]) is not int:
+                            raise CircuitError("Z_IF requires a target and an earlier measurement index")
+                        op = Op(nm, [int(op[1])], noisy, record=op[2])
+                    else:
+                        op = Op(nm, [int(q) for q in op[1:]], noisy)
+                if op.name == "Z_IF":
+                    if type(op.record) is not int or not 0 <= op.record < prior_records:
+                        raise CircuitError(f"tick {k}: feedback must use a record from an earlier tick")
+                elif op.record is not None:
+                    raise CircuitError("unexpected classical operand")
                 if op.name == "CX":
                     if len(op.qs) != 2 or op.qs[0] == op.qs[1]:
                         raise CircuitError(f"tick {k}: CX needs two distinct qubits")
@@ -76,6 +92,7 @@ class Circuit:
                     top = max(top, q)
                 row.append(op)
             self.ticks.append(row)
+            prior_records += sum(op.name in ("M", "MX") for op in row)
         self.n = top + 1 if n is None else int(n)
         if self.n <= top:
             raise CircuitError("n is smaller than the largest qubit index")
@@ -131,7 +148,7 @@ class Circuit:
 
     def to_json(self):
         return dict(name=self.name, n=self.n, outputs=self.outputs,
-                    ticks=[[[("" if op.noisy else "!") + op.name, *op.qs] for op in t]
+                    ticks=[[[("" if op.noisy else "!") + op.name, *op.args()] for op in t]
                            for t in self.ticks],
                     detectors=self.detectors, observables=self.observables,
                     sha256=self.sha256())

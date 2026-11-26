@@ -41,6 +41,12 @@ def propagate(circuit, tick, x, z, flips=0):
                 if bool(xb) != bool(zb):
                     x ^= b
                     z ^= b
+            elif nm in ("S", "SDG"):
+                if x & b:
+                    z ^= b
+            elif nm == "Z_IF":
+                if flips >> op.record & 1:
+                    z ^= b
             elif nm in ("R", "RX"):
                 x &= ~b
                 z &= ~b
@@ -91,10 +97,13 @@ class Model:
         self.final = [(g.x, g.z, sim.frame_mask(g.s)) for g in sim.output_group(self.out_mask)]
         self.locations = []
         meas_index = {(m[0], m[1]): i for i, m in enumerate(circuit.meas)}
+        controls = {op.record for tick in circuit.ticks for op in tick if op.name == "Z_IF"}
         for idx, (k, j, op) in enumerate(circuit.locations()):
             loc = Location(idx, k, op)
             if op.name in ("M", "MX"):
-                loc.faults["flip"] = (0, 0, 1 << meas_index[(k, j)])
+                record = meas_index[(k, j)]
+                flip = (0, 0, 1 << record)
+                loc.faults["flip"] = propagate(circuit, k, *flip) if record in controls else flip
             else:
                 gens = []
                 for q in op.qs:
@@ -158,6 +167,8 @@ class Model:
             raise ValueError("a location appears twice in a fault set")
         x = z = fl = 0
         for i, label in faults:
+            if type(i) is not int or not 0 <= i < len(self.locations):
+                raise ValueError("fault location out of range")
             loc = self.locations[i]
             if loc.op.name in ("M", "MX"):
                 if label != "flip":

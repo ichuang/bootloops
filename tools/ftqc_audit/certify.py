@@ -1,6 +1,6 @@
 """Receipts for circuit-level fault properties, and their re-verification.
 
-As in qeccert, a number is an interval: the upper end carries a witness (a fault
+As in ftqc_codes, a number is an interval: the upper end carries a witness (a fault
 set that `verify` replays through the circuit), the lower end names the leg that
 proved it.  A strict-fault-tolerance failure carries its counterexample.
 """
@@ -12,9 +12,9 @@ from . import analysis
 from .circuit import Circuit
 from .model import Model
 
-SCHEMA = "faultcert-receipt-1"
-VERSION = "0.1.0"
-NOISE = ("one fault = one location: any non-identity Pauli after R, RX, I, H (one qubit) or "
+SCHEMA = "ftqc_audit-receipt-1"
+VERSION = "0.2.0"
+NOISE = ("one fault = one location: any non-identity Pauli after R, RX, I, H, S, SDG, Z_IF (one qubit) or "
          "CX (two qubits), or a flipped outcome at M, MX; weight = number of locations")
 
 
@@ -22,11 +22,11 @@ class Refusal(Exception):
     pass
 
 
-def _qeccert():
+def _ftqc_codes():
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if here not in sys.path:
         sys.path.insert(0, here)
-    from qeccert import cnf, sat
+    from ftqc_codes import cnf, sat
     return cnf, sat
 
 
@@ -112,8 +112,8 @@ def _set_upper(model, kind, res, faults):
 
 def _leg_b(model, kind, cols, back, res, max_weight, workdir, timeout):
     import tempfile
-    cnf, sat = _qeccert()
-    base = dict(leg="B", method="SAT on the fault matrix (qeccert.cnf), LRAT checked by qeccert.lrat",
+    cnf, sat = _ftqc_codes()
+    base = dict(leg="B", method="SAT on the fault matrix (ftqc_codes.cnf), LRAT checked by ftqc_codes.lrat",
                 solver=sat.solver_version())
     if not cols:
         return
@@ -126,7 +126,7 @@ def _leg_b(model, kind, cols, back, res, max_weight, workdir, timeout):
         D += [sum(1 << i for i, c in enumerate(cols) if (c[part] >> b) & 1) for b in range(nb)]
     tmp = None
     if workdir is None:
-        tmp = tempfile.mkdtemp(prefix="faultcert-sat-")
+        tmp = tempfile.mkdtemp(prefix="ftqc_audit-sat-")
         workdir = tmp
     os.makedirs(workdir, exist_ok=True)
     try:
@@ -168,7 +168,7 @@ def build(circuit, max_weight=4, strict_order=0, legs=("A",), cap=3_000_000, wor
     rec = dict(schema=SCHEMA, circuit=circuit.to_json(), noise_model=NOISE,
                counts=circuit.counts(), model=model.stats(),
                detectors=model.detectors, results={},
-               tool=dict(name="faultcert", version=VERSION, python=platform.python_version()))
+               tool=dict(name="ftqc_audit", version=VERSION, python=platform.python_version()))
     for kind in ("circuit_distance", "fault_distance"):
         if kind in want:
             rec["results"][kind] = distance(model, kind, max_weight, legs, cap, workdir, sat_timeout)
@@ -194,7 +194,7 @@ def build(circuit, max_weight=4, strict_order=0, legs=("A",), cap=3_000_000, wor
 
 
 def verify(receipt, full=False, cap=3_000_000):
-    if receipt.get("schema") != SCHEMA:
+    if receipt.get("schema") not in (SCHEMA, "faultcert-receipt-1"):
         raise Refusal("unknown receipt schema")
     try:
         circuit = Circuit.from_json(receipt["circuit"])
