@@ -48,6 +48,10 @@ The registered packages, grouped as the index groups them:
   ring-basis member), Annihilator, Ansatzer, Galois, Rankscreen.
 - **Exact statistics and evidence** — Mixalot (with Boxwalk, the exact box-moment
   contiguity walker, as member), Popcorn, POSQ, and JaCK & Jill.
+- **Quantum error correction and fault tolerance** — Faultweb (exact F_2 Pauli-web
+  verifier, constructive fault-equivalent ZX-calculus compiler, flag-conditioned
+  syndrome decoder synthesizer, and zero-float outward-rounded stochastic
+  gadget-contract emitter).
 - **Operations** — Turnstile (admission control for long jobs on a shared machine:
   priority token, RAM and CPU-width ledgers; formerly Bigram-queue) ships under
   [`../../ops/`](../../ops/README.md), not `tools/`, and has its own page outside the

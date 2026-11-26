@@ -346,6 +346,8 @@ def circuit_distance(
 
     if cross_check_spackle and isinstance(obj, CliffordCircuit):
         sp = analyze_circuit_spackle(obj, noise_model=noise_model)
+        if ft.analysis.signed_boundary_stabs != sp.signed_boundary_stabs:
+            raise AssertionError("Disjoint-lineage boundary stabiliser mismatch in circuit_distance")
         best_sp: int | None = None
         for sec in sectors:
             undet_sp, _ = _compute_undetectable_min_weights(
@@ -532,8 +534,12 @@ def check_fault_equiv(
     if cross_check_spackle and isinstance(obj_l, CliffordCircuit) and isinstance(obj_r, CliffordCircuit):
         sp_l = analyze_circuit_spackle(obj_l, noise_model=noise_model_lhs)
         sp_r = analyze_circuit_spackle(obj_r, noise_model=nm_rhs)
-        if sp_l.signed_boundary_stabs != sp_r.signed_boundary_stabs:
-            raise AssertionError("Disjoint-lineage map mismatch between pauliweb and spackle")
+        if (
+            ana_l.signed_boundary_stabs != sp_l.signed_boundary_stabs
+            or ana_r.signed_boundary_stabs != sp_r.signed_boundary_stabs
+            or sp_l.signed_boundary_stabs != sp_r.signed_boundary_stabs
+        ):
+            raise AssertionError("Disjoint-lineage boundary stabiliser mismatch between pauliweb and spackle")
         sp_pass = True
         for sec in sectors:
             sul, _ = _compute_undetectable_min_weights(

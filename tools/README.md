@@ -72,6 +72,7 @@ clone differs by package:
 | `emitall/` | claims-integrity harness: re-emit every quoted headline number from its receipt, fail on drift; document-side members `battery.py` (paper claims rows) and `paper_seams.py` (comment-swallow seam gate over a paper's tex tree) | selftest |
 | `eras/` | ERAS — dependency-tamed certified enclosure forms in a shared parameter, with the consumer-pluggable adversarial verification battery | selftest |
 | `famhar/` | multi-sheet family evaluator harness over a 2-var dlog connection (one JSON config per family; affine + polynomial letters) | selftest |
+| `faultweb/` | exact F_2 Pauli-web verifier, constructive fault-equivalent ZX-calculus compiler (Rodatz–Poór–Kissinger, arXiv:2506.17181v4), flag-conditioned syndrome decoder synthesizer, and zero-float outward-rounded stochastic FTQC gadget-contract emitter (`faultweb-contract-v1`) | selftest |
 | `ffcapital/` | exact salvage of FireFly `ff_save` reconstruction state from dead or capped runs, fail-closed | data-gated |
 | `formglue/` | glue around FORM 5: traces, color, term-stream rewriting, MZV evaluation, GRACE integration | partial |
 | `frobenius-boundary/` | family-agnostic Frobenius-branch boundary machinery at var=∞ for non-analytic anchors | data-gated |
@@ -105,7 +106,7 @@ clone differs by package:
 | `wayfinder/` | Wayfinder — the eps-graded DE-transport pipeline: one evaluator contract, certified transport, Frobenius landings, the dlog-connection sampler wing, the engine-agnostic eps->0 limit extractor (epslimit: Laurent/Richardson extrapolation of an external engine's eps-grid) and the FLINT exact rational-function exporter (flintexport) | partial |
 | `winnow/` | upgraded-Laporta F_p eliminator library with native lambda-witness receipts — Seedling's exact elimination engine (`import ibplapper`) | partial |
 
-50 packages (`wayfinder` includes the sampler wing; `counterweight`
+51 packages (`wayfinder` includes the sampler wing; `counterweight`
 includes `canonical_form/`; `landau-alphabet` includes the Gröbner escalation
 backend and `LandauAlphabet.jl/`, the Julia engine `gpl-eval` builds on).
 The one operations package, Turnstile (admission control for long jobs on a

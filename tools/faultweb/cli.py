@@ -16,25 +16,49 @@ from pathlib import Path
 import sys
 from typing import Any
 
-from .adapters import circuit_to_qasm2, circuit_to_stim_text
-from .contracts import build_gadget_contract
-from .diagram import CliffordCircuit, RefusalError, ZXDiagram, circuit_to_zx_fe, load_spec_file
-from .equivalence import check_fault_equiv, circuit_distance, resolve_code
-from .pauliweb import analyze_pauli_webs, compile_outcome_map
-from .rewrites import DerivationCertificate, verify_derivation
-from .synthesize import (
-    make_cat_spec,
-    make_full_syndrome_spec,
-    make_steane_7_1_3,
-    make_syndrome_meas_spec,
-    synth_cat_state,
-    synth_sequential_cat4_steane_bad,
-    synth_shor_syndrome,
-    synth_steane_goto_prep,
-    synth_steane_syndrome,
-    synth_steane_zero_like,
-    synth_unflagged_cat_state,
-)
+if __package__ in (None, ""):
+    _PKG_DIR = Path(__file__).resolve().parent
+    sys.path = [p for p in sys.path if Path(p or ".").resolve() != _PKG_DIR]
+    sys.path.insert(0, str(_PKG_DIR.parent))
+    from faultweb.adapters import circuit_to_qasm2, circuit_to_stim_text
+    from faultweb.contracts import build_gadget_contract
+    from faultweb.diagram import CliffordCircuit, RefusalError, ZXDiagram, circuit_to_zx_fe, load_spec_file
+    from faultweb.equivalence import check_fault_equiv, circuit_distance, resolve_code
+    from faultweb.pauliweb import analyze_pauli_webs, compile_outcome_map
+    from faultweb.rewrites import DerivationCertificate, verify_derivation
+    from faultweb.synthesize import (
+        make_cat_spec,
+        make_full_syndrome_spec,
+        make_steane_7_1_3,
+        make_syndrome_meas_spec,
+        synth_cat_state,
+        synth_sequential_cat4_steane_bad,
+        synth_shor_syndrome,
+        synth_steane_goto_prep,
+        synth_steane_syndrome,
+        synth_steane_zero_like,
+        synth_unflagged_cat_state,
+    )
+else:
+    from .adapters import circuit_to_qasm2, circuit_to_stim_text
+    from .contracts import build_gadget_contract
+    from .diagram import CliffordCircuit, RefusalError, ZXDiagram, circuit_to_zx_fe, load_spec_file
+    from .equivalence import check_fault_equiv, circuit_distance, resolve_code
+    from .pauliweb import analyze_pauli_webs, compile_outcome_map
+    from .rewrites import DerivationCertificate, verify_derivation
+    from .synthesize import (
+        make_cat_spec,
+        make_full_syndrome_spec,
+        make_steane_7_1_3,
+        make_syndrome_meas_spec,
+        synth_cat_state,
+        synth_sequential_cat4_steane_bad,
+        synth_shor_syndrome,
+        synth_steane_goto_prep,
+        synth_steane_syndrome,
+        synth_steane_zero_like,
+        synth_unflagged_cat_state,
+    )
 
 PRESET_NAMES = (
     "cat4",
@@ -253,7 +277,10 @@ def cmd_contract(args: argparse.Namespace) -> int:
 
 
 def cmd_selftest(args: argparse.Namespace) -> int:
-    from .battery import run_battery
+    if __package__ in (None, ""):
+        from faultweb.battery import run_battery
+    else:
+        from .battery import run_battery
 
     report = run_battery(include_mutations=args.mutation_controls)
     if args.json:
