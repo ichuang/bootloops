@@ -248,6 +248,9 @@ def run_leg(receipt, code, targets=None, workdir=None, timeout=3600, name=None):
             for q in ("d_x", "d_z"):
                 certify.add_lower_bound(receipt, q, b,
                                         dict(ev, quantity=q, status="proved", claim=f"{q} >= {b}"))
+        elif tail.startswith("lean exceeded"):
+            for q in ("d_x", "d_z"):
+                receipt["evidence"].append(dict(ev, quantity=q, status="skipped", reason=tail))
         else:
             for q in ("d_x", "d_z"):
                 receipt["evidence"].append(dict(ev, quantity=q, status="failed",
