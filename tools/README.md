@@ -92,6 +92,7 @@ clone differs by package:
 | `pmflow/` | self-consistent auxiliary-mass-flow CLI for cut-eikonal (PM) integral families | smoke |
 | `popcorn/` | certified population-genetics likelihoods: exact/ball-certified selection-SFS vectors + gradients, certified DFE-mixing kernel, dominance; plus exact Lambda-coalescent expected SFS, float-validated two-locus moments and transient selected SFS under piecewise-constant N(t), an EPO ancestral-state join utility; exact linked two-site frequency spectra E[L_i L_j] under Lambda-coalescents with exact in/out certificates against every variable-size Kingman history, exact minor-allele folding of two-site spectra with class-membership deciders, and an exact two-site genotype projection + two-site spectrum estimator (VCF/TSV, cM or bp bins, block jackknife); certified (Arb-ball, model-conditional) enclosures of the transient selected SFS under piecewise-constant N(t) at small n, and msprime simulation harnesses — planted SFS/two-site truths with seeded synthetic genotype + polarization tables, and a two-window/two-locus Monte Carlo with jackknife errors | selftest |
 | `posq/` | certified two-sided Bayesian evidence / Bayes-factor quadrature (BALLER member) | partial |
+| `qeccert/` | certified code facts for CSS quantum error-correcting codes: n, k, logical distances d_x and d_z, correctable weight t, lightest stabilizer weights and structural flags as a JSON receipt, each bound carried with a dot-product-checkable witness (upper) and the leg that proved it (lower); three legs: exact information-set enumeration, SAT with the CaDiCaL LRAT proof re-checked by an in-package checker, and a generated Lean 4 theorem built on Lean-QEC (Ehatamm, Lee, Wu, Tao, arXiv:2605.16523) | partial (the SAT leg needs cadical, the Lean leg needs lake and a built Lean-QEC; both skip with a named line otherwise) |
 | `qinvert/` | exact consistency certificates for published summary statistics over partially released entity-level tables | selftest |
 | `rankscreen/` | multi-prime parallel rank + inconsistency screen for exact-Q eliminations | selftest |
 | `ratfit/` | exact rational-function reconstruction and gating suite for sampled path-DE data (Thiele/Newton/mod-p core, thiele_gate, li2close, design_grid), now with degree_alias: failure-axis triage for reconstruction failures, grid alias vs CRT height | partial |
@@ -105,7 +106,7 @@ clone differs by package:
 | `wayfinder/` | Wayfinder — the eps-graded DE-transport pipeline: one evaluator contract, certified transport, Frobenius landings, the dlog-connection sampler wing, the engine-agnostic eps->0 limit extractor (epslimit: Laurent/Richardson extrapolation of an external engine's eps-grid) and the FLINT exact rational-function exporter (flintexport) | partial |
 | `winnow/` | upgraded-Laporta F_p eliminator library with native lambda-witness receipts — Seedling's exact elimination engine (`import ibplapper`) | partial |
 
-50 packages (`wayfinder` includes the sampler wing; `counterweight`
+51 packages (`wayfinder` includes the sampler wing; `counterweight`
 includes `canonical_form/`; `landau-alphabet` includes the Gröbner escalation
 backend and `LandauAlphabet.jl/`, the Julia engine `gpl-eval` builds on).
 The one operations package, Turnstile (admission control for long jobs on a
