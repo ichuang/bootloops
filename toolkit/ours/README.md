@@ -48,6 +48,10 @@ The registered packages, grouped as the index groups them:
   ring-basis member), Annihilator, Ansatzer, Galois, Rankscreen.
 - **Exact statistics and evidence** — Mixalot (with Boxwalk, the exact box-moment
   contiguity walker, as member), Popcorn, POSQ, and JaCK & Jill.
+- **Fault-tolerant quantum computing** — Qeccert (certified parameters of CSS codes as
+  receipts: exact enumeration, SAT with a checked LRAT proof, and a generated Lean 4
+  theorem on top of Lean-QEC, which is credited in its GUIDE and listed in
+  [`../external/TOOLS.md`](../external/TOOLS.md)).
 - **Operations** — Turnstile (admission control for long jobs on a shared machine:
   priority token, RAM and CPU-width ledgers; formerly Bigram-queue) ships under
   [`../../ops/`](../../ops/README.md), not `tools/`, and has its own page outside the
