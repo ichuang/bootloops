@@ -50,9 +50,12 @@ The registered packages, grouped as the index groups them:
   contiguity walker, as member), Popcorn, POSQ, and JaCK & Jill.
 - **Fault-tolerant quantum computing** — `ftqc_codes` certifies CSS code parameters,
   `ftqc_audit` checks faults in scheduled circuits, and `ftqc_gadgets` verifies
-  encoded operations and their composition. `ftqc_extractors` checks logical
-  measurements and `ftqc_zx` verifies and synthesizes Clifford gadgets with ZX
-  methods. [Interfaces, proof assumptions and examples](../../tools/FTQC.md)
+  encoded operations, locality, and concatenated levels. `ftqc_extractors` checks logical
+  measurements, `ftqc_zx` verifies and synthesizes Clifford gadgets with ZX
+  methods, `ftqc_compose` joins distillation, residual frames, and local-stochastic
+  error bounds across operations, and `ftqc_uncompute` certifies and simplifies logical
+  reversible arithmetic using Hadamard-Measure-Reset (`HMR`), spooky pebbling, and
+  superposition masking. [Interfaces, proof assumptions and examples](../../tools/FTQC.md)
 - **Operations** — Turnstile (admission control for long jobs on a shared machine:
   priority token, RAM and CPU-width ledgers; formerly Bigram-queue) ships under
   [`../../ops/`](../../ops/README.md), not `tools/`, and has its own page outside the

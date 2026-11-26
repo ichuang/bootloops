@@ -1,6 +1,6 @@
 # Fault-tolerant quantum computing in BootLoops
 
-The six tools on `ftqc_integration` cover different parts of a fault-tolerance argument. Start with the object you want to certify and identify what the next step needs from its receipt.
+The seven tools on `ftqc_integration` cover different parts of a fault-tolerance and logical-compilation argument. Start with the object you want to certify and identify what the next step needs from its receipt.
 
 | Tool | Input and question | Evidence |
 |---|---|---|
@@ -10,6 +10,7 @@ The six tools on `ftqc_integration` cover different parts of a fault-tolerance a
 | [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, refinement receipts for component substitution and two-level checks on concatenated codes. |
 | [ftqc_zx](ftqc_zx/GUIDE.md) | Can a candidate replace a reference circuit under the specified noise model? | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic gadget contracts. |
 | [ftqc_compose](ftqc_compose/GUIDE.md) | Do the output and fault guarantees of one operation meet the next operation’s input requirements? | Typed joins, residual data and frame checks, level reduction and local-stochastic error bounds for a composed study. |
+| [ftqc_uncompute](ftqc_uncompute/GUIDE.md) | Does a logical arithmetic circuit with HMR, spooky pebbling, or superposition masking preserve quantum coherence, and what rewrites simplify it? | Symbolic HMR phase-cancellation and branch-injectivity proofs, Fiat-Shamir trajectory Clopper-Pearson bounds, spooky pebbling & mask certificates (`ftqc_uncompute-receipt-1`), and auto-verified `R1`–`R7` simplifications. |
 
 ## Where the tools connect
 
@@ -18,6 +19,7 @@ The six tools on `ftqc_integration` cover different parts of a fault-tolerance a
 - **From a Clifford schedule to a concatenated gadget.** `ftqc_gadgets` uses the audit fault propagator and adds encoded Bell inputs, reference qubits and decoders. Its two-level checker binds inner receipts to signed logical operations and outer faults to physical columns. It verifies the decoder radius and records any specified ancillas and the rectangle argument assumed by the reduction. [Gadget guide](ftqc_gadgets/GUIDE.md)
 - **From gadgets to a circuit-wide noise bound.** `ftqc_compose` checks ordered wires, residual filters and bad fault supports. Its level-reduction checker substitutes physical supports into a logical circuit. A local-stochastic bound also needs a joint fault-support model. A two-level gadget receipt can inform the local claim; a Definition 4.8 hypothesis supplied to compose remains an explicit premise. [Composition guide](ftqc_compose/GUIDE.md#level-reduction)
 - **Comparing a ZX design with a location-fault study.** Run the ZX verifier on the proposed circuit and its reference. To use its result in another argument, match the gates and idles, input codespace, flag or detector handling, output frame and fault-counting convention. The ZX contract has its own verifier and noise model. [ZX guide](ftqc_zx/GUIDE.md)
+- **From logical uncomputation to physical gadgets and logical T.** `ftqc_uncompute` certifies logical KickMix `.kmx` circuits, spooky pebbling schedules, and superposition-masked arithmetic (`ftqc_uncompute-receipt-1`), exports Clifford+`HMR` subcircuits (`MX` + `R` + `Z_IF`) into `ftqc_audit.Circuit`, and prices `R1`–`R7` Toffoli/$T$/reaction-depth tradeoffs against `ftqc_zx-contract-v1` gadget contracts and `ftqc_compose` logical-$T$ factory bounds. [Uncomputation guide](ftqc_uncompute/GUIDE.md)
 
 ## Follow a gross-code measurement into the audit tool
 
@@ -69,12 +71,22 @@ Replay the eight-qubit example from the **research repository root**. The compan
 PYTHONPATH=bootloops/tools python3 -m ftqc_compose verify studies/compose/distilled-t-hgp8.json studies/compose/distilled-t-hgp8-receipt.json
 ```
 
-## Reproduce the integration checks
+## Certify and simplify measurement-based uncomputation
 
-From BootLoops, run the six registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+Check a $\mathrm{GF}(2^3)$ bilinear syndrome circuit with 0-Toffoli `HMR` cleanup, verify its zero-float receipt, and synthesize a depth-optimal parallel spooky pebbling schedule.
 
 ```sh
-python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx ftqc_compose
+python3 -m tools.ftqc_uncompute check tools/ftqc_uncompute/examples/dqi_rs_tiny_mbuc.kmx -o "$out/dqi.receipt.json"
+python3 -m tools.ftqc_uncompute verify "$out/dqi.receipt.json"
+python3 -m tools.ftqc_uncompute pebble --length 12 --mode kmrv -o "$out/pebble12.json"
+```
+
+## Reproduce the integration checks
+
+From BootLoops, run the seven registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+
+```sh
+python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute
 ```
 
 From the research repository root with its pinned BootLoops submodule initialized, run the command below to verify the saved inputs, evidence hashes, bounds and witnesses. The twelve-round search also requires a C++17 compiler with unsigned 128-bit integers. The study inventory and replay prerequisites are in `studies/README.md`.

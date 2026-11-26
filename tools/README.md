@@ -52,7 +52,7 @@ clone differs by package:
 
 ## Package index
 
-The [FTQC tool guide](FTQC.md) maps the six packages on `ftqc_integration` to their proof obligations and gives the commands for the combined test run and research replay.
+The [FTQC tool guide](FTQC.md) maps the seven packages on `ftqc_integration` to their proof obligations and gives the commands for the combined test run and research replay.
 
 | package | what it is | battery |
 |---|---|---|
@@ -82,6 +82,7 @@ The [FTQC tool guide](FTQC.md) maps the six packages on `ftqc_integration` to th
 | `ftqc_compose/` | [Composable fault-tolerance](ftqc_compose/README.md) with typed gadget joins, gross-code residual data and frame checks, level reduction and local-stochastic bounds from distillation to logical T | selftest |
 | `ftqc_extractors/` | [Fault-tolerance certificates](ftqc_extractors/README.md) for HGP and gross-code memory, extractor surgery and logical circuits with exhaustive, theorem-based and SAT/LRAT replay | selftest |
 | `ftqc_gadgets/` | fault properties of Clifford gadgets on unknown inputs as receipts: each input block enters as half of a noiseless encoded Bell pair, so the action on every input is a property of one stabilizer state; lookup decoders on the measurement record or as a Pauli frame; the gate and error-correction properties of Aliferis, Gottesman and Preskill at low order with replayable counterexamples; refinement of a gadget against a specification and fault equivalence (after Rodatz, Poor and Kissinger, truncated in weight); composition receipts that replace an ancilla factory by its specification; a coordinate-locality certificate that gives the same properties for codes whose t is too large to enumerate, with the decoder radius verified on the check matrix; a levels module for the outer level of a concatenated scheme (signed inner-operation receipts, physical two-level gadgets with hierarchical decoding, direct tests) | selftest |
+| `ftqc_uncompute/` | certified verification and simplification (`R1`–`R7`) of logical reversible & arithmetic quantum circuits using Hadamard-Measure-Reset (`HMR`) / KickMix trajectories (arXiv:2610.23832v2), parallel spooky pebbling (`Blast`/`Unblast` & $A^*$, EUROCRYPT 2026), and superposition masking / streaming Fibonacci ladders (arXiv:2610.06733v1), emitting zero-float `ftqc_uncompute-receipt-1` certificates with disjoint Kraus cross-checks and live `ftqc_audit`/`ftqc_zx`/`ftqc_compose` bridges | selftest |
 | `ftqc_zx/` | exact F_2 Pauli-web verifier, constructive fault-equivalent ZX-calculus compiler (Rodatz–Poór–Kissinger, arXiv:2506.17181v4), flag-conditioned syndrome decoder synthesizer, and zero-float outward-rounded stochastic FTQC gadget-contract emitter (`ftqc_zx-contract-v1`) | selftest |
 | `galois/` | motivic Galois coaction-cut engine + the exact MZV relation ring it reduces against | data-gated |
 | `gatekeeper/` | Gatekeeper — data-integrity + held-out-CV honesty layer that gates every closure | selftest |
@@ -113,7 +114,7 @@ The [FTQC tool guide](FTQC.md) maps the six packages on `ftqc_integration` to th
 | `wayfinder/` | Wayfinder — the eps-graded DE-transport pipeline: one evaluator contract, certified transport, Frobenius landings, the dlog-connection sampler wing, the engine-agnostic eps->0 limit extractor (epslimit: Laurent/Richardson extrapolation of an external engine's eps-grid) and the FLINT exact rational-function exporter (flintexport) | partial |
 | `winnow/` | upgraded-Laporta F_p eliminator library with native lambda-witness receipts — Seedling's exact elimination engine (`import ibplapper`) | partial |
 
-56 packages (`wayfinder` includes the sampler wing; `counterweight`
+57 packages (`wayfinder` includes the sampler wing; `counterweight`
 includes `canonical_form/`; `landau-alphabet` includes the Gröbner escalation
 backend and `LandauAlphabet.jl/`, the Julia engine `gpl-eval` builds on).
 The one operations package, Turnstile (admission control for long jobs on a

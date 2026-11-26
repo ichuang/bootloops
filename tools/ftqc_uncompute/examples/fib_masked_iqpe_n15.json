@@ -1,0 +1,50 @@
+{
+  "eigen_base": 2,
+  "expected_control_weights": {
+    "c0": 1,
+    "c1": 1,
+    "c2": 2,
+    "c3": 3
+  },
+  "kind": "masked_ladder",
+  "mask_kind": "mult_mod_n",
+  "modulus": 15,
+  "name": "fib_masked_iqpe_n15",
+  "runs": 1,
+  "steps": [
+    {
+      "control_id": "c0",
+      "op": "ctrl_mul_reg1",
+      "power": 1
+    },
+    {
+      "op": "fib_inv",
+      "power": 1
+    },
+    {
+      "control_id": "c1",
+      "op": "ctrl_mul_reg1",
+      "power": 1
+    },
+    {
+      "op": "fib_inv",
+      "power": 1
+    },
+    {
+      "control_id": "c2",
+      "op": "ctrl_mul_reg1",
+      "power": 1
+    },
+    {
+      "op": "fib_inv",
+      "power": 1
+    },
+    {
+      "control_id": "c3",
+      "op": "ctrl_mul_reg1",
+      "power": 1
+    }
+  ],
+  "subroutine_kind": "euclidean_dialog",
+  "subroutine_steps": 7
+}
