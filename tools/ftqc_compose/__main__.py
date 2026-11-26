@@ -33,6 +33,10 @@ def receipt(spec):
 
 
 def evaluate(spec):
+    if spec["kind"] == "level":
+        from .level import level_result
+
+        return level_result(spec)
     if spec["kind"] == "hgp-repeat":
         from .hgp import repeated_result
 
