@@ -685,6 +685,232 @@ def _is_violation(g, loc, label):
         return False
 
 
+# ---------------------------------------------------------------- 9. locality leg
+def _coords(g):
+    """qubit -> coordinate for library gadgets: blocks are allocated n qubits at a time."""
+    n = len((g.inputs + g.outputs)[0].qubits)
+    refs = {q for b in g.inputs for q in b.refs}
+    qs = [q for q in range(g.circuit.n) if q not in refs]
+    return {q: i % n for i, q in enumerate(qs)}, n
+
+
+def t_local(heavy):
+    rnd = random.Random(17)
+    cases = [("cnot:steane", "gate", None, True, False), ("idle:steane", "gate", None, True, False),
+             ("knill:steane,anc=spec", "ec", 1, True, True), ("steane_ec:steane,anc=spec", "ec", 1, True, True),
+             ("steane_ec:steane,anc=spec,rounds=2", "ec", 1, True, True),
+             ("measure:steane", "ec", 1, True, True), ("measure:steane,x", "ec", 1, True, True),
+             ("cnot:golay", "gate", None, True, False), ("knill:golay,anc=spec", "ec", 3, True, True),
+             ("steane_ec:golay,anc=spec", "ec", 3, True, True), ("measure:golay", "ec", 3, True, True)]
+    for spec, kind, through, gate, ec in cases:
+        g = library.load(spec)
+        an = Analysis(g)
+        r = props.local(an)
+        ok = r["local"] and r["through"] == through and r["gate"] == gate and r["ec"] == ec and r["sector"]
+        check(f"local: {spec} is coordinate-local with the expected radius and properties", ok, str(r)[:300])
+        if not r["local"]:
+            continue
+        t_code = 1 if "steane" in spec else 3
+        T = min(through if through is not None else t_code, 1 if "steane" in spec else (3 if heavy else 2))
+        e = props.check(an, kind, T)
+        check(f"local: enumeration agrees for {spec} through {T}", e["holds_through"] == T, str(e["note"]))
+        if g.outputs and ec:
+            c = props.close(an, T)
+            check(f"local: closeness by enumeration agrees for {spec}", r["close"] and c["holds_through"] == T)
+        # the stronger statement: any number of faults inside few coordinates
+        coord, n = _coords(g)
+        m = an.model
+        in_locs = {i for b in g.inputs for i in b.in_locs}
+        by_c = {}
+        for l in m.locations:
+            if l.index not in in_locs:
+                cs = {coord[q] for q in l.op.qs}
+                if len(cs) == 1:
+                    by_c.setdefault(cs.pop(), []).append(l)
+        W = an.weigher()
+        limit = through if through is not None else t_code
+        good = tried = 0
+        for _ in range(150):
+            k = rnd.randint(1, limit)
+            cs = rnd.sample(range(n), k)
+            pool = [l for c in cs for l in by_c.get(c, [])]
+            chosen = rnd.sample(pool, min(len(pool), rnd.randint(1, 3 * k + 2)))
+            faults = [(l.index, rnd.choice(sorted(l.faults))) for l in chosen]
+            fc = {coord[m.locations[i].op.qs[0]] for i, _ in faults}
+            inerr = [(b, c, rnd.choice("XYZ")) for b in range(len(g.inputs)) for c in cs if rnd.random() < 0.4]
+            eff = an.effect(an.replay(faults, inerr))
+            bound = len(fc) if kind == "ec" else k
+            tried += 1
+            good += eff != -1 and W.weight(eff, min(bound, t_code)) is not None if bound <= t_code else eff != -1
+        check(f"local: many faults inside at most {limit} coordinates stay within the bound ({spec})",
+              good == tried, f"{good}/{tried}")
+    for spec, why in (("cnot:steane,leaky", "confined"), ("seq_syndrome:steane", ""),
+                      ("knill:steane,anc=raw", ""), ("prep:steane,zero,tree=XZ", "postselects")):
+        r = props.local(Analysis(library.load(spec)))
+        check(f"local: {spec} is refused", r["local"] is False and why in r["reason"], str(r)[:200])
+    # a correction applied one position over: the decoder is triggered at p, the error stays
+    sc = library.code_of("steane")
+    b = Builder("shifted_correction")
+    A = b.input(sc, "data")
+    b.no_detectors()
+    P = library.frag_prep(b, sc, "plus", "spec")
+    b.tick([("CX", a, q) for a, q in zip(A, P)])
+    recs = b.measure(P, "Z")
+    b.decoder("x_errors", recs, sc.hz, "X", A[1:] + A[:1])
+    b.output(A, sc, "data")
+    r = props.local(Analysis(b.build()))
+    check("local: a correction applied at the neighbouring position is refused",
+          r["local"] is False and "not confined to that coordinate" in r["reason"], str(r)[:200])
+    # decoder positions numbered differently from the block's
+    perm = [3, 0, 1, 2, 6, 4, 5]
+    b = Builder("permuted_decoder")
+    A = b.input(sc, "data")
+    b.no_detectors()
+    recs = b.measure(A, "Z")
+    rows = [sum(1 << i for i in range(7) if (h >> perm[i]) & 1) for h in sc.hz]
+    b.decoder("outcomes", [recs[perm[i]] for i in range(7)], rows, "record")
+    g = b.build()
+    check("local: the permuted decoder is a correct decoder", props.check(Analysis(g), "ec", 1)["holds_through"] == 1)
+    r = props.local(Analysis(g))
+    check("local: but its positions are not the block's coordinates, and that is refused",
+          r["local"] is False and "two coordinates" in r["reason"] and r.get("input_error"), str(r)[:200])
+    ag = Analysis(library.load("steane_ec:golay,anc=spec"))
+    r = props.local(ag, dict(x_errors=3, z_errors=1))
+    check("local: the smallest decoder radius is the one that counts", r["local"] and r["through"] == 1)
+    an = Analysis(library.load("knill:steane,anc=spec"))
+    check("local: a radius above the one the table shows is refused", props.local(an, 2)["local"] is False)
+    # two blocks, three coordinates of dirt, a code that corrects one: beyond the radius the
+    # statement must not be claimed
+    r = props.local(an)
+    check("local: the certificate never claims more than the decoders' radius", r["through"] == 1)
+    # radii from a code receipt; analysis without tables
+    import ftqc_codes
+    for name, want in (("steane", 1), ("golay", 3)):
+        crec = ftqc_codes.build(ftqc_codes.load(name))
+        g = library.load(f"knill:{name},anc=spec")
+        rr = library.radii(g, crec)
+        check(f"local: decoder radii from the {name} code receipt", set(rr.values()) == {want}, str(rr))
+        a2 = Analysis(g, tables=False)
+        r2 = props.local(a2, rr)
+        check(f"local: without decoder tables the certificate is the same ({name})",
+              r2["local"] and r2["through"] == want and r2["ec"] and r2["close"]
+              and all(d["source"] == "given" for d in r2["decoders"]))
+        e = props.check(a2, "ec", 1)
+        check(f"local: enumeration without tables stops with a note ({name})",
+              e["holds_through"] < 1 and "lookup table" in (e["note"] or ""), str(e)[:200])
+        check("local: without a radius and without tables nothing is claimed", props.local(a2)["local"] is False)
+    # repeated correction: later rounds do not depend on the input
+    a = Analysis(library.load("steane_ec:steane,anc=spec,rounds=2"))
+    ind = props.independent_of_input(a)
+    check("rounds: the second round's decoders cannot be changed by any input error, the first round's can",
+          ind["x_errors_2"]["independent"] and ind["z_errors_2"]["independent"]
+          and not ind["x_errors_1"]["independent"] and not ind["z_errors_1"]["independent"], str(ind))
+    for b, p, t in [e for v in ind.values() if v["input_error"] for e in v["input_error"]]:
+        sg = a.replay([], [(b, p, t)])
+        check("rounds: the witness input error does change a first-round check", a.parts(sg)[1] != 0)
+    a1 = Analysis(library.load("steane_ec:steane,anc=spec"))
+    check("rounds: with one round every decoder depends on the input",
+          not any(v["independent"] for v in props.independent_of_input(a1).values()))
+    # receipts
+    rec = certify.build(library.load("steane_ec:golay,anc=spec"), local=True)
+    certify.verify(rec)
+    check("local: receipt verifies and its summary states the result",
+          "coordinate-local on 23 coordinates" in certify.summary(rec) and "at most 3" in certify.summary(rec))
+    bad = copy.deepcopy(rec)
+    bad["results"][0]["through"] = 5
+    refuses("local: an inflated radius in a receipt is refused", lambda: certify.verify(bad), "recompute")
+    bad = copy.deepcopy(rec)
+    bad["results"][0]["decoders"][0].update(radius=5, source="given")
+    refuses("local: a given radius above the table's is refused", lambda: certify.verify(bad), "recompute")
+    rec = certify.build(library.load("cnot:steane,leaky"), local=True)
+    certify.verify(rec)
+    check("local: a negative certificate carries its fault", rec["results"][0]["local"] is False
+          and rec["results"][0].get("fault"))
+
+
+# ---------------------------------------------------------------- 10. two levels
+def t_levels(heavy):
+    from ftqc_gadgets import levels
+    jobs = [("measure", dict(basis="Z"), 2, 3000), ("measure", dict(basis="X"), 1, 1500),
+            ("cnot", {}, 1, 1500), ("steane_ec", dict(anc="spec"), 2 if heavy else 1, 2500)]
+    if heavy:
+        jobs.append(("knill", dict(anc="spec"), 1, 4000))
+    for fam, kw, exh, samples in jobs:
+        g = levels.two_level(fam, "steane", "steane", **kw)
+        d = levels.Direct(g, "steane", "steane")
+        r = d.run(exhaustive=exh, samples=samples, search=40000)
+        tag = f"{fam}{''.join(',' + str(v) for v in kw.values())}"
+        check(f"two levels, direct ({tag}): with at most one bad column every examined set acts ideally",
+              r["failures"] == 0 and r["exhaustive_sets"] > 100 and r["sampled_sets"] > samples // 2
+              and (r["t1"], r["t2"]) == (1, 1), str({k: v for k, v in r.items() if k != "beyond"}))
+        check(f"two levels, direct ({tag}): two bad columns can fail, and a failing set is found",
+              r["beyond"] is not None and r["beyond"]["bad_columns"] == 2, str(r["beyond"]))
+        # the outer certificate says the same thing: one bad coordinate, not two
+        outer = props.local(Analysis(library.load(
+            {"measure": "measure:steane," + kw.get("basis", "Z").lower(), "cnot": "cnot:steane",
+             "steane_ec": "steane_ec:steane,anc=spec", "knill": "knill:steane,anc=spec"}[fam])))
+        check(f"two levels ({tag}): the outer locality certificate tolerates exactly what the direct test shows",
+              outer["local"] and outer["through"] in (None, 1))
+    g = levels.two_level("measure", "steane", "steane", basis="Z")
+    g2 = Gadget.from_json(json.loads(json.dumps(g.to_json())))
+    check("two levels: a gadget with hierarchical decoders survives a JSON round trip",
+          g2.sha256() == g.sha256() and g2.decoders[0].rule["type"] == "hier")
+    check("two levels: the hierarchical rule is part of the gadget's hash",
+          library.measure(ftqc_codes_concat(), "Z").sha256() != g.sha256())
+    refuses("two levels: a gadget that joins two positions is refused",
+            lambda: levels.positions(library.load("cnot:steane,leaky")), "joins two positions", exc=GadgetError)
+    # reduction receipts
+    outer = certify.build(library.load("steane_ec:steane,anc=spec"), local=True)
+    parts = {role: certify.build(library.load(f"prep:steane,{role},tree={seq}"),
+                                 refines=[(library.prep("steane", role, "spec"), 1, 0)])
+             for role, seq in (("plus", "ZX"), ("zero", "XZ"))}
+    ec_spec = certify.build(library.load("steane_ec:steane,anc=spec"), [("ec", 1)], close=1)
+    ec = dict(composition=certify.compose(ec_spec, parts), target=ec_spec, parts=parts)
+    inner = dict(cnot=certify.build(library.load("cnot:steane"), [("gate", 1)]), ec=ec,
+                 measure_z=certify.build(library.load("measure:steane,z"), [("ec", 1)]),
+                 measure_x=certify.build(library.load("measure:steane,x"), [("ec", 1)]))
+    lv = levels.reduction(outer, inner)
+    check("levels: Steane correction over Steane blocks: one bad column, one fault per inner rectangle",
+          lv["conclusion"] == dict(bad_columns_tolerated=1, inner_faults_per_rectangle=1)
+          and [r["role"] for r in lv["inner"]] == ["cnot", "ec", "measure_x", "measure_z"]
+          and len(lv["outer"]["assumed"]) == 2, str(lv["conclusion"]))
+    levels.verify_reduction(lv, outer, inner)
+    check("levels: summary names the assumptions", "assumed: plus ancilla" in levels.summary(lv))
+    refuses("levels: a missing inner receipt is refused",
+            lambda: levels.reduction(outer, {k: v for k, v in inner.items() if k != "cnot"}), "no inner receipt")
+    refuses("levels: an inner correction analysed with specified ancillas is refused",
+            lambda: levels.reduction(outer, dict(inner, ec=ec_spec)), "specified parts")
+    refuses("levels: an inner correction without the any-input property is refused",
+            lambda: levels.reduction(outer, dict(inner, ec=certify.build(library.load("idle:steane"),
+                                                                           [("gate", 1)]))), "does not establish")
+    ec_only = certify.build(library.load("steane_ec:steane,anc=spec"), [("ec", 1)])
+    refuses("levels: an inner correction with ec but without close is refused",
+            lambda: levels.reduction(outer, dict(inner, ec=dict(
+                composition=certify.compose(ec_only, parts), target=ec_only, parts=parts))),
+            "does not establish")
+    refuses("levels: inner receipts about different codes are refused",
+            lambda: levels.reduction(outer, dict(inner, cnot=certify.build(library.load("cnot:golay"),
+                                                                             [("gate", 1)]))), "same code")
+    refuses("levels: an outer receipt without a locality certificate is refused",
+            lambda: levels.reduction(ec_spec, inner), "locality")
+    refuses("levels: an outer gadget that is not local is refused",
+            lambda: levels.reduction(certify.build(library.load("cnot:steane,leaky"), local=True), inner),
+            "locality")
+    bad = copy.deepcopy(lv)
+    bad["conclusion"]["bad_columns_tolerated"] = 2
+    refuses("levels: an inflated conclusion is refused", lambda: levels.verify_reduction(bad, outer, inner),
+            "conclusion")
+    weak = dict(inner, cnot=certify.build(library.load("cnot:steane"), [("gate", 0)]))
+    check("levels: a weaker inner receipt lowers the inner radius",
+          levels.reduction(outer, weak)["conclusion"]["inner_faults_per_rectangle"] == 0)
+
+
+def ftqc_codes_concat():
+    import ftqc_codes
+    from ftqc_codes.codes import concatenate
+    return concatenate(ftqc_codes.load("steane"), ftqc_codes.load("steane"))
+
+
 # ---------------------------------------------------------------- 8. command line
 def t_cli():
     env = dict(os.environ, PYTHONPATH=os.path.dirname(HERE))
@@ -721,7 +947,7 @@ def main():
     t0 = time.time()
     for fn, args in ((t_structure, ()), (t_tables, ()), (t_dense, (heavy,)), (t_linear, ()),
                      (t_weights, ()), (t_props, (heavy,)), (t_refine, (heavy,)), (t_compose, ()),
-                     (t_receipts, ()), (t_cli, ())):
+                     (t_receipts, ()), (t_local, (heavy,)), (t_levels, (heavy,)), (t_cli, ())):
         t1 = time.time()
         fn(*args)
         print(f"  {fn.__name__:<14} {time.time() - t1:6.2f} s   ({len(PASS)} passed so far)")
