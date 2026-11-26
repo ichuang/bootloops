@@ -187,9 +187,11 @@ def synth_cat_state(
         map2 = {q: (m + q if q < m else 2 * m + n_anc1 + (q - m)) for q in range(sub_c2.n_qubits)}
         ops = []
         for op in sub_c1.ops:
-            ops.append(CircuitOp(op.kind, tuple(map1[q] for q in op.qubits), op.mode, op.label, dict(op.params)))
+            lbl1 = f"L_{op.label}" if op.label else ""
+            ops.append(CircuitOp(op.kind, tuple(map1[q] for q in op.qubits), op.mode, lbl1, dict(op.params)))
         for op in sub_c2.ops:
-            ops.append(CircuitOp(op.kind, tuple(map2[q] for q in op.qubits), op.mode, op.label, dict(op.params)))
+            lbl2 = f"R_{op.label}" if op.label else ""
+            ops.append(CircuitOp(op.kind, tuple(map2[q] for q in op.qubits), op.mode, lbl2, dict(op.params)))
 
         m_checks = m if (w_target is None or w_target >= m) else w_target
         bridge_base = 2 * m + n_anc1 + n_anc2

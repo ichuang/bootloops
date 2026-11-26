@@ -38,7 +38,8 @@ from .diagram import (
     circuit_to_zx_fe,
 )
 from .equivalence import CSSCodeSpec
-from .pauliweb import compile_outcome_map
+from .gf2 import rref_gf2, solve_gf2, swap_zx_bits
+from .pauliweb import analyze_pauli_webs, compile_outcome_map
 
 WORK_PREC = 100
 OUT_PREC = 30
@@ -98,6 +99,7 @@ class ScheduledLocation:
     qubits: tuple[int, ...]
     label: str
     is_idle: bool
+    meas_index: int = -1       # 0..n_meas-1 when `kind in SINGLE_MEAS`, else -1
 
 
 @dataclass(frozen=True)
@@ -174,6 +176,14 @@ def schedule_circuit_ticks(circuit: CliffordCircuit) -> TickSchedule:
     #   - Input qubits start live at tick 0.
     #   - Prepared qubits become live at their `PREP_*` tick, and cease being live after `MEAS_*` tick!
     #   - Output qubits remain live through `total_ticks - 1`.
+    # Map original op index of each `SINGLE_MEAS` to its 0..n_meas-1 order in `circuit.ops`
+    orig_op_to_meas_idx: dict[int, int] = {}
+    m_run = 0
+    for idx, op in enumerate(circuit.ops):
+        if op.kind in SINGLE_MEAS:
+            orig_op_to_meas_idx[idx] = m_run
+            m_run += 1
+
     ops_by_tick: list[list[tuple[int, CircuitOp]]] = [[] for _ in range(total_ticks)]
     for t_use, idx, op in placed_ops:
         ops_by_tick[t_use].append((idx, op))
@@ -216,7 +226,9 @@ def schedule_circuit_ticks(circuit: CliffordCircuit) -> TickSchedule:
             for q in op.qubits:
                 used_in_tick.add(q)
             lbl = op.label or f"{op.kind}_t{t}_op{idx}"
-            sloc = ScheduledLocation(loc_id, t, op.kind, op.qubits, lbl, is_idle=False)
+            sloc = ScheduledLocation(
+                loc_id, t, op.kind, op.qubits, lbl, is_idle=False, meas_index=orig_op_to_meas_idx.get(idx, -1)
+            )
             loc_id += 1
             all_locs.append(sloc)
             this_tick_locs.append(sloc)
@@ -260,38 +272,78 @@ def schedule_circuit_ticks(circuit: CliffordCircuit) -> TickSchedule:
     )
 
 
+class _StabilizerSubspace:
+    """Polynomial-time O(n_out) stabiliser subspace membership and low-weight coset reducer."""
+
+    def __init__(self, gen_rows: tuple[int, ...] | list[int], n_bits: int) -> None:
+        self.n_bits = n_bits
+        rref_rows, piv_cols, _ = rref_gf2(gen_rows, n_bits)
+        self.rref_rows = tuple(rref_rows)
+        self.piv_cols = tuple(piv_cols)
+        if len(self.rref_rows) <= 10:
+            self.elements: list[int] | None = _expand_rowspace(self.rref_rows, n_bits)
+        else:
+            self.elements = None
+
+    def reduce_vec(self, vec: int) -> int:
+        cur = vec
+        for row, pcol in zip(self.rref_rows, self.piv_cols):
+            if (cur >> pcol) & 1:
+                cur ^= row
+        return cur
+
+    def contains(self, vec: int) -> bool:
+        return self.reduce_vec(vec) == 0
+
+    def min_coset_rep(self, err_mask: int) -> tuple[int, int]:
+        if self.contains(err_mask):
+            return 0, 0
+        for q in range(self.n_bits):
+            bit = 1 << q
+            if self.contains(err_mask ^ bit):
+                return 1, bit
+        if self.elements is not None:
+            return _min_coset_rep(err_mask, self.elements, self.n_bits)
+        # Check weight 2 in O(n_bits^2) even when subspace has dimension > 10!
+        for q1 in range(self.n_bits):
+            b1 = 1 << q1
+            for q2 in range(q1 + 1, self.n_bits):
+                cand = b1 | (1 << q2)
+                if self.contains(err_mask ^ cand):
+                    return 2, cand
+        red = self.reduce_vec(err_mask)
+        return red.bit_count(), red
+
+
 def _joint_min_coset_rep(
     out_x: int,
     out_z: int,
-    x_stabs: list[int],
-    z_stabs: list[int],
+    x_space: _StabilizerSubspace,
+    z_space: _StabilizerSubspace,
     n_out: int,
 ) -> tuple[int, int, int]:
-    """Minimize joint Pauli support weight `((out_x ^ sx) | (out_z ^ sz)).bit_count()` over `x_stabs x z_stabs`.
-
-    Essential for states like |cat_4> where Z_2 Z_3 is a stabiliser so X_2 Z_3 ~ -i Y_2 has
-    joint Pauli support weight 1 rather than 2!
-    """
-    x_set = set(x_stabs)
-    z_set = set(z_stabs)
-    if out_x in x_set and out_z in z_set:
+    """Minimize joint Pauli support weight `((out_x ^ sx) | (out_z ^ sz)).bit_count()` in polynomial time."""
+    if x_space.contains(out_x) and z_space.contains(out_z):
         return 0, 0, 0
-    # Fast exact weight-1 check (`3 * n_out` O(1) set lookups):
     for q in range(n_out):
         bit = 1 << q
-        if (out_x ^ bit) in x_set and out_z in z_set:
+        if x_space.contains(out_x ^ bit) and z_space.contains(out_z):
             return 1, bit, 0
-        if out_x in x_set and (out_z ^ bit) in z_set:
+        if x_space.contains(out_x) and z_space.contains(out_z ^ bit):
             return 1, 0, bit
-        if (out_x ^ bit) in x_set and (out_z ^ bit) in z_set:
+        if x_space.contains(out_x ^ bit) and z_space.contains(out_z ^ bit):
             return 1, bit, bit
-    if len(x_stabs) * len(z_stabs) <= 4096:
+    if (
+        x_space.elements is not None
+        and z_space.elements is not None
+        and len(x_space.elements) * len(z_space.elements) <= 4096
+    ):
         best_w = n_out + 1
         best_rx = out_x
         best_rz = out_z
-        for sx in x_stabs:
+        for sx in x_space.elements:
             cx = out_x ^ sx
-            for sz in z_stabs:
+            for sz in z_space.elements:
                 cz = out_z ^ sz
                 w = (cx | cz).bit_count()
                 if w < best_w or (w == best_w and (cx, cz) < (best_rx, best_rz)):
@@ -299,55 +351,54 @@ def _joint_min_coset_rep(
                     best_rx = cx
                     best_rz = cz
         return best_w, best_rx, best_rz
-    wx, rx = _min_coset_rep(out_x, x_stabs, n_out)
-    wz, rz = _min_coset_rep(out_z, z_stabs, n_out)
+    _, rx = x_space.min_coset_rep(out_x)
+    _, rz = z_space.min_coset_rep(out_z)
     return (rx | rz).bit_count(), rx, rz
 
 
 def _stabilizers_for_output(
     circuit: CliffordCircuit,
     codespace: CSSCodeSpec | None,
-) -> tuple[list[int], list[int], int]:
-    """Return `(x_stab_masks, z_stab_masks, n_out)` on `0..len(output_qubits)-1` for coset weight reduction."""
+) -> tuple[_StabilizerSubspace, _StabilizerSubspace, int]:
+    """Return `(x_space, z_space, n_out)` on `0..len(output_qubits)-1` for coset weight reduction."""
     n_out = len(circuit.output_qubits)
     if codespace is not None and n_out == codespace.n:
         if len(circuit.input_qubits) == 0:
-            # |0_L> state prep: Z-stabilisers include logical Z! (Wait: X errors modulo H_X, Z errors modulo <H_Z, L_Z>!)
-            # Wait: on |0_L>, L_Z IS a +1 stabilizer so Z errors are reduced modulo <H_Z, L_Z>, whereas L_X is NOT a
-            # stabilizer of |0_L> (an L_X error flips |0_L> -> |1_L>!), so X errors are ONLY reduced modulo H_X!
-            x_stabs = _expand_rowspace(codespace.hx_rows, n_out)
-            z_stabs = _expand_rowspace(codespace.hz_rows + codespace.lz_rows, n_out)
-            return x_stabs, z_stabs, n_out
-        x_stabs = _expand_rowspace(codespace.hx_rows, n_out)
-        z_stabs = _expand_rowspace(codespace.hz_rows, n_out)
-        return x_stabs, z_stabs, n_out
+            return (
+                _StabilizerSubspace(codespace.hx_rows, n_out),
+                _StabilizerSubspace(codespace.hz_rows + codespace.lz_rows, n_out),
+                n_out,
+            )
+        return (
+            _StabilizerSubspace(codespace.hx_rows, n_out),
+            _StabilizerSubspace(codespace.hz_rows, n_out),
+            n_out,
+        )
 
-    # Check if `circuit` is a pure Z-cat or X-cat state preparation (`input_qubits == ()`)!
-    if len(circuit.input_qubits) == 0 and n_out >= 2:
-        # Inspect boundary stabilizers via Pauli webs:
-        ana = circuit_to_zx_fe(circuit, "fault_free")
-        from .pauliweb import analyze_pauli_webs
-
-        pw = analyze_pauli_webs(ana)
+    if n_out >= 2:
+        n_in = len(circuit.input_qubits)
+        in_mask = (1 << (2 * n_in)) - 1
+        pw = analyze_pauli_webs(circuit_to_zx_fe(circuit, "fault_free"))
         x_rows: list[int] = []
         z_rows: list[int] = []
         for sym, sgn in pw.signed_boundary_stabs:
-            if sgn != 0:
+            if sgn != 0 or (sym & in_mask) != 0:
                 continue
+            out_sym = sym >> (2 * n_in)
             z_part = 0
             x_part = 0
             for j in range(n_out):
-                if (sym >> (2 * j)) & 1:
+                if (out_sym >> (2 * j)) & 1:
                     z_part |= 1 << j
-                if (sym >> (2 * j + 1)) & 1:
+                if (out_sym >> (2 * j + 1)) & 1:
                     x_part |= 1 << j
             if z_part == 0 and x_part != 0:
                 x_rows.append(x_part)
             elif x_part == 0 and z_part != 0:
                 z_rows.append(z_part)
-        return _expand_rowspace(tuple(x_rows), n_out), _expand_rowspace(tuple(z_rows), n_out), n_out
+        return _StabilizerSubspace(x_rows, n_out), _StabilizerSubspace(z_rows, n_out), n_out
 
-    return [0], [0], n_out
+    return _StabilizerSubspace((), n_out), _StabilizerSubspace((), n_out), n_out
 
 
 def build_gadget_contract(
@@ -386,9 +437,66 @@ def build_gadget_contract(
     # `compile_outcome_map` on `circuit` ALONE (without prepending encoder) finds the INTERNAL ancilla
     # detector checks (such as flags `steane5_flag == 0` or Shor `k3 ^ k4 == 0`), WITHOUT treating the
     # syndrome measurements themselves as postselected zero checks! That is EXACTLY what we want!
-    omap = compile_outcome_map(circuit_to_zx_fe(circuit, "fault_free"))
+    zx_ff = circuit_to_zx_fe(circuit, "fault_free")
+    ana_ff = analyze_pauli_webs(zx_ff)
+    omap = compile_outcome_map(zx_ff)
     meas_label_to_bit = {lbl: i for i, lbl in enumerate(omap.meas_labels)}
     det_parity_checks = omap.parity_checks  # bitmasks over `0..len(omap.meas_labels)-1`
+
+    # Precompute Appendix A (Proposition A.1) classical Pauli-frame compensation for valid
+    # measurement outcomes `mbits in ker(det_parity_checks)` by solving directly over pure
+    # OUTPUT-wire Pauli corrections `D^{P(k)} = C_out * D^I` (Kissinger Eq. 9, p. 50)!
+    n_in = len(circuit.input_qubits)
+    n_meas = len(omap.meas_labels)
+    n_b_tot = n_in + n_out
+    out_dual_rows = [
+        swap_zx_bits(s_vec >> (2 * n_in), n_out) for s_vec, _ in ana_ff.signed_boundary_stabs
+    ]
+    outcome_frame_pivots: list[tuple[int, int, int]] = []  # (bit_idx_in_mbits, frame_x_mask, frame_z_mask)
+    if n_meas > 0 and n_out > 0 and omap.valid_outcome_basis:
+        basis_rref, piv_cols_m, transforms_m = rref_gf2(
+            list(omap.valid_outcome_basis), n_meas, track_transform=True
+        )
+        n_stab_rows = len(ana_ff.signed_boundary_stabs)
+        for r_i, pcol in enumerate(piv_cols_m):
+            comb = transforms_m[r_i]
+            syn_piv = 0
+            for j_b, b_syn in enumerate(omap.basis_boundary_syndromes):
+                if (comb >> j_b) & 1:
+                    syn_piv ^= b_syn
+            rhs_bits = [(syn_piv >> s_i) & 1 for s_i in range(n_stab_rows)]
+            ok_pure, c_out_symp, _ = solve_gf2(out_dual_rows, rhs_bits, 2 * n_out)
+            if (not ok_pure) and n_in == n_out:
+                # Non-trivial measurement branch (Kissinger Appendix A, Eq. 7 p. 48):
+                # Check single-qubit symmetric branch flip `B_sym = P_{in,q} P_{out,q}` + pure output frame `C_out`!
+                in_dual_rows = [
+                    swap_zx_bits(s_vec & ((1 << (2 * n_in)) - 1), n_in)
+                    for s_vec, _ in ana_ff.signed_boundary_stabs
+                ]
+                for q_br in range(n_in):
+                    for sym_pauli in (2, 1, 3):  # try X, Z, Y symmetric branch flip on wire q_br
+                        sym_mask = sym_pauli << (2 * q_br)
+                        adj_rhs = [
+                            rhs_bits[s_i]
+                            ^ (((in_dual_rows[s_i] & sym_mask).bit_count() ^ (out_dual_rows[s_i] & sym_mask).bit_count()) & 1)
+                            for s_i in range(n_stab_rows)
+                        ]
+                        ok_br, cand_c_out, _ = solve_gf2(out_dual_rows, adj_rhs, 2 * n_out)
+                        if ok_br:
+                            ok_pure = True
+                            c_out_symp = cand_c_out
+                            break
+                    if ok_pure:
+                        break
+            if ok_pure and c_out_symp != 0:
+                fx_piv = 0
+                fz_piv = 0
+                for o_i in range(n_out):
+                    if (c_out_symp >> (2 * o_i)) & 1:
+                        fz_piv |= 1 << o_i
+                    if (c_out_symp >> (2 * o_i + 1)) & 1:
+                        fx_piv |= 1 << o_i
+                outcome_frame_pivots.append((pcol, fx_piv, fz_piv))
 
     # Optional Appendix C.2 flag-conditioned decoder when inline on a CSS code block:
     flag_decoder: FlagConditionedDecoder | None = None
@@ -458,7 +566,7 @@ def build_gadget_contract(
                     zm = (zm & ~((1 << q0) | (1 << q1))) | (z1 << q0) | (z0 << q1)
                 elif k in SINGLE_MEAS:
                     q = sloc.qubits[0]
-                    m_idx = meas_label_to_bit[sloc.label]
+                    m_idx = sloc.meas_index
                     if k == "MEAS_Z":
                         bit = (xm >> q) & 1
                     elif k == "MEAS_X":
@@ -546,8 +654,14 @@ def build_gadget_contract(
             out_x, out_z, mbits = propagate_single_fault(sloc.loc_id, fx_m, fz_m)
             det_fired = any(((chk & mbits).bit_count() & 1) == 1 for chk in det_parity_checks)
 
-            wx, repx = _min_coset_rep(out_x, x_stabs, n_out)
-            wz, repz = _min_coset_rep(out_z, z_stabs, n_out)
+            if (not det_fired) and mbits != 0 and outcome_frame_pivots:
+                for bit_idx, fx_piv, fz_piv in outcome_frame_pivots:
+                    if (mbits >> bit_idx) & 1:
+                        out_x ^= fx_piv
+                        out_z ^= fz_piv
+
+            wx, repx = x_stabs.min_coset_rep(out_x)
+            wz, repz = z_stabs.min_coset_rep(out_z)
             if noise_model == "circuit_depolarizing":
                 w_joint, repx, repz = _joint_min_coset_rep(out_x, out_z, x_stabs, z_stabs, n_out)
             else:
@@ -568,7 +682,7 @@ def build_gadget_contract(
                         if f_mask != 0 and codespace is not None:
                             nsyn = _syndrome_bits(out_x, codespace.hz_rows)
                             rec = flag_decoder.lookup_flagged.get((f_mask, nsyn), 0)
-                            res_wt, _ = _min_coset_rep(out_x ^ rec, x_stabs, n_out)
+                            res_wt, _ = x_stabs.min_coset_rep(out_x ^ rec)
                             if res_wt > 0:
                                 bad_post_decoder_labels += 1
                     else:
@@ -579,7 +693,7 @@ def build_gadget_contract(
                         if f_mask != 0 and codespace is not None:
                             nsyn = _syndrome_bits(out_z, codespace.hx_rows)
                             rec = flag_decoder.lookup_flagged.get((f_mask, nsyn), 0)
-                            res_wt, _ = _min_coset_rep(out_z ^ rec, z_stabs, n_out)
+                            res_wt, _ = z_stabs.min_coset_rep(out_z ^ rec)
                             if res_wt > 0:
                                 bad_post_decoder_labels += 1
             else:
