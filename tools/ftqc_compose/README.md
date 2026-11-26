@@ -16,3 +16,5 @@ python3 run_selftests.py ftqc_compose
 See the [package guide](GUIDE.md) for the contract language, evidence and limits, and the [FTQC overview](../FTQC.md) for related tools.
 
 The [level-reduction and noise rules](GUIDE.md#level-reduction) also check unconditional circuits with typed interfaces and calculate exact rational local-stochastic bounds. The 15-to-1 example verifies all single-resource corrections and the 105 two-resource bad supports under fault-free processing.
+
+The [gross-code residual checker](GUIDE.md#gross-code-residual-data-and-frame) transports data and split-frame errors to the BB144 output. The [distilled logical T study](GUIDE.md#from-a-distilled-qubit-to-logical-t) checks the encoding interface, all four adaptive branches, and separate bounds for factory, encoder and online faults.

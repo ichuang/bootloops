@@ -37,6 +37,10 @@ def evaluate(spec):
         from .stochastic import stochastic_result
 
         return stochastic_result(spec)
+    if spec["kind"] == "distilled-logical-t":
+        from .logical_t import logical_t_result
+
+        return logical_t_result(spec)
     if spec["kind"] == "gross-residual":
         from .gross_residual import gross_result
 
