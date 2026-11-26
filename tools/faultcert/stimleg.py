@@ -52,7 +52,7 @@ def to_stim(circuit, model, noisy=True):
     return "\n".join(lines) + "\n"
 
 
-def compare(circuit, model, distance_lower=None):
+def compare(circuit, model, distance_lower=None, search_logical=True):
     """Returns an evidence dict; status 'agrees', 'DISAGREES' or 'skipped'."""
     why = available()
     ev = dict(leg="S", method="Stim detector error model and logical-error search")
@@ -85,7 +85,7 @@ def compare(circuit, model, distance_lower=None):
         ev.update(status="DISAGREES",
                   reason=f"{len(ours - theirs)} signatures only here, {len(theirs - ours)} only in Stim")
         return ev
-    if circuit.observables:
+    if circuit.observables and search_logical:
         try:
             found = sc.search_for_undetectable_logical_errors(
                 dont_explore_detection_event_sets_with_size_above=6,

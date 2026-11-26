@@ -121,3 +121,35 @@ class PortFrameTests(unittest.TestCase):
         witness_mask(support, n, z, x[:-1])
         with self.assertRaisesRegex(ValueError, "not a nontrivial logical"):
             witness_mask(support, n, z, x)
+
+
+class NoisyCycleTests(unittest.TestCase):
+    def test_corrected_cycle(self):
+        from .gross_cycle import cycle, validate_cycle
+
+        _, (_, hx, hz), _, _ = gross_z()
+        body = cycle()
+        # Drop the early gauge CNOT. A tick schedule still exists, but its
+        # signed meter pullback must fail.
+        body[1] = [op for op in body[1] if op[0] != "CX" or op[1] != 234]
+        with self.assertRaisesRegex(ValueError, "incorrect ideal check"):
+            validate_cycle(body, hx, hz)
+
+    def test_record_columns_against_forward_faultcert(self):
+        from faultcert.circuit import Circuit
+        from faultcert.model import Model
+        from faultcert.record_model import RecordModel
+
+        circ = Circuit(
+            [[("RX", 0), ("R", 1)], [("CX", 0, 1)], [("M", 0), ("M", 1)]],
+            detectors=[],
+            observables=[[0, 1]],
+            outputs=[],
+        )
+        native, fast = Model(circ), RecordModel(circ)
+        for site, group in enumerate(fast.groups):
+            for label, sig in group.items():
+                self.assertEqual(native.replay([(site, label)]), (0, sig, 0))
+                self.assertEqual(fast.replay([(site, label)]), (0, sig))
+        with self.assertRaisesRegex(ValueError, "random"):
+            RecordModel(Circuit([[("RX", 0)], [("M", 0)]], detectors=[[0]], outputs=[]))

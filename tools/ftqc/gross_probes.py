@@ -83,7 +83,7 @@ def experiment(rounds, basis):
         detectors.extend([split + i for i in bits(c)] for c in cycles)
     detectors.extend(terminal(h) for h in (mem.hz if is_z else mem.hx))
     if is_z:
-        reps = quotient(kernel(mem.hx, mem.n), mem.hz)
+        reps = quotient([shifted_z(), *kernel(mem.hx, mem.n)], mem.hz)
         obs = [list(range(first + known, first + size))]
     else:
         reps = quotient(kernel([*mem.hz, shifted_z()], mem.n), mem.hx)
