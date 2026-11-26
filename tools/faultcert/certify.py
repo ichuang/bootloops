@@ -13,8 +13,8 @@ from .circuit import Circuit
 from .model import Model
 
 SCHEMA = "faultcert-receipt-1"
-VERSION = "0.1.0"
-NOISE = ("one fault = one location: any non-identity Pauli after R, RX, I, H (one qubit) or "
+VERSION = "0.2.0"
+NOISE = ("one fault = one location: any non-identity Pauli after R, RX, I, H, S, SDG, Z_IF (one qubit) or "
          "CX (two qubits), or a flipped outcome at M, MX; weight = number of locations")
 
 

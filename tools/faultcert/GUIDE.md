@@ -11,10 +11,10 @@ line otherwise).
 
 Circuit-level fault properties of Clifford gadgets, as receipts. `qeccert`
 says what a code's distance is; this package says what faults inside a circuit
-do. Input: a circuit of preparations, H, CX, idles and measurements in ticks,
+do. Input: a circuit of preparations, H, phase gates, CX, record-controlled Z, idles and measurements in ticks,
 optionally with declared detectors, logical observables and output qubits.
 Fault model: one fault is one location misbehaving (any non-identity Pauli
-after a preparation, idle, H or CX; a flipped outcome at a measurement), and
+after a preparation, idle or unitary gate; a flipped outcome at a measurement), and
 the weight of a fault set is its number of locations.
 
 Outputs:
@@ -73,9 +73,8 @@ Legs:
 - All-orders statements. Everything here is "for all fault sets of at most j
   locations" with j small; a probability bound still needs an argument such as
   a cone or counting theorem on top.
-- Non-Clifford gates, and classically controlled operations (decoders and
-  adaptive corrections inside the circuit). Postselection is supported as
-  "no detector fires".
+- General adaptive programs, decoders and non-Clifford unitaries. The supported
+  feed-forward operation applies Z using one earlier reported bit.
 - Leakage, coherent errors, correlated faults across locations.
 - Large circuits at high weight: leg A enumerates subsets of the distinct
   fault effects (a few thousand of them for a distance-5 surface patch), so it
@@ -96,6 +95,7 @@ With `tools/` on `PYTHONPATH` (or from `tools/`):
 Circuit JSON: `{"name", "n", "ticks": [[["RX",0],["R",1]], [["CX",0,1]], ...],
 "detectors": [[measurement indices], ...] | null, "observables": [[...]],
 "outputs": [qubits]}`. Operations: `R` (|0>), `RX` (|+>), `I`, `H`, `CX c t`,
+`S`, `SDG`, `Z_IF q r` (Z on q when zero-based record r from a previous tick is 1),
 `M` (Z), `MX` (X); prefix a name with `!` to make that operation noiseless.
 Measurements are numbered in order of appearance. `detectors: null` means
 "discover them": every outcome parity that is deterministic in the noiseless

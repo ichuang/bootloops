@@ -25,15 +25,21 @@ def available():
 
 def to_stim(circuit, model, noisy=True):
     lines = []
+    count = 0
     for tick in circuit.ticks:
         after = []
         for op in tick:
             q = " ".join(map(str, op.qs))
             nz = noisy and op.noisy
             if op.name in ("M", "MX"):
+                count += 1
                 lines.append(f"{op.name}({P}) {q}" if nz else f"{op.name} {q}")
             else:
-                lines.append(f"{op.name} {q}")
+                if op.name == "Z_IF":
+                    lines.append(f"CZ rec[{op.record - count}] {q}")
+                else:
+                    gate = "S_DAG" if op.name == "SDG" else op.name
+                    lines.append(f"{gate} {q}")
                 if nz:
                     after.append(("DEPOLARIZE2" if op.name == "CX" else "DEPOLARIZE1") + f"({P}) {q}")
         lines += after

@@ -144,6 +144,13 @@ def dense_run(circ, faults, forced=None):
             sim.h(op.qs[0])                      # preparations happen on fresh |0>
         elif op.name == "H":
             sim.h(op.qs[0])
+        elif op.name in ("S", "SDG"):
+            phase = 1j if op.name == "S" else -1j
+            for i in range(len(sim.v)):
+                if i >> op.qs[0] & 1:
+                    sim.v[i] *= phase
+        elif op.name == "Z_IF" and reported[op.record]:
+            sim.pauli(op.qs[0], "Z")
         elif op.name == "CX":
             sim.cx(*op.qs)
         if lab:
@@ -170,10 +177,12 @@ def random_circuit(rnd, n):
                 tick.append(("CX", qs.pop(), qs.pop()))
             else:
                 q = qs.pop()
-                tick.append((rnd.choice(["H", "I", "I"]), q))
+                tick.append((rnd.choice(["H", "I", "S", "SDG"]), q))
         ticks.append(tick)
     meas = rnd.sample(range(n), rnd.randint(1, n - 1))
     ticks.append([(rnd.choice(["M", "MX"]), q) for q in meas])
+    live = [q for q in range(n) if q not in meas]
+    ticks.append([("Z_IF", rnd.choice(live), rnd.randrange(len(meas)))])
     return Circuit(ticks, n)
 
 
@@ -415,6 +424,20 @@ def t_controls():
     r2 = copy.deepcopy(rec2)
     fake_violation(r2)
     refuses("control: strict-FT counterexample that is not one", lambda: certify.verify(r2), "does not replay")
+    for phase, sign in (("S", 1), ("SDG", 0)):
+        phase_circuit = Circuit([[("RX", 0)], [("S", 0)], [(phase, 0)], [("MX", 0)]])
+        check(f"signed ideal S followed by {phase}",
+              Model(phase_circuit).sim.parity_form([0]) == sign)
+    ticks = [[("R", 0), ("RX", 1)], [("M", 0)], [("Z_IF", 1, 0)], [("MX", 1)]]
+    feedback = Circuit(ticks, detectors=[], observables=[[1]])
+    check("flipped control reaches measured observable",
+          Model(feedback).replay([(2, "flip")]) == (0, 1, 0))
+    check("feedback survives native JSON roundtrip",
+          Circuit.from_json(feedback.to_json()).canonical() == feedback.canonical())
+    refuses("same-tick record cannot control Z",
+            lambda: Circuit([ticks[0], ticks[1] + ticks[2]]), "earlier tick", CircuitError)
+    refuses("negative native witness location",
+            lambda: Model(feedback).replay([(-1, "flip")]), "out of range", ValueError)
     # circuit-level refusals
     for name, fn, needle in [
         ("observables without declared detectors",
