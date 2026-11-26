@@ -9,6 +9,7 @@ Gadget specs (CODE is a ftqc_codes spec without commas, e.g. steane, golay, or r
                                             checked copy in Z; Z: CX checked->kept, measure in X)
                                  spec       noiseless preparation followed by one noisy wire
                                             per qubit (the specification of a preparation)
+                               `,rounds=K` adds K ticks of idles after every raw preparation
   cnot:CODE[,leaky]            transversal CX between two input blocks; `leaky` adds a pair
                                of cancelling CX inside the control block (negative control)
   idle:CODE                    one noisy wire per qubit on an input block
@@ -49,11 +50,15 @@ def code_of(spec):
 
 
 # ---------------------------------------------------------------------- fragments
-def frag_prep(b, code, state, method="raw"):
-    """Emit a preparation of |0_L> or |+_L> at the builder's cursor; returns its qubits."""
+def frag_prep(b, code, state, method="raw", rounds=0):
+    """Emit a preparation of |0_L> or |+_L> at the builder's cursor; returns its qubits.
+    rounds: noisy idle ticks on every qubit after each raw preparation (one level up, an
+    idle is an inner error correction: a raw outer preparation ends with such rounds)."""
     qs = b.alloc(code.n)
     if method == "raw":
         b.layers(prep_layers(code, state, qs))
+        for _ in range(rounds):
+            b.wires(qs)
     elif method == "ideal":
         b.layers(prep_layers(code, state, qs), False)
     elif method == "spec":
@@ -63,7 +68,7 @@ def frag_prep(b, code, state, method="raw"):
         seq = method[5:].upper()
         if not seq or set(seq) - set("XZ"):
             raise GadgetError(f"tree sequence must be a word in X and Z, got {seq!r}")
-        blocks = b.par(*[(lambda: frag_prep(b, code, state, "raw")) for _ in range(2 ** len(seq))])
+        blocks = b.par(*[(lambda: frag_prep(b, code, state, "raw", rounds)) for _ in range(2 ** len(seq))])
         qs = _purify(b, code, state, seq, blocks)
     else:
         raise GadgetError(f"unknown preparation method {method!r}")
@@ -91,11 +96,11 @@ def _purify(b, code, state, seq, blocks):
 
 
 # ---------------------------------------------------------------------- gadgets
-def prep(code, state="zero", method="raw", idles=False):
+def prep(code, state="zero", method="raw", idles=False, rounds=0):
     code = code_of(code)
-    b = Builder(f"prep({code.name},{state},{method})")
+    b = Builder(f"prep({code.name},{state},{method}" + (f",rounds={rounds}" if rounds else "") + ")")
     b.no_detectors()
-    qs = frag_prep(b, code, state, method)
+    qs = frag_prep(b, code, state, method, rounds)
     b.output(qs, code)
     return b.build(idles)
 
@@ -276,14 +281,17 @@ def load(spec):
     idles, ideal = "idles" in flags, "ideal" in flags
     flags -= {"idles", "ideal"}
     anc = next((f[4:] for f in flags if f.startswith("anc=")), "raw")
-    rounds = int(next((f[7:] for f in flags if f.startswith("rounds=")), "1"))
+    rounds = next((f[7:] for f in flags if f.startswith("rounds=")), None)
+    if rounds is not None and not rounds.isdigit():
+        raise GadgetError(f"rounds takes a number in {spec!r}")
+    rounds = None if rounds is None else int(rounds)
     flags = {f for f in flags if not f.startswith("anc=") and not f.startswith("rounds=")}
     try:
         if fam == "prep":
-            rest = [p for p in parts[1:] if p not in ("idles", "ideal")]
+            rest = [p for p in parts[1:] if p not in ("idles", "ideal") and not p.startswith("rounds=")]
             state = rest[0] if rest else "zero"
             method = rest[1] if len(rest) > 1 else "raw"
-            return prep(parts[0], state, method, idles)
+            return prep(parts[0], state, method, idles, rounds or 0)
         if fam == "cnot" and flags <= {"leaky"}:
             return cnot(parts[0], "leaky" in flags, ideal, idles)
         if fam == "idle" and not flags:
@@ -293,7 +301,7 @@ def load(spec):
         if fam == "seq_syndrome" and not flags:
             return seq_syndrome(parts[0], idles)
         if fam == "steane_ec" and not flags:
-            return steane_ec(parts[0], anc, ideal, idles, rounds)
+            return steane_ec(parts[0], anc, ideal, idles, 1 if rounds is None else rounds)
         if fam == "measure" and flags <= {"x", "z", "X", "Z"}:
             return measure(parts[0], (sorted(flags) or ["Z"])[0])
     except IndexError:

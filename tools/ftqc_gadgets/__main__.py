@@ -46,6 +46,12 @@ def main(argv=None):
     a.add_argument("--local", action="store_true", help="coordinate-locality certificate")
     a.add_argument("--radius", type=int, help="decoder radius for --local (default: from the tables)")
     a.add_argument("--code-receipt", help="ftqc_codes receipt of the block code: decoder radii for --local")
+    a.add_argument("--tree", action="store_true", help="factory certificate of a purification tree")
+    a.add_argument("--strict", action="store_true",
+                   help="for --tree: only the last idle round of a leaf is local (outer-level factories)")
+    a.add_argument("--light", action="store_true",
+                   help="for --tree alone: do not propagate every fault through the whole circuit (large trees)")
+    a.add_argument("--wmin", type=int, help="for --tree: minimum stabilizer weight to prove (large codes)")
     a.add_argument("--no-tables", action="store_true", help="skip decoder tables (large codes)")
     a.add_argument("-o", "--out")
     a.add_argument("--cap", type=int, default=3_000_000)
@@ -126,11 +132,13 @@ def main(argv=None):
             if args.code_receipt:
                 with open(args.code_receipt) as f:
                     loc = library.radii(g, json.load(f))
+        tree = dict(strict=args.strict, wmin=args.wmin, light=args.light) if args.tree else None
         rec = certify.build(g, checks, args.close, refs, args.sector, args.cap, local=loc,
-                            tables=not args.no_tables)
+                            tables=not args.no_tables, tree=tree)
         emit(rec, args.out)
         print(certify.summary(rec))
-        failed = any(r.get("violation") or r.get("local") is False for r in rec["results"])
+        failed = any(r.get("violation") or r.get("local") is False or r.get("tree") is False
+                     for r in rec["results"])
         return 1 if failed else 0
     except certify.Refusal as e:
         print("REFUSED:", e, file=sys.stderr)
