@@ -53,3 +53,7 @@ Inputs specify the HGP seeds, the anticommuting logical_x and logical_z masks on
     python3 -m ftqc verify tools/ftqc/examples/t-gate.json /tmp/t.json
 
 The physical adapter is a verified-cat parity meter with direct access to the listed sites. Implementing the protocol on a particular fixed coupler network requires compiling and checking its routing and storage locations.
+
+## Cross-checks with faultcert
+
+Compare the two fault propagators on an extractor or fixed T arm, replay a logical witness, or export a verified cat for a native strict-FT analysis. The [comparison guide](FAULTCERT.md) gives the commands and the input, acceptance and output assumptions for each claim.

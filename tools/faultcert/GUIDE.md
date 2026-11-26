@@ -189,3 +189,7 @@ Detector error models and the cross-check leg: Stim (C. Gidney, Quantum 5, 497,
 2021). Strict fault tolerance of preparations: P. Aliferis, D. Gottesman,
 J. Preskill (2006). SAT leg: qeccert, CaDiCaL (A. Biere et al.), LRAT
 (Cruz-Filipe, Heule, Hunt, Kaufmann, Schneider-Kamp 2017).
+
+## HGP extractors and logical T circuits
+
+The [FTQC comparison guide](../ftqc/FAULTCERT.md) shows how to analyze an actual HGP meter's cat preparation here and how to use this package's forward propagator to replay a logical fault in the enclosing circuit.
