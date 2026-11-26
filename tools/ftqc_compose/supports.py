@@ -48,11 +48,11 @@ class Family:
 
     def describe(self):
         counts = Counter(map(len, self.terms))
-        return dict(
-            sites=sorted(self.sites),
-            minimal=[sorted(t) for t in self.terms],
-            enumerator={str(k): v for k, v in sorted(counts.items())},
-        )
+        return {
+            "sites": sorted(self.sites),
+            "minimal": [sorted(t) for t in self.terms],
+            "enumerator": {str(k): v for k, v in sorted(counts.items())},
+        }
 
     def union(self, other):
         return Family(self.sites | other.sites, [*self.terms, *other.terms])
@@ -79,17 +79,24 @@ def leaf(node):
     if node["op"] != "family":
         raise ValueError("expected an explicit support family")
     if not isinstance(node["minimal"], list):
-        raise ValueError("minimal must be a list of supports")
+        raise TypeError("minimal must be a list of supports")
     return Family(names(node["sites"]), [names(t) for t in node["minimal"]])
+
+
+def finite_domain(sites):
+    if len(sites) > 16:
+        raise ValueError("truth-table checker supports at most 16 physical sites")
 
 
 def evaluate(node):
     op = node["op"]
     if op == "family":
+        finite_domain(node["sites"])
         return leaf(node)
     if op in ("union", "product"):
         fields(node, "op", "left", "right")
         a, b = evaluate(node["left"]), evaluate(node["right"])
+        finite_domain(a.sites | b.sites)
         return a.union(b) if op == "union" else a.product(b)
     if op == "substitute":
         fields(node, "op", "outer", "at")
@@ -98,6 +105,7 @@ def evaluate(node):
         if inner.keys() != outer.sites:
             raise ValueError("substitution must cover every outer site exactly once")
         sites = disjoint(inner.values())
+        finite_domain(sites)
         terms = (
             frozenset().union(*choice)
             for t in outer.terms
@@ -126,12 +134,24 @@ def family_result(spec):
     fields(spec, "kind", "expression")
     node = spec["expression"]
     family = evaluate(node)
-    if len(family.sites) > 16:
-        raise ValueError("truth-table checker supports at most 16 physical sites")
+    # Reconstruct minimal generators from the truth table. A true set is
+    # minimal iff deleting any one of its members changes its value to false.
+    true_sets = set()
+    generators = []
     for size in range(len(family.sites) + 1):
         for sites in combinations(sorted(family.sites), size):
-            if family.bad(frozenset(sites)) != predicate(node, set(sites)):
+            support = frozenset(sites)
+            if predicate(node, support):
+                if all(support - {i} not in true_sets for i in support):
+                    generators.append(support)
+                true_sets.add(support)
+            if family.bad(support) != (support in true_sets):
                 raise ValueError("family disagrees with Boolean semantics")
+    counts = Counter(map(len, generators))
+    if set(generators) != set(family.terms) or family.describe()["enumerator"] != {
+        str(k): v for k, v in counts.items()
+    }:
+        raise ValueError("minimal generators or enumerator differ from truth table")
     return dict(
         status="verified",
         interpretation="exact minimal supports of expression",

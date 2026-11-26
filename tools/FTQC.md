@@ -1,6 +1,6 @@
 # Fault-tolerant quantum computing in BootLoops
 
-Choose a tool by the claim you need to prove. A distance can count qubits in a code or faulty locations in a circuit. A gadget proof can instead ask how much error survives correction on an unknown input, or whether an implementation can replace a reference circuit. The five packages on the `ftqc_integration` branch make these questions executable in one checkout.
+Choose a tool by the claim you need to prove. A distance can count qubits in a code or faulty locations in a circuit. A gadget proof can instead ask how much error survives correction on an unknown input, or whether an implementation can replace a reference circuit. The six packages on the `ftqc_compose` branch make these questions executable in one checkout.
 
 | Question | Tool | Evidence |
 |---|---|---|
@@ -9,6 +9,7 @@ Choose a tool by the claim you need to prove. A distance can count qubits in a c
 | What does an encoded gate or correction gadget guarantee for an unknown input? | [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) | Bounds on residual errors with input errors and internal faults counted separately. Refinement and composition receipts justify replacing a specified sub-gadget with an implementation. |
 | Does an extractor measure the intended logical observable and preserve the other logical qubits? | [`ftqc_extractors`](ftqc_extractors/README.md) | HGP and gross-code measurement proofs, static and scheduled distance bounds, and conditional logical T proofs with explicit magic-state assumptions. |
 | Can a proposed Clifford circuit replace a reference under a given fault model? | [`ftqc_zx`](ftqc_zx/GUIDE.md) | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic bounds for a specified noise model. |
+| Which gadget guarantees can be joined on these ordered wires? | [`ftqc_compose`](ftqc_compose/README.md) | Exact finite bad-support families, typed composition receipts and an accepted-branch HGP measurement proof. |
 
 ## Where the tools connect
 
@@ -47,10 +48,10 @@ python3 -m ftqc_zx equiv steane_5anc steane_spec --w 3 --noise-model circuit_css
 
 ## Reproduce the integration checks
 
-From BootLoops, run the five registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+From BootLoops, run the six registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
 
 ```sh
-python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx
+python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx ftqc_compose
 ```
 
 From the research repository root with its pinned BootLoops submodule initialized, run the command below to verify the saved inputs, evidence hashes, bounds and witnesses. The twelve-round search also requires a C++17 compiler with unsigned 128-bit integers. [Research studies and replay instructions](https://github.mit.edu/ichuang/RESEARCH-extractors-proof-system-2026/tree/main/studies)

@@ -3,8 +3,8 @@
 import argparse
 import hashlib
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from .supports import family_result
 
@@ -18,6 +18,25 @@ def digest(value):
 
 
 def receipt(spec):
+    from .contracts import Violation
+
+    try:
+        result = evaluate(spec)
+    except Violation as failure:
+        result = {
+            "status": "counterexample",
+            "scope": "accepted-diagonal-pauli",
+            "failed_obligation": "leaf simulation",
+            "witness": failure.evidence,
+        }
+    return {"schema": "ftqc_compose-1", "input_sha256": digest(spec), "result": result}
+
+
+def evaluate(spec):
+    if spec["kind"] == "hgp-repeat":
+        from .hgp import repeated_result
+
+        return repeated_result(spec)
     if spec["kind"] == "family":
         result = family_result(spec)
     elif spec["kind"] == "contract":
@@ -26,7 +45,7 @@ def receipt(spec):
         result = contract_result(spec)
     else:
         raise ValueError("unknown study kind")
-    return dict(schema="ftqc_compose-1", input_sha256=digest(spec), result=result)
+    return result
 
 
 def main():
@@ -44,7 +63,7 @@ def main():
         if args.command == "verify":
             if canonical(result) != canonical(json.loads(args.receipt.read_text())):
                 raise ValueError("receipt differs from recomputed evidence")
-            print("verified", result["result"]["status"])
+            print("verified receipt:", result["result"]["status"])
             return 0
         content = json.dumps(result, indent=2, sort_keys=True) + "\n"
         if args.o:

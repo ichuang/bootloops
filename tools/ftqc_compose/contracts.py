@@ -6,21 +6,33 @@ All verification is relative to the recorded ideal boundaries and fault model.
 
 from itertools import combinations, product
 
-from .supports import Family, fields, names, disjoint, leaf
-
+from .supports import Family, disjoint, fields, leaf, names
 
 SCOPE = "accepted-diagonal-pauli"
-BIT = dict(
-    kind="C", wires=["0"], code="bit", basis="Z", decoder="identity", bad=[["0"]]
-)
-REP = dict(
-    kind="C",
-    wires=["0", "1", "2"],
-    code="repetition-3",
-    basis="Z",
-    decoder="majority",
-    bad=[list(t) for t in combinations(["0", "1", "2"], 2)],
-)
+BIT = {
+    "kind": "C",
+    "wires": ["0"],
+    "code": "bit",
+    "basis": "Z",
+    "decoder": "identity",
+    "bad": [["0"]],
+}
+REP = {
+    "kind": "C",
+    "wires": ["0", "1", "2"],
+    "code": "repetition-3",
+    "basis": "Z",
+    "decoder": "majority",
+    "bad": [list(t) for t in combinations(["0", "1", "2"], 2)],
+}
+
+
+class Violation(ValueError):
+    """A checked leaf failed its stated simulation obligation."""
+
+    def __init__(self, evidence):
+        super().__init__("leaf simulation failed")
+        self.evidence = evidence
 
 
 def validate_port(port):
@@ -30,7 +42,7 @@ def validate_port(port):
     for key in ("code", "basis", "decoder"):
         if not isinstance(port[key], str) or not port[key]:
             raise ValueError(f"invalid port {key}")
-    return leaf(dict(op="family", sites=port["wires"], minimal=port["bad"]))
+    return leaf({"op": "family", "sites": port["wires"], "minimal": port["bad"]})
 
 
 def join(outputs, inputs):
@@ -47,15 +59,15 @@ def join(outputs, inputs):
 def theorem(inputs, outputs, ideal, family, filters, evidence, premises=()):
     if filters is not None and len(filters) != len(inputs):
         raise ValueError("friendly proof requires one filter per input bundle")
-    return dict(
-        inputs=inputs,
-        outputs=outputs,
-        ideal=ideal,
-        family=family,
-        filters=filters,
-        evidence=evidence,
-        premises=list(premises),
-    )
+    return {
+        "inputs": inputs,
+        "outputs": outputs,
+        "ideal": ideal,
+        "family": family,
+        "filters": filters,
+        "evidence": evidence,
+        "premises": list(premises),
+    }
 
 
 def classical(node):
@@ -109,7 +121,7 @@ def hypothesis(node):
             raise ValueError(f"missing hypothesis {key}")
     for ports in (node["inputs"], node["outputs"]):
         if not isinstance(ports, list):
-            raise ValueError("expected a list of ordered bundles")
+            raise TypeError("expected a list of ordered bundles")
         for p in ports:
             validate_port(p)
     filters = node["filters"]
@@ -134,6 +146,10 @@ def derive(node):
     op = node["op"]
     if op in ("prepare0", "majority", "bit-wire"):
         return classical(node)
+    if op == "hgp-z":
+        from .hgp import hgp_leaf
+
+        return hgp_leaf(node)
     if op == "hypothesis":
         return hypothesis(node)
     if op not in ("sequence", "parallel"):
@@ -152,7 +168,7 @@ def derive(node):
             if a["filters"] is None or b["filters"] is None
             else a["filters"] + b["filters"]
         )
-    evidence = dict(rule=op, left=a["evidence"], right=b["evidence"])
+    evidence = {"rule": op, "left": a["evidence"], "right": b["evidence"]}
     return theorem(
         inputs,
         outputs,

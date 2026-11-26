@@ -1,11 +1,16 @@
 # ftqc_compose
 
-Build and replay finite bad-support calculations from He, Nguyen and Pattison, §2. A support is bad when it contains a listed generator. The receipt counts inclusion-minimal generators by size. This polynomial gives a union bound when the event family covers physical failures and the supplied noise law obeys the local-stochastic subset condition.
+Check bad-support families, join typed gadgets in series or parallel, and replay a diagonal-Pauli proof for two one-edge HGP measurements on the same encoded memory. The receipt records which inputs, decoders, physical locations, ideal boundaries and unresolved premises its conclusion uses.
 
-With `tools` on PYTHONPATH, run `python3 -m ftqc_compose check SPEC -o RECEIPT` and `python3 -m ftqc_compose verify SPEC RECEIPT`. The `family` input takes an `expression` whose operations are `family` (sites and minimal supports), `union`, `product` (left and right), or `substitute` (outer expression and an expression for each outer site under `at`). Products and substituted children require disjoint physical domains. Every generated family receipt checks every subset against an independent Boolean interpreter, up to 16 physical sites. Larger domains are refused. [Paper](https://arxiv.org/abs/2508.08246)
+From the BootLoops root:
 
-## Typed contracts
+```sh
+export PYTHONPATH=tools
+out=$(mktemp -d)
+echo '{"kind":"hgp-repeat","variant":"edge-extractor"}' > "$out/spec.json"
+python3 -m ftqc_compose check "$out/spec.json" -o "$out/receipt.json"
+python3 -m ftqc_compose verify "$out/spec.json" "$out/receipt.json"
+python3 run_selftests.py ftqc_compose
+```
 
-A `contract` study supplies an ordered tree under `program` using `sequence` and `parallel`. The `accepted-diagonal-pauli` scope tracks correctness of accepted branches under stochastic Pauli faults. It permits correlated fault supports. Every join matches the ordered wire coordinates, classical or quantum kind, code, logical basis and decoder. Avoidance of the output's bad residual supports must imply avoidance of the next input's bad supports. Sequential and parallel composition take the union of the physical bad families on disjoint location domains.
-
-The built-in classical leaves are three fallible preparations of zero (`prepare0`), an ideal classical `majority` decoder and an ideal `bit-wire`. A `hypothesis` leaf can name other simulation obligations and one factor of a friendly filter per input bundle, or null if friendliness is unproved. These declarations yield a conditional receipt with its unresolved premises. Set `require_closed` to require checked leaves, and `require_friendly` to require a filter derivation. Parallel composition needs both filters. Sequential composition inherits the first gadget's filter under a valid join (Prop. 4.9). A friendly conditional receipt depends on its declared hypotheses. Fully coherent faults and unconditional postselection probabilities require separate proofs.
+See the [package guide](GUIDE.md) for the contract language, evidence and limits, and the [FTQC overview](../FTQC.md) for related tools.

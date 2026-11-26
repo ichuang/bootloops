@@ -52,7 +52,7 @@ clone differs by package:
 
 ## Package index
 
-The [FTQC tool guide](FTQC.md) explains how the five quantum fault-tolerance packages work together.
+The [FTQC tool guide](FTQC.md) explains how the six quantum fault-tolerance packages work together.
 
 | package | what it is | battery |
 |---|---|---|

@@ -5,23 +5,26 @@ from .supports import Family, evaluate, family_result, predicate
 
 
 def majority(sites):
-    return dict(
-        op="family", sites=sites, minimal=list(map(list, combinations(sites, 2)))
-    )
+    return {
+        "op": "family",
+        "sites": sites,
+        "minimal": list(map(list, combinations(sites, 2))),
+    }
 
 
 class Supports(unittest.TestCase):
     def test_majorities(self):
         outer = majority(list("abc"))
         self.assertEqual(
-            family_result(dict(kind="family", expression=outer))["enumerator"], {"2": 3}
+            family_result({"kind": "family", "expression": outer})["enumerator"],
+            {"2": 3},
         )
-        node = dict(
-            op="substitute",
-            outer=outer,
-            at={v: majority([v + str(i) for i in range(3)]) for v in "abc"},
-        )
-        result = family_result(dict(kind="family", expression=node))
+        node = {
+            "op": "substitute",
+            "outer": outer,
+            "at": {v: majority([v + str(i) for i in range(3)]) for v in "abc"},
+        }
+        result = family_result({"kind": "family", "expression": node})
         self.assertEqual(
             (result["enumerator"], result["checked_subsets"]), ({"4": 27}, 512)
         )
