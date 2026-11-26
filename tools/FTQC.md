@@ -63,7 +63,7 @@ The report states that the gate, error-correction and any-input properties hold 
 
 The research study feeds the correcting 15-to-1 factory into an explicit CSS encoder and the extractor’s HGP logical T gate. Compose replays the gate receipt and verifies the four adaptive measurement branches. For the banked correlated factory model, ideal encoding and gate execution give a logical-channel half-diamond distance of at most 21/2000. A single encoder fault can produce an accepted logical Z, so the noisy study accounts for factory, encoder and gate faults separately.
 
-Replay the eight-qubit example from the **research repository root**. The companion 450-qubit example and both gross-code residual studies run as part of the full replay. [Composition studies](https://github.mit.edu/ichuang/RESEARCH-extractors-proof-system-2026/tree/main/studies/compose)
+Replay the eight-qubit example from the **research repository root**. The companion 450-qubit example and both gross-code residual studies run as part of the full replay. See `studies/compose/README.md` in the research checkout for the inputs and receipts.
 
 ```sh
 PYTHONPATH=bootloops/tools python3 -m ftqc_compose verify studies/compose/distilled-t-hgp8.json studies/compose/distilled-t-hgp8-receipt.json
@@ -77,7 +77,7 @@ From BootLoops, run the six registered suites together. Install Stim and put CaD
 python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx ftqc_compose
 ```
 
-From the research repository root with its pinned BootLoops submodule initialized, run the command below to verify the saved inputs, evidence hashes, bounds and witnesses. The twelve-round search also requires a C++17 compiler with unsigned 128-bit integers. [Research studies and replay instructions](https://github.mit.edu/ichuang/RESEARCH-extractors-proof-system-2026/tree/main/studies)
+From the research repository root with its pinned BootLoops submodule initialized, run the command below to verify the saved inputs, evidence hashes, bounds and witnesses. The twelve-round search also requires a C++17 compiler with unsigned 128-bit integers. The study inventory and replay prerequisites are in `studies/README.md`.
 
 ```sh
 sh studies/replay.sh
