@@ -14,3 +14,5 @@ python3 run_selftests.py ftqc_compose
 ```
 
 See the [package guide](GUIDE.md) for the contract language, evidence and limits, and the [FTQC overview](../FTQC.md) for related tools.
+
+The [level-reduction and noise rules](GUIDE.md#level-reduction) also check unconditional circuits with typed interfaces and calculate exact rational local-stochastic bounds. The 15-to-1 example verifies all single-resource corrections and the 105 two-resource bad supports under fault-free processing.

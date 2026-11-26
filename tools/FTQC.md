@@ -9,7 +9,7 @@ Choose a tool by the claim you need to prove. A distance can count qubits in a c
 | What does an encoded gate or correction gadget guarantee for an unknown input? | [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) | Bounds on residual errors with input errors and internal faults counted separately. Refinement and composition receipts justify replacing a specified sub-gadget with an implementation. |
 | Does an extractor measure the intended logical observable and preserve the other logical qubits? | [`ftqc_extractors`](ftqc_extractors/README.md) | HGP and gross-code measurement proofs, static and scheduled distance bounds, and conditional logical T proofs with explicit magic-state assumptions. |
 | Can a proposed Clifford circuit replace a reference under a given fault model? | [`ftqc_zx`](ftqc_zx/GUIDE.md) | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic bounds for a specified noise model. |
-| Which gadget guarantees can be joined on these ordered wires? | [`ftqc_compose`](ftqc_compose/README.md) | Exact finite bad-support families, typed composition receipts and an accepted-branch HGP measurement proof. |
+| Which gadget guarantees can be joined on these ordered wires? | [`ftqc_compose`](ftqc_compose/README.md) | Bad-support families, typed composition, level reduction and local-stochastic output bounds, including correcting 15-to-1 magic-state distillation. |
 
 ## Where the tools connect
 

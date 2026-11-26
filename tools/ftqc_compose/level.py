@@ -28,6 +28,26 @@ def local(g):
             "premise: unconditional Def. 4.8 for all avoiding Pauli pairs with environment"
         )
         return result
+    if op in ("magic-source", "rm15-ideal"):
+        fields(g, "op", "site")
+        sites = names([g["site"]])
+        if op == "magic-source":
+            return theorem(
+                [],
+                [QBIT],
+                "prepare-T",
+                Family(sites, [sites]),
+                [],
+                "unencoded fresh T|+>; any faulty preparation is bad",
+            )
+        return theorem(
+            [QBIT] * 15,
+            [QBIT],
+            "RM15-inject-correct-decode",
+            Family(sites, []),
+            ["identity"] * 15,
+            "fault-free trace-preserving distillation channel on trivial bundles",
+        )
     if op == "prepare0":
         # Fresh preparations, then a classical readout at each of the three sites.
         # Good sites are exactly zero; the at-most-one touched bit is an allowed
@@ -168,7 +188,7 @@ def level_result(spec):
         if not set(v["inputs"]) <= live.keys() or outs & wires:
             raise ValueError("missing, reused, or out-of-order bundle")
         r = local(v["gadget"])
-        if v["gadget"]["op"] in ("bit-wire", "majority", "vote3"):
+        if v["gadget"]["op"] in ("bit-wire", "majority", "vote3", "rm15-ideal"):
             ideal_sites.update(r["family"].sites)
         join([live.pop(i) for i in v["inputs"]], r["inputs"])
         if len(outs) != len(r["outputs"]):
@@ -208,6 +228,12 @@ def level_result(spec):
         if premises or any(p != BIT for p in spec["inputs"].values()):
             raise ValueError("logical output check requires native classical gates")
         check = check_classical(vertices, spec["inputs"], spec["outputs"], outer)
+    elif method == "distill15":
+        from .distill import output_check
+
+        if premises:
+            raise ValueError("distillation requires native unconditional gadgets")
+        check = output_check(vertices, spec["inputs"], spec["outputs"], outer)
     elif method == "none":
         check = None
     else:
