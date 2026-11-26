@@ -60,20 +60,20 @@ runtime containment check (`Fraction(lo) <= exact <= Fraction(hi)`).
   the static distance of the underlying code itself.
 - **Non-Clifford logical protocols & HGP extractor surgery** ($T$ gates, magic
   states, $\mathbb{Z}_8$ conditional $S^p Z^x$ branch identities, or hypergraph
-  product single-column / cyclic graph-surgery extractors): use **`ftqc`**.
+  product single-column / cyclic graph-surgery extractors): use **`ftqc_extractors`**.
   `ftqc_zx` refuses non-Clifford phases and QASM instructions fail-closed with
   `NON-CLIFFORD-PHASE-REFUSED` / `NON-CLIFFORD-OR-UNSUPPORTED-QASM`.
 - **SAT/LRAT UNSAT distance certificates or Stim DEM mechanism diffs on large
   unstructured Clifford schedules**: when you have one hand-written tick circuit
   (e.g. a distance-5 rotated surface-code memory patch with no constructive ZX
   derivation) and need an LRAT-checked CaDiCaL refutation or a live Stim
-  detector-error-model comparison, use **`faultcert`**. `ftqc_zx`'s direct
+  detector-error-model comparison, use **`ftqc_audit`**. `ftqc_zx`'s direct
   semantic BFS enforces a deterministic state cap (`FAULT-ENUM-BUDGET-EXCEEDED`,
   `Theorem 3.11`) and scales via constructive ZX proof verification
   (`verify_derivation`) instead of SAT solving.
 - **Aliferis-Gottesman-Preskill (`prep`/`gate`/`ec`/`close`) composition receipts
   with arbitrary lookup decoders by truncated fault enumeration**: use
-  **`gadgetcert`**. Conversely, `gadgetcert` stops at small enumerated orders
+  **`ftqc_gadgets`**. Conversely, `ftqc_gadgets` stops at small enumerated orders
   and does not check constructive all-weights ZX rewrite derivations or emit
   all-orders stochastic `Decimal` probability enclosures — use **`ftqc_zx`** for
   those.
@@ -83,14 +83,14 @@ runtime containment check (`Fraction(lo) <= exact <= Fraction(hi)`).
   `audit_pyzx_rewrite`.
 - **Context-dependent surface-code single-ancilla hook schedules (`Remark 3.6`)**
   without supplying the surrounding spacetime context — audit the full
-  multi-round patch in **`faultcert`** instead.
+  multi-round patch in **`ftqc_audit`** instead.
 
-## Relationship to sibling QEC/FTQC packages (`ftqc_codes`, `faultcert`, `gadgetcert`, `ftqc`)
+## Relationship to sibling QEC/FTQC packages (`ftqc_codes`, `ftqc_audit`, `ftqc_gadgets`, `ftqc_extractors`)
 
 BootLoops separates quantum error correction and fault tolerance into
 complementary layers so each claim is checked by the right mathematical engine:
 
-| Dimension | `ftqc_codes` | `faultcert` | `gadgetcert` | `ftqc` | `ftqc_zx` |
+| Dimension | `ftqc_codes` | `ftqc_audit` | `ftqc_gadgets` | `ftqc_extractors` | `ftqc_zx` |
 |---|---|---|---|---|---|
 | **Primary object** | Static CSS check matrices $(H_X, H_Z)$ | One fixed physical Clifford tick circuit (prepared inputs) | Clifford gadgets on unknown inputs + lookup decoders + hierarchical composition | HGP code-deformation extractors & magic-state logical $T$ schedules | Relational pairs $(C_1, C_2)$ of open Clifford circuits / ZX diagrams + stochastic gadget contracts |
 | **Core question** | What are $[n, k, d_X, d_Z, t, w_{\min}]$ of this code? | Which location faults in this one circuit escape its detectors or leave heavy residual error? | Does a gadget satisfy AGP `prep`/`gate`/`ec`/`close` or truncated refinement, and do sub-gadget receipts compose? | Does this HGP surgery or conditional logical $T$ protocol preserve target + spectator logicals to distance $d$? | Is $C_1 \stackrel{w}{\widehat{=}} C_2$? Does a polynomial-time ZX rewrite proof certify $C_{\mathrm{impl}}$ from $C_{\mathrm{spec}}$? What are its flag decoder and all-orders stochastic error bounds? |
@@ -105,7 +105,7 @@ complementary layers so each claim is checked by the right mathematical engine:
    codespace precondition depends on the static distance $d$ of a CSS code (BCH,
    QR, Golay, surface, bivariate-bicycle gross code `bb144`, or concatenated
    codes) and you want an independent LRAT, cut, or Lean-QEC distance receipt.
-2. **Reach for `ftqc_zx` (not `faultcert`, `gadgetcert`, or `ftqc`)** when:
+2. **Reach for `ftqc_zx` (not `ftqc_audit`, `ftqc_gadgets`, or `ftqc_extractors`)** when:
    - synthesizing or optimising gadgets *by construction* via ZX leg-bending and
      detecting regions (3-ancilla Shor `Prop. 7.6`, 2-rail dynamic teleportation
      Shor `Prop. 7.7`, 5-ancilla 15-CNOT Steane `Prop. 7.12`, or $w$-truncated
@@ -119,18 +119,18 @@ complementary layers so each claim is checked by the right mathematical engine:
      `verify_derivation`, or
    - emitting certified all-orders stochastic space-time / dirt contracts
      (`ftqc_zx-contract-v1`) for whole-circuit overhead ledgers.
-3. **Reach for `faultcert` or `gadgetcert` (not `ftqc_zx`)** when auditing a
+3. **Reach for `ftqc_audit` or `ftqc_gadgets` (not `ftqc_zx`)** when auditing a
    hand-written multi-round memory schedule with CaDiCaL/LRAT or Stim DEM diffs
-   (`faultcert`), or checking Aliferis-Gottesman-Preskill `ec`/`close`/`gate`
+   (`ftqc_audit`), or checking Aliferis-Gottesman-Preskill `ec`/`close`/`gate`
    rectangle composition with lookup decoders at small fault order
-   (`gadgetcert`).
-4. **Reach for `ftqc` (not `ftqc_zx` or `faultcert`)** when certifying HGP
+   (`ftqc_gadgets`).
+4. **Reach for `ftqc_extractors` (not `ftqc_zx` or `ftqc_audit`)** when certifying HGP
    graph-surgery logical measurements (`column`, `canonical`, `circuit` with
    spectator preservation) or non-Clifford magic-state logical $T$ protocols
-   (`t_gate`, `t_bounds`, `t_source`). To lower ancilla overhead in an `ftqc`
+   (`t_gate`, `t_bounds`, `t_source`). To lower ancilla overhead in an `ftqc_extractors`
    protocol, design and certify the compact ancilla/syndrome sub-gadget in
    `ftqc_zx` first, then validate the enclosing HGP or logical-$T$ schedule in
-   `ftqc`.
+   `ftqc_extractors`.
 
 ## INVOKE
 
