@@ -53,7 +53,9 @@ The registered packages, grouped as the index groups them:
   theorem on top of Lean-QEC, which is credited in its GUIDE and listed in
   [`../external/TOOLS.md`](../external/TOOLS.md)). Faultcert (circuit-level fault
   properties of Clifford gadgets: the exact fault model, circuit and fault distance,
-  strict fault tolerance at low order, cross-checked against Stim).
+  strict fault tolerance at low order, cross-checked against Stim). Gadgetcert (gadgets
+  on unknown inputs: gate and error-correction properties with decoders, refinement
+  against a specification, fault equivalence, composition of receipts).
 - **Operations** — Turnstile (admission control for long jobs on a shared machine:
   priority token, RAM and CPU-width ledgers; formerly Bigram-queue) ships under
   [`../../ops/`](../../ops/README.md), not `tools/`, and has its own page outside the
