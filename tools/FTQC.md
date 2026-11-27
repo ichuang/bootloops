@@ -9,14 +9,14 @@ flowchart TD
     accTitle: How the eight FTQC tools fit together
     accDescr: Code checks feed extractor and decoder studies. Extractor circuits go to fault analysis. Decoder rules and propagated faults feed gadget checks. Composition uses gadget fault cones, and uncompute uses ZX cost contracts. The dashed arrow marks the proposed magic-state factory connection.
 
-    codes["ftqc_codes<br/>CSS codes and distances"]
-    extractors["ftqc_extractors<br/>Logical measurements"]
-    decoders["ftqc_decoders<br/>Syndrome decoding"]
-    faults["ftqc_faults<br/>Circuit and ZX proofs"]
-    gadgets["ftqc_gadgets<br/>Encoded operations"]
-    uncompute["ftqc_uncompute<br/>Reversible circuit cleanup"]
-    compose["ftqc_compose<br/>End-to-end guarantees"]
-    magic["ftqc_magic · planned<br/>Magic-state factories"]
+    codes["<b>ftqc_codes</b><br/><small>CSS codes and distances</small>"]:::codes
+    extractors["<b>ftqc_extractors</b><br/><small>Logical measurements</small>"]:::extractors
+    decoders["<b>ftqc_decoders</b><br/><small>Syndrome decoding</small>"]:::decoders
+    faults["<b>ftqc_faults</b><br/><small>Circuit and ZX proofs</small>"]:::faults
+    gadgets["<b>ftqc_gadgets</b><br/><small>Encoded operations</small>"]:::gadgets
+    uncompute["<b>ftqc_uncompute</b><br/><small>Reversible circuit cleanup</small>"]:::uncompute
+    compose["<b>ftqc_compose</b><br/><small>End-to-end guarantees</small>"]:::compose
+    magic["<b>ftqc_magic</b><br/><small>Magic-state factories · planned</small>"]:::planned
 
     codes -->|CSS checks| extractors
     codes -->|Syndrome model| decoders
@@ -27,8 +27,14 @@ flowchart TD
     gadgets -->|Fault cones| compose
     magic -.->|Proposed factory guarantee| compose
 
-    classDef planned stroke-dasharray:5 4
-    class magic planned
+    classDef codes fill:#CCFBF1,stroke:#0F766E,stroke-width:2px,color:#172033
+    classDef extractors fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#172033
+    classDef decoders fill:#EDE9FE,stroke:#7C3AED,stroke-width:2px,color:#172033
+    classDef faults fill:#FFE4D5,stroke:#C2410C,stroke-width:2px,color:#172033
+    classDef gadgets fill:#DCFCE7,stroke:#15803D,stroke-width:2px,color:#172033
+    classDef uncompute fill:#FCE7F3,stroke:#BE185D,stroke-width:2px,color:#172033
+    classDef compose fill:#FEF3C7,stroke:#A16207,stroke-width:2px,color:#172033
+    classDef planned fill:#E0F2FE,stroke:#0369A1,stroke-width:2px,color:#172033,stroke-dasharray:5 4
 ```
 
 | Tool | Input and question | Evidence |
