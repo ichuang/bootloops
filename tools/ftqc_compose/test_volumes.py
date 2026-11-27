@@ -79,6 +79,8 @@ class Volumes(unittest.TestCase):
         same = fl.filter_contract_result(encoded(costs={"raw": str(raw_total), "X": str(7 * step), "Z": str(7 * step)}))
         self.assertEqual(F(same["expected_cost"]), F(r["expected_cost"]))
         self.assertEqual(same["contract"], r["contract"])
+        self.assertNotIn("priced", same)                 # the field appears only when the tool priced the tree
+        self.assertNotIn("priced", fl.filter_contract_result(encoded()))
         with self.assertRaises(ValueError):
             fl.filter_contract_result(encoded(inner_costs=costs, costs={"raw": "1", "X": "1", "Z": "1"}))
         with self.assertRaises(ValueError):

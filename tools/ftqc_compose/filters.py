@@ -639,10 +639,11 @@ def encoded_result(spec):
                         last_round_local=True, blocks_end_as_just_corrected=True),
                step=step_report, shared_sources=shared, carry_last=carry,
                cost_unit=("physical locations" if priced else "as declared") if costs else "raw preparations",
-               priced=priced,
                uniting="sources may be shared: a + b",
                rounding=f"bounds upward, acceptance downward, {SIG} significant digits",
                premises=PREMISES_ENCODED, check=CHECK, reset=RESET)
+    if priced:                       # only when costs were asked for: earlier receipts recompute unchanged
+        out["priced"] = priced
     if res["vanished"]:
         out.update(status="no bound", reason="the lower bound on acceptance is not positive at some check",
                    accept_lower=[decimal(down(a, 20)) if a > 0 else "0" for a in res["accept_lower"]])
