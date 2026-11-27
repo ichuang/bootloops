@@ -51,6 +51,7 @@ class Timeline:
         self.now = 0
         self.ready = {}
         self.links = set()
+        self.link_owner = {}
 
     def issue(self, label, options, *, controls=(), record=None, phase="factory"):
         # Conditional arms occupy the same reserved window. Conditions are
@@ -65,6 +66,8 @@ class Timeline:
                 blob = json.dumps(template, sort_keys=True, separators=(",", ":"))
                 links, counts = footprint(blob)
                 self.links.update(links)
+                for pair in links:
+                    self.link_owner.setdefault(pair, label)
                 self.inventory[key] = dict(ticks=len(template["ticks"]), counts=counts)
                 if self.expanded:
                     self.templates[key] = template
@@ -114,9 +117,9 @@ def pauli(x, z):
 def prepare_sources(t, source):
     # The native proof checks carrier Clifford, projection, fixed checks and the
     # frame. Serialize preparations and preserve each block until its last use.
-    from ftqc_codes.gf2 import independent_rows
 
     lanes = []
+    acceptance = []
     base = FIRST_SOURCE
     for j, row in enumerate(source["inputs"]):
         model = row["spec"]["model"]
@@ -164,9 +167,21 @@ def prepare_sources(t, source):
                     controls=[syndromes[i]],
                     phase="preparation",
                 )
+        acceptance.append(
+            dict(
+                attempt=row["spec"]["attempt"],
+                block=row["spec"]["block"],
+                require_zero=[
+                    f"{prefix}.{axis}{i}"
+                    for axis in ("X", "Z")
+                    for i in proof["postselect"][axis]
+                ],
+                reject_if_event=[e["id"] for e in model["events"] if e["reject"]],
+            )
+        )
         lanes.append((base, n, pairs))
         base += n
-    return lanes, base
+    return lanes, base, acceptance
 
 
 def install(s, expanded=False):
@@ -182,11 +197,13 @@ def install(s, expanded=False):
     src = factory(s["source"])["factory"]
     if len({b["block"] for b in src["inputs"]}) != len(src["inputs"]):
         raise ValueError("input blocks must be disjoint from each other")
+    if any(b["block"] == "BB144/factory" for b in src["inputs"]):
+        raise ValueError("source preparation aliases live factory memory")
     m = mapping()
     truth = ideal_table(m)
     _, xs, zs = layout()
     t = Timeline(s["latency"], expanded)
-    lanes, width = prepare_sources(t, s["source"])
+    lanes, width, source_conditions = prepare_sources(t, s["source"])
     # Resolve the source verification and heralding before use of any member.
     pre_end = t.now + s["latency"]
     t.now = pre_end
@@ -282,7 +299,10 @@ def install(s, expanded=False):
     if "couplers" in s:
         offered = {tuple(sorted(pair)) for pair in s["couplers"]}
         if set(links) - offered:
-            raise ValueError("uninstalled physical coupler")
+            pair = min(set(links) - offered)
+            raise ValueError(
+                f"uninstalled physical coupler {pair} at {t.link_owner[pair]}"
+            )
     result = dict(
         status="proved",
         map_sha256=digest(m),
@@ -292,6 +312,7 @@ def install(s, expanded=False):
         width=width,
         factory_width=FIRST_SOURCE,
         preparation_end=pre_end,
+        source_acceptance=source_conditions,
         elapsed=t.now,
         installed_couplers=links,
         steps=t.steps,

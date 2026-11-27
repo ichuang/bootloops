@@ -3,7 +3,30 @@
 from fractions import Fraction
 from itertools import product
 from .catalog import get_catalog_factory
-from .certify import canonical_json_sha256
+from .certify import canonical_json_sha256, compute_package_source_sha256
+
+
+def rm15_program():
+    """Unrecycled five-wire PPR program in the positive odd-parity T convention."""
+    fac = get_catalog_factory("bk_15_1_3_t")
+    algebra = fac.verify_algebraic_structure()
+    return dict(
+        schema="ftqc-magic-ppr-1",
+        factory=fac.name,
+        prepare_plus=list(range(fac.k + fac.r)),
+        rotations=[
+            dict(
+                column=i,
+                parity=fac.column_mask(i),
+                phase_on_odd_mod8=1,
+                exponent_i_pi_P_over_8=-1,
+            )
+            for i in range(fac.n)
+        ],
+        corrections={k: v for k, v in algebra.items() if k.endswith("_corrections")},
+        postselect_plus_X=list(range(fac.k, fac.k + fac.r)),
+        output_slot=0,
+    )
 
 
 def integer(value, limit):
@@ -86,6 +109,7 @@ def evaluate(batches, independent_attempts):
     final = clean + wrong
     return dict(
         schema="ftqc-magic-insitu-rm15-1",
+        source_sha256=compute_package_source_sha256(),
         catalog=fac.name,
         state="T",
         phases=[0, 1],
@@ -102,7 +126,9 @@ def evaluate(batches, independent_attempts):
     )
 
 
-def output_delivery(spec, proof, replay):
+def output_delivery(spec, proof):
+    from ftqc_compose.__main__ import receipt as replay
+
     rebuilt = replay(spec)
     if canonical_json_sha256(rebuilt) != canonical_json_sha256(proof):
         raise ValueError("in-situ output receipt differs from replay")
@@ -115,7 +141,25 @@ def output_delivery(spec, proof, replay):
         producer=dict(
             spec_sha256=canonical_json_sha256(spec),
             receipt_sha256=canonical_json_sha256(proof),
+            source_sha256=f["source_sha256"],
         ),
+        source_attempts=[row["attempt"] for row in f["inputs"]],
+        native_output_count=1,
+        states_per_batch=1,
+        resource_wires=1,
+        wire_order="little-endian",
+        correlation="INDEPENDENT_SINGLE",
+        acceptance_rule="all source heralds and four positive RM checks",
+        conditional_infidelity_upper=str(delta),
+        accepted_bad_mass_upper=f["accepted_wrong"],
+        distance=None,
+        leading_count=None,
+        accepted_fault_witness=None,
+        active_qubits=None,
+        expected_wire_ticks_per_batch_upper=None,
+        expected_wire_ticks_per_state_upper=None,
+        expected_wire_ticks_per_output_upper=None,
+        producer_clifford_corrections={"output_s_corrections": {"0": 1}},
         state="T",
         groups=[[0]],
         phases=[0, 1],

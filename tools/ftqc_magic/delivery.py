@@ -15,12 +15,11 @@ def sqrt_upper(q):
     return Fraction(r + (r * r < n), scale)
 
 
-def read_delivery(spec, receipt, *, replay_insitu=None):
-    if spec.get("kind")=="insitu-rm15":
-        if replay_insitu is None:
-            raise ValueError("in-situ output needs producer and factory replay")
+def read_delivery(spec, receipt):
+    if spec.get("kind") == "insitu-rm15":
         from .insitu import output_delivery
-        return output_delivery(spec, receipt, replay_insitu)
+
+        return output_delivery(spec, receipt)
     identity = verify_receipt(spec, receipt)
     if spec.get("kind", "pipeline").strip().lower() == "pipeline":
         stages = spec["stages"]

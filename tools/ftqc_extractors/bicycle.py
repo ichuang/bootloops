@@ -4,7 +4,7 @@ from functools import lru_cache, reduce
 from operator import xor
 from ftqc_codes.gf2 import Echelon, nullspace, dot
 from ftqc_gadgets.surgery import Instrument
-from ftqc_magic.catalog import get_catalog_factory
+from ftqc_magic.insitu import rm15_program
 from .gross import shifted_z, gross_z, port_frame, cell
 from .gross_cycle import cycle, X0, Z0, NWIRES
 from .algebra import bits
@@ -82,8 +82,7 @@ def mapping():
     from .__main__ import digest
 
     m, xs, zs = layout()
-    fac = get_catalog_factory("bk_15_1_3_t")
-    alg = fac.verify_algebraic_structure()
+    program = rm15_program()
     native_spec = native()
     stabs = Echelon(m.hz)
     orbit = {}
@@ -92,8 +91,8 @@ def mapping():
             physical = shifted_z(dx, dy)
             orbit.setdefault(stabs.reduce(physical), (dx, dy, physical))
     rotations = []
-    for i in range(15):
-        mask = fac.column_mask(i)
+    for rotation in program["rotations"]:
+        i, mask = rotation["column"], rotation["parity"]
         desired = combine(zs, mask) ^ zs[5]
         for extra in (0, 1 << 6):
             key = stabs.reduce(desired ^ combine(zs, extra))
@@ -119,7 +118,8 @@ def mapping():
                 shift=[dx, dy],
                 physical_z=physical,
                 sign=0,
-                angle_pi_over_8=1,
+                exponent_i_pi_P_over_8=rotation["exponent_i_pi_P_over_8"],
+                phase_on_odd_mod8=rotation["phase_on_odd_mod8"],
             )
         )
     return dict(
@@ -130,15 +130,14 @@ def mapping():
         basis=[[x, z] for x, z in zip(xs, zs)],
         native_circuit_sha256=digest(native_spec),
         orbit_size=len(orbit),
-        factory_plus_slots=list(range(5)),
+        magic_program_sha256=digest(program),
+        factory_plus_slots=program["prepare_plus"],
         pivot_slot=5,
         zero_slots=[6],
         spectators=list(range(7, 12)),
-        output_slot=0,
-        postselect_plus_X=list(range(1, 5)),
-        clifford_corrections={
-            k: v for k, v in alg.items() if k.endswith("_corrections")
-        },
+        output_slot=program["output_slot"],
+        postselect_plus_X=program["postselect_plus_X"],
+        clifford_corrections=program["corrections"],
         rotations=rotations,
         scope="one-round Gross Z Choi check transported by exact coordinate translations",
     )

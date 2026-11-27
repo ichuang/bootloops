@@ -55,3 +55,17 @@ Land the milestones in order on a feature branch, with one tested commit per mil
 ```sh
 python3 run_selftests.py ftqc_magic ftqc_extractors ftqc_gadgets ftqc_compose ftqc_faults
 ```
+
+## Implementation and evidence
+
+Milestones 1–6 have runnable studies. The first integration preserves the
+shared triple's exact error probability through rejection, RM15 and an HGP8
+T consumer. The second realizes all 15 mapped pivot parities in the Gross Z
+orbit, checks all 32,768 source masks, and prices the installed adaptive
+factory under a restricted physical readout-noise model. The signed basis,
+adapter, timing and evidence boundaries are documented in the
+[implementation guide](../tools/ftqc_extractors/BICYCLE_FACTORY.md).
+The research archive includes a compressed expanded pulse schedule,
+reference-entangled Clifford controls, exact results and seeded counts.
+Whole-circuit noisy distance, a noisy T law from the paper's empirical Y
+probes, and a reproduction of the 378-qubit paper hardware remain open.

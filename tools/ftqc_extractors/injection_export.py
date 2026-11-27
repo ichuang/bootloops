@@ -126,7 +126,8 @@ def export(s, budget):
         )
     elif evidence_type == "raw-T":
         from .injection_t import accepted_t
-        spec, law = accepted_t(m,budget)
+
+        spec, law = accepted_t(m, budget)
     elif evidence_type == "sampled-Y":
         from ftqc_faults.audit.injection_statistics import summarize
 

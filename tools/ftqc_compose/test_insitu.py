@@ -118,3 +118,30 @@ class DistillTests(unittest.TestCase):
         r = evaluate(gate)
         self.assertEqual(r["instrument"]["transcripts"], 4)
         self.assertEqual(r["resource_trace_distance_upper"], "1/1000")
+
+    def test_y_evidence_is_not_a_t_input(self):
+        try:
+            import stim
+        except ImportError:
+            self.skipTest("optional Stim")
+        from ftqc_extractors.injection_circuit import run
+
+        circuit = run(dict(case="bb-uniform"))
+        sample = dict(
+            circuit_sha256=circuit["circuit_sha256"],
+            postselected_detectors=circuit["postselect_width"],
+            outputs=4,
+            shots=1,
+            accepted=1,
+            accepted_mask_counts=[1] + [0] * 15,
+        )
+        for model in (
+            dict(type="closed-Y", case="bb-uniform", locations=[], frame=[0] * 4),
+            dict(type="sampled-Y", case="bb-uniform", sample=sample),
+        ):
+            s = study()
+            row = s["inputs"][0]
+            row["spec"]["model"] = model
+            row["receipt"] = receipt(row["spec"])
+            with self.assertRaisesRegex(ValueError, "exact T"):
+                evaluate(s)

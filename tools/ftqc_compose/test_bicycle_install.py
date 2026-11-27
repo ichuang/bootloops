@@ -43,3 +43,52 @@ class InstalledTests(unittest.TestCase):
                 install(dict(self.spec, schedule=steps))
         with self.assertRaisesRegex(ValueError, "coupler"):
             install(dict(self.spec, couplers=self.proof["installed_couplers"][1:]))
+
+    def test_physical_probe(self):
+        try:
+            import stim
+        except ImportError:
+            self.skipTest("optional physical tableau probe")
+        from .bicycle_probe import physical_probe
+
+        for seed in (1, 17):
+            self.assertTrue(physical_probe(self.spec, seed)["spectator_Bell"])
+
+    def test_local_faults_and_cost(self):
+        from fractions import Fraction
+        from .bicycle_price import price
+
+        inp = dict(kind="bb144-rm15-price", installation=self.spec, faults=[])
+        self.assertEqual(price(inp)["conditional_output_Z"], "1/1000")
+        inp["faults"] = [
+            dict(loc, p="1/8") for loc in self.proof["fault_locations"][:3]
+        ]
+        r = price(inp)
+        q = Fraction(1, 1000)
+        a = Fraction(3, 4)
+        # Direct enumeration: among eight subsets only empty and the full
+        # triple survive the four terminal checks, independently of the carrier triple.
+        import itertools
+
+        accept = bad = 0
+        for bits in itertools.product(range(2), repeat=3):
+            syn = 0
+            for i, b in enumerate(bits):
+                if b:
+                    syn ^= i + 1
+            if syn:
+                continue
+            mass = a * Fraction(7 ** (3 - sum(bits)), 512)
+            accept += mass
+            bad += mass * (1 - q if sum(bits) % 2 else q)
+        self.assertEqual(
+            (Fraction(r["final_accept"]), Fraction(r["accepted_wrong"])), (accept, bad)
+        )
+        self.assertEqual([w["final_check_mask"] for w in r["witnesses"]], [1, 2, 3])
+        cost = r["inclusive"]
+        prep = cost["source_reject_ticks"]
+        total = cost["full_attempt_ticks"]
+        self.assertEqual(
+            Fraction(cost["expected_qubit_cycles_per_output"]),
+            cost["peak_reserved_qubits"] * (prep + a * (total - prep)) / accept,
+        )

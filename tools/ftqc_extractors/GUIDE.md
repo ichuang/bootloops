@@ -135,3 +135,7 @@ realized transcript. Factory time windows and independent retry noise are
 study assumptions. Whole-program noisy fault distance is open. See
 `test_magic_delivery.py` for the installed [[4,2,2]] lifted product, and
 `ftqc_gadgets/test_occupied_transfer.py` for the 32-logical HGP450 port check.
+
+The [in-situ BB144 factory guide](../ftqc_extractors/BICYCLE_FACTORY.md)
+covers injection batch replay, RM15 input assignment, signed native pivot
+measurements, physical scheduling and full-attempt pricing.
