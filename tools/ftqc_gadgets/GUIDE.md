@@ -124,6 +124,12 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   inside the rule's cones. `Direct` builds the program qubit by qubit on a code and
   runs real lookup decoders with corrections carried through later gates: the first
   decoding that goes wrong must have more than t dirty coordinates in its cone.
+  `cones.ledger(flow)` reports what a schedule spends: block-ticks, the largest number of live
+  blocks, inner and outer corrections and resources delivered by kind; `cones.count(program)`
+  gives the same counts from the layers alone, for sweeps over many schedules.
+  `cones.correction_pattern(program)` measures how gates and idle ticks are followed by
+  corrections (runs of steps without one). The `volume` study of `ftqc_compose` prices the
+  ledger.
 - **independent_of_input**: which decoders' check values no input error can change.
   For repeated error correction (`steane_ec:CODE,rounds=2`) the later rounds have
   this property and the first does not: after one round, what a block does next is

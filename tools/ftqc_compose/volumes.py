@@ -67,11 +67,9 @@ def program_volume(program, n1, n2, costs, uncosted=()):
     """(ledger, parts, total, uncosted counts) of a program in the format of ftqc_gadgets cones."""
     from ftqc_gadgets import cones
 
-    flow = cones.Flow(cones.Program.from_json(program))
+    flow = cones.Flow(cones.Program.from_json(program), two=True if n2 is not None else None)
     if flow.two and n2 is None:
         raise ValueError("a two-level program needs the outer code's n")
-    if not flow.two and n2 is not None:
-        raise ValueError("an outer code was given for a single-level program")
     counts = cones.ledger(flow)
     parts, total, skipped = price(counts, n1, n2 or 1, costs, uncosted)
     return counts, parts, total, skipped

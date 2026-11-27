@@ -36,6 +36,11 @@ class Volumes(unittest.TestCase):
         self.assertEqual(r["status"], "computed")
         rec = receipt(spec())
         self.assertEqual(rec["result"], r)
+        import json
+        from pathlib import Path
+
+        banked = json.loads((Path(__file__).parent / "examples" / "volume-two-level.json").read_text())
+        self.assertEqual(banked, spec())
 
     def test_single_level_and_inner_resources(self):
         prog = {"name": "one", "inputs": [], "outputs": ["A", "C"],

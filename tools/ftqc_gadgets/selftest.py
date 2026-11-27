@@ -1577,7 +1577,8 @@ def t_cones(heavy):
     # steps: the gate on A and on B (corrected next), the idle tick of A while B is measured (corrected next)
     check("cones: a schedule that corrects after every gate and idle tick has runs of length one only",
           pat["corrects_after_every_step"] and pat["steps"] == 3 and pat["corrected"] == 3 and pat["runs"] == {"1": 3}
-          and pat["gates"] == 2 and pat["idle_ticks"] == 1 and pat["longest_run"] == 1, str(pat))
+          and pat["gates"] == 2 and pat["idle_ticks"] == 1 and pat["longest_run"] == 1
+          and pat["gates_not_followed_by_correction"] == 0, str(pat))
     loose = cones.Program([[("CX", "A", "B")], [("CX", "A", "B")], [], [("MZ", "B"), ("ECa", "A")], [("ECb", "A")], []],
                           ["A", "B"], ["A"], "loose")
     pat = cones.correction_pattern(loose)
