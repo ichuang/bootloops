@@ -13,15 +13,16 @@ work=$(mktemp -d)
 # 1. Run the <2 s cold-clone self-certification & mutation battery
 python3 tools/ftqc_decoders/selftest.py
 
-# 2. Expose a weight-3 symmetric split-stabilizer trapping set on BB72 [[72,12,6]]
-#    under plain BP, and verify that Relay-BP, BP+LSD, and BP+OSD all heal it
-python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb72_trapping_set.json -o "$work/bb72.json"
-python3 -m ftqc_decoders verify "$work/bb72.json"
+# 2. Expose a weight-3 symmetric split-stabilizer trapping set on BB144 [[144,12,12]]
+#    under plain BP, and verify that Relay-BP, BP+LSD, and BP+OSD all heal it.
+#    The fixture retains its original filename. Its problem.kind field selects bb144.
+python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb72_trapping_set.json -o "$work/bb144-trap.json"
+python3 -m ftqc_decoders verify "$work/bb144-trap.json"
 
 # 3. Export BB144 [[144,12,12]] to Stim .dem and decode with audited Tesseract
-#    (using the dedicated uv environment when external C++ backends are desired)
+#    Run this optional example with stim and tesseract-decoder installed.
 python3 -m ftqc_decoders convert-dem --code bb144 -o "$work/bb144.dem"
-/home/ike/.venvs/ftqc_decoders/bin/python -m ftqc_decoders decode \
+python3 -m ftqc_decoders decode \
   --code "$work/bb144.dem" --faults 0,18,41 --decoder external:tesseract
 ```
 

@@ -97,7 +97,7 @@ gaps with replayable `ftqc_decoders-receipt-1` certificates:
 
 - Multi-core $10^9$-shot Monte-Carlo threshold sweeps in pure Python — export `.dem`
   via `convert-dem` or use `BootLoopsSinterDecoder` / `TesseractSinterDecoder` inside
-  `sinter.collect` in the dedicated `uv` environment (`/home/ike/.venvs/ftqc_decoders`).
+  `sinter.collect` in an environment with the chosen decoder and `sinter` installed.
 - Proving static or circuit *information-theoretic* minimum distance — use `ftqc_codes`,
   `ftqc_audit`, or `ftqc_extractors` for undetected-fault lower bounds.
 
@@ -107,23 +107,27 @@ Run from the BootLoops repository root (supports both `PYTHONPATH=tools python3 
 and `python3 -m tools.ftqc_decoders`):
 
 ```sh
+work=$(mktemp -d)
+
 # 1. Discover a weight-3 symmetric split-stabilizer trapping set on BB144 (d=12)
 #    under plain BP, and prove Relay-BP, BP+LSD, and BP+OSD all heal it:
 python3 -m tools.ftqc_decoders trapping-set --code bb144 --decoder bp_only \
-  --compare relay_bp,bp_lsd,bp_osd -o /tmp/bb144_ts.receipt.json
-python3 -m tools.ftqc_decoders verify /tmp/bb144_ts.receipt.json
+  --compare relay_bp,bp_lsd,bp_osd -o "$work/bb144_ts.receipt.json"
+python3 -m tools.ftqc_decoders verify "$work/bb144_ts.receipt.json"
 
-# 2. Certify exact operational radius 2 on Golay [[23,1,7]] under BP+OSD-2:
+# 2. Check all 277 X-sector patterns of weight zero, one or two on Golay [[23,1,7]].
+#    Success proves that BP+OSD-2 corrects through weight two.
 python3 -m tools.ftqc_decoders certify-radius --code golay --decoder bp_osd \
-  --osd-order 2 --radius 2 -o /tmp/golay_r2.receipt.json
-python3 -m tools.ftqc_decoders verify /tmp/golay_r2.receipt.json
+  --osd-order 2 --radius 2 -o "$work/golay_r2.receipt.json"
+python3 -m tools.ftqc_decoders verify "$work/golay_r2.receipt.json"
 
-# 3. Compute a non-vacuous connected-cluster Peierls LER upper bound on BB144:
+# 3. Bound BB144 logical error assuming independent decoding of disjoint clusters
+#    and successful decoding of every connected cluster through size five.
 python3 -m tools.ftqc_decoders enclose --code bb144 --mode peierls_cluster \
   --p 1/10000 --radius 5
 
-# 4. Run audited Google Quantum AI Tesseract on BB72 (using the dedicated uv venv):
-/home/ike/.venvs/ftqc_decoders/bin/python -m tools.ftqc_decoders decode \
+# 4. With stim and tesseract-decoder installed, run audited Tesseract on BB72.
+python3 -m tools.ftqc_decoders decode \
   --code bb72 --faults 2,19 --decoder external:tesseract
 ```
 
@@ -141,7 +145,7 @@ python3 -m tools.ftqc_decoders enclose --code bb144 --mode peierls_cluster \
   and `Relay-BP` across `Steane`, `Golay`, `QR-47`, `BB72`, and `BB144`.
 - `L3_uf_ssf_metachecks_sat_lrat`: half-edge `Union-Find`, `BeliefFind`, `SSF`, live
   `ftqc_extractors/surgery_sequence.py` mapping-cone metachecks, and `SAT+LRAT` MWD.
-- `L4_trapping_sets_and_deff`: `BB72` split-stabilizer trapping set + `Golay` `OSD-1`
+- `L4_trapping_sets_and_deff`: `BB144` split-stabilizer trapping set + `Golay` `OSD-1`
   vs `OSD-2` witness replay.
 - `L5_enclosures_bridges_examples_cli`: outward `Decimal` containment, exact shells,
   Peierls cluster bound, Hoeffding shells, `ftqc_gadgets` procedural decoder bridge,
