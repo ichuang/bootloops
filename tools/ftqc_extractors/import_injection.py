@@ -97,13 +97,21 @@ def export(root, out, circuits):
             if circuits is None or idx not in (491, 5):
                 continue
             cases = (
-                [("uniform", 0.001, 2), ("asymmetric", 0.001, 3)]
+                [
+                    ("uniform", 0.001, 2),
+                    ("uniform-three", 0.001, 3),
+                    ("asymmetric", 0.001, 3),
+                ]
                 if n == 144
                 else [("uniform", 0.0001, 3)]
             )
             for model, p, rounds in cases:
                 if n == 144:
-                    noise = "li_uniform" if model == "uniform" else "li_twoq_dominant"
+                    noise = (
+                        "li_uniform"
+                        if model.startswith("uniform")
+                        else "li_twoq_dominant"
+                    )
                     actual = InitCfgMgrV2().load(
                         code_id=code.identifier,
                         noise_model=noise,

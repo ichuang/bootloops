@@ -20,6 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
+    "injection_circuit": ("case", ""),
     "injection_search": ("memory logicals count objective", ""),
     "injection": ("method memory logicals", "preparation postselect"),
     "pbc": ("blocks bridges magic_supplies gates target max_degree", "outcomes"),
@@ -86,6 +87,10 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     if backend == "sat" and kind not in ("circuit", "t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "injection_circuit":
+            from .injection_circuit import run
+
+            return run(s)
         if kind == "injection_search":
             from .injection_search import search as search_injections
 

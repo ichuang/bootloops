@@ -75,3 +75,45 @@ class SourceTests(unittest.TestCase):
             self.assertEqual(
                 receipt(spec, budget=1)["result"]["status"], "inconclusive"
             )
+
+
+class CircuitTests(unittest.TestCase):
+    def setUp(self):
+        try:
+            import stim
+        except ImportError:
+            self.skipTest("optional Stim circuit benchmark")
+        self.stim = stim
+
+    def test_reference_and_random_syndrome(self):
+        from .injection_circuit import paths, run
+        from ftqc_audit.injection_records import parse
+
+        stim = self.stim
+        for case, coefficient, raw in [
+            ("bb-uniform", "94/15", 4),
+            ("bb-asymmetric", "8/3", 4),
+            ("hgp-release", "48", 0),
+        ]:
+            result = run(dict(case=case))
+            self.assertEqual(result["first_order_total"], coefficient)
+            self.assertEqual(len(result["explicit_raw_flip_witnesses"]), raw)
+        _, path, _, _ = paths("bb-uniform")
+        circuit = stim.Circuit.from_file(path).without_noise()
+        rec, ops, det, obs = parse(circuit)
+        measured = circuit.compile_sampler(seed=445).sample(64)
+        fixed = {row[0] for row in det[:32]}
+        self.assertFalse(measured[:, sorted(fixed)].any())
+        self.assertTrue(measured[:, sorted(set(range(144)) - fixed)].any())
+        # Forward replay a raw X after injecting the first carrier.
+        modified = stim.Circuit()
+        for inst in circuit:
+            modified.append(inst)
+            if inst.name == "RY" and 64 in [t.value for t in inst.targets_copy()]:
+                modified.append("X", 64)
+        actual = modified.compile_sampler(seed=3).sample(2)
+        detectors, outputs = circuit.compile_m2d_converter().convert(
+            measurements=actual, separate_observables=True
+        )
+        self.assertFalse(detectors.any())
+        self.assertEqual(outputs.tolist(), [[True, False, False, False]] * 2)
