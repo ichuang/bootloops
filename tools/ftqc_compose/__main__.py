@@ -33,6 +33,9 @@ def receipt(spec):
 
 
 def evaluate(spec):
+    if spec["kind"] == "surgery-channel":
+        from .surgery import channel
+        return channel(spec)
     if spec["kind"] == "injection-batch":
         from .injection_batch import result
 

@@ -1699,6 +1699,12 @@ def t_cli():
 
 
 def main():
+    import unittest
+    suite = unittest.defaultTestLoader.loadTestsFromNames([
+        "ftqc_gadgets.test_surgery", "ftqc_gadgets.test_surgery_build",
+        "ftqc_gadgets.test_surgery_geometry", "ftqc_gadgets.test_surgery_operational",
+    ])
+    check("signed surgery regressions", unittest.TextTestRunner().run(suite).wasSuccessful())
     heavy = "--heavy" in sys.argv
     t0 = time.time()
     for fn, args in ((t_structure, ()), (t_tables, ()), (t_dense, (heavy,)), (t_linear, ()),
