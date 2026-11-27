@@ -647,6 +647,12 @@ def _regress_proof_limits() -> str:
     return "phase expansion and both dense verification paths respect proof budgets"
 
 
+def _leg_l7_cuts_and_blocks() -> str:
+    from tools.ftqc_uncompute.selftest_blocks import leg_cuts_and_blocks
+
+    return leg_cuts_and_blocks()
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
@@ -669,6 +675,7 @@ def run_selftest() -> int:
         ("L4_superposition_masking", _leg_l4_masking_and_ladders),
         ("L5_advisor_r1_r7", _leg_l5_advisor_and_rewrites),
         ("L6_receipts_and_bridges", _leg_l6_receipts_and_bridges),
+        ("L7_cuts_and_block_programs", _leg_l7_cuts_and_blocks),
         ("N1_N6_sabotage_controls", _leg_sabotage_controls),
         ("M1_M4_mutant_kills", _leg_mutants),
     ]
