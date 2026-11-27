@@ -169,7 +169,7 @@ def apply_catalyzed_ccz_to_2t(
         if catalyst_infidelity is not None
         else ccz_source.conditional_infidelity_upper
     )
-    n_ccz_blocks = ccz_source.k_outputs
+    n_ccz_blocks = max(1, ccz_source.target.k // 3)
     k_t_out = 2 * n_ccz_blocks
     # Union bound over CCZ error + catalyst poisoning per step:
     cond_infid = min(Fraction(1), ccz_source.conditional_infidelity_upper + cat_err)
@@ -442,7 +442,10 @@ def compose_magic_pipeline(
                 if rec_sched is not None:
                     joint_meta["recycling"] = rec_sched.to_dict()
                 if corr_prop == "joint_3twirl":
-                    joint_meta["joint_3twirl_kernel_norm"] = sum(three_twirl_ccz_weight_transfer().values())
+                    twirl_dist = three_twirl_ccz_weight_transfer(
+                        dict(current.joint_z_error_upper), max(1, current.k_outputs // 3)
+                    )
+                    joint_meta["joint_3twirl_kernel_norm"] = str(sum(twirl_dist.values(), Fraction(0)))
                 if phys_q is not None:
                     joint_meta["litinski_physical_qubits"] = phys_q
 

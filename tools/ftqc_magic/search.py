@@ -298,6 +298,78 @@ def encode_spatial_nogo_cnf(
     )
 
 
+def _check_ascii_lrat_rup(dimacs: str, proof_bytes: bytes) -> dict[str, int]:
+    """Minimal standalone ASCII LRAT RUP verifier fallback when `ftqc_codes` is absent."""
+    db: dict[int, tuple[int, ...]] = {}
+    cid = 0
+    buf: list[int] = []
+    for raw in dimacs.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("c") or line.startswith("p"):
+            continue
+        for tok in line.split():
+            v = int(tok)
+            if v == 0:
+                cid += 1
+                db[cid] = tuple(buf)
+                buf = []
+            else:
+                buf.append(v)
+
+    steps = 0
+    hints_total = 0
+    derived_empty = False
+    for raw in proof_bytes.decode("ascii").splitlines():
+        parts = raw.split()
+        if not parts or parts[0].startswith("c"):
+            continue
+        if len(parts) >= 2 and parts[1] == "d":
+            for tok in parts[2:]:
+                did = int(tok)
+                if did != 0:
+                    db.pop(did, None)
+            continue
+        nums = [int(t) for t in parts]
+        step_id = nums[0]
+        z1 = nums.index(0, 1)
+        lits = tuple(nums[1:z1])
+        z2 = nums.index(0, z1 + 1)
+        hints = nums[z1 + 1 : z2]
+        falsified = set(lits)
+        conflict = False
+        for h in hints:
+            if h <= 0 or h not in db:
+                raise ValueError(f"Invalid or non-RUP LRAT hint {h} at step {step_id}")
+        hints_total += len(hints)
+        # Unit-propagate strictly over the hinted clause subset (supports both forward & CaDiCaL reverse hint order!):
+        pending = [db[h] for h in hints]
+        conflict = False
+        progressed = True
+        while progressed and not conflict:
+            progressed = False
+            next_pending: list[tuple[int, ...]] = []
+            for cl in pending:
+                rem = [lit for lit in cl if lit not in falsified]
+                if not rem:
+                    conflict = True
+                    break
+                if len(rem) == 1:
+                    falsified.add(-rem[0])
+                    progressed = True
+                else:
+                    next_pending.append(cl)
+            pending = next_pending
+        if not conflict:
+            raise ValueError(f"LRAT step {step_id} did not reach RUP conflict")
+        db[step_id] = lits
+        steps += 1
+        if not lits:
+            derived_empty = True
+    if not derived_empty:
+        raise ValueError("LRAT proof did not derive the empty clause")
+    return {"steps": steps, "hints": hints_total}
+
+
 def solve_or_verify_spatial_sat(
     instance: SpatialSATInstance,
     *,
@@ -309,14 +381,22 @@ def solve_or_verify_spatial_sat(
     and independently check either its LRAT UNSAT refutation or the extracted `BinaryFactory`!
     """
     _ensure_tools_on_syspath()
-    from ftqc_codes import lrat as codes_lrat
-    from ftqc_codes import sat as codes_sat
+    try:
+        from ftqc_codes import lrat as codes_lrat
+        from ftqc_codes import sat as codes_sat
+    except ImportError:
+        codes_lrat = None
+        codes_sat = None
 
     dimacs = instance.dimacs()
     cnf_sha = hashlib.sha256(dimacs.encode()).hexdigest()
 
     if banked_lrat_bytes is not None:
-        stats = codes_lrat.check(dimacs, banked_lrat_bytes)
+        stats = (
+            codes_lrat.check(dimacs, banked_lrat_bytes)
+            if codes_lrat is not None
+            else _check_ascii_lrat_rup(dimacs, banked_lrat_bytes)
+        )
         return {
             "verdict": "UNSAT-NOGO-CERTIFIED",
             "mode": "banked_lrat_verified",
@@ -330,7 +410,7 @@ def solve_or_verify_spatial_sat(
             "lrat_hints": stats["hints"],
         }
 
-    solver = codes_sat.find_cadical()
+    solver = codes_sat.find_cadical() if codes_sat is not None else None
     if solver is None:
         return {
             "verdict": "SKIPPED-NO-CADICAL",

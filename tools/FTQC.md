@@ -1,13 +1,13 @@
 # Fault-tolerant quantum computing in BootLoops
 
-Seven tools are available on `ftqc_integration`. An eighth, `ftqc_magic`, is in development for magic-state factories.
+Eight tools are available on `ftqc_integration`.
 
-The arrows show what one tool supplies to another in selected studies. The dashed arrow marks a proposed connection.
+The arrows show what one tool supplies to another in selected studies.
 
 ```mermaid
 flowchart TD
     accTitle: How the eight FTQC tools fit together
-    accDescr: Code checks feed extractor and decoder studies. Extractor circuits go to fault analysis. Decoder rules and propagated faults feed gadget checks. Composition uses gadget fault cones, and uncompute uses ZX cost contracts. The dashed arrow marks the proposed magic-state factory connection.
+    accDescr: Code checks feed extractor, decoder, and magic-state factory studies. Extractor circuits go to fault analysis. Decoder rules feed gadget and magic escape/metacheck checks. Composition uses gadget fault cones and magic-state factory contracts, and uncompute uses ZX cost contracts and magic pricing.
 
     codes["<b>ftqc_codes</b><br/><small>CSS codes and distances</small>"]:::codes
     extractors["<b>ftqc_extractors</b><br/><small>Logical measurements</small>"]:::extractors
@@ -16,16 +16,19 @@ flowchart TD
     gadgets["<b>ftqc_gadgets</b><br/><small>Encoded operations</small>"]:::gadgets
     uncompute["<b>ftqc_uncompute</b><br/><small>Reversible circuit cleanup</small>"]:::uncompute
     compose["<b>ftqc_compose</b><br/><small>End-to-end guarantees</small>"]:::compose
-    magic["<b>ftqc_magic</b><br/><small>Magic-state factories · planned</small>"]:::planned
+    magic["<b>ftqc_magic</b><br/><small>Magic-state factories</small>"]:::magic
 
     codes -->|CSS checks| extractors
     codes -->|Syndrome model| decoders
+    codes -->|SAT and LRAT| magic
     extractors -->|Scheduled probes| faults
     faults -->|ZX cost contracts| uncompute
     faults -->|Fault propagation| gadgets
     decoders -->|Decoder rules| gadgets
+    decoders -->|Escape and metachecks| magic
     gadgets -->|Fault cones| compose
-    magic -.->|Proposed factory guarantee| compose
+    magic -->|Factory contracts| compose
+    magic -->|Factory pricing| uncompute
 
     classDef codes fill:#CCFBF1,stroke:#0F766E,stroke-width:2px,color:#172033
     classDef extractors fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#172033
@@ -34,7 +37,7 @@ flowchart TD
     classDef gadgets fill:#DCFCE7,stroke:#15803D,stroke-width:2px,color:#172033
     classDef uncompute fill:#FCE7F3,stroke:#BE185D,stroke-width:2px,color:#172033
     classDef compose fill:#FEF3C7,stroke:#A16207,stroke-width:2px,color:#172033
-    classDef planned fill:#E0F2FE,stroke:#0369A1,stroke-width:2px,color:#172033,stroke-dasharray:5 4
+    classDef magic fill:#E0F2FE,stroke:#0369A1,stroke-width:2px,color:#172033
 ```
 
 | Tool | Input and question | Evidence |
@@ -46,7 +49,7 @@ flowchart TD
 | [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, component refinement, two-level checks on concatenated codes, and the faults that can reach each decoding event in a scheduled program. |
 | [ftqc_compose](ftqc_compose/GUIDE.md) | Do the output and fault guarantees of one operation meet the next operation’s input requirements? | Typed joins, residual data and frame checks, level reduction and local-stochastic error bounds for a composed study. |
 | [ftqc_uncompute](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup preserve the logical quantum action? Is a pebbling schedule legal, and what error does a declared mask allow? | Exact symbolic HMR checks, sampled trajectory bounds, mask and schedule checks, and source-bound replay of `ftqc_uncompute-receipt-1`. |
-| **`ftqc_magic` (planned)** | What output quality and yield can a magic-state factory deliver? | In development. For current studies, see [simultaneous injection](ftqc_extractors/INJECTION.md) and [15-to-1 distillation](ftqc_compose/GUIDE.md#correcting-15-to-1-distillation). |
+| [ftqc_magic](ftqc_magic/GUIDE.md) | What output quality, yield, and active-qubit footprint can a magic-state factory or cultivation pipeline deliver, and are its output correlations safe to compose? | Exact $\mathbb{Z}[\omega_8]$ / $\mathbb{Q}(\sqrt{2})$ / rational distillation & stabilizer-collapse proofs, recycled check schedules, $O(n^3)$ Clifford-hook cultivation distances, Caliper open-boundary escape gaps, single-shot qLDPC `CCZ` contracts, and `ftqc_magic-receipt-1` exports. |
 
 ## Where the tools connect
 
@@ -58,6 +61,7 @@ flowchart TD
 - **Comparing a ZX design with a location-fault study.** Run the ZX verifier on the proposed circuit and its reference. To use its result in another argument, match the gates and idles, input codespace, flag or detector handling, output frame and fault-counting convention. The ZX contract has its own verifier and noise model. [ZX guide](ftqc_zx/GUIDE.md)
 - **From logical cleanup to physical audit.** The Clifford exporter lowers Hadamard-measure-reset (HMR) to X measurement and reset. A classically controlled Z follows the value of its bit, including a stored constant, an inversion or a later measurement. Conditional quantum gates beyond this direct Z feedback and non-Clifford operations require another implementation before export. The audit bridge builds a weight-one physical fault model for the chosen preparation and outputs. [Audit bridge](ftqc_uncompute/adapters/ftqc_bridge.py)
 - **Pricing a logical circuit.** The resource estimator combines logical gate counts and reaction depth with the supplied ZX contract enclosures and numerical factory cost and escape assumptions. A composed logical-T receipt can justify a factory input separately. The caller supplies that number to the estimator. [Pricing implementation](ftqc_uncompute/adapters/ftqc_bridge.py) · [Logical-T composition](ftqc_compose/GUIDE.md#from-a-distilled-qubit-to-logical-t)
+- **From cultivation and distillation to composed magic contracts.** `ftqc_magic` verifies binary/PPR, $\mathrm{GF}(2^s)$ trace, and non-triorthogonal $\mathbb{Z}[\omega_8]$ stabilizer factories, mid-circuit check recycling, $O(n^3)$ Clifford-hook cultivation (`d_T` vs `d_S`), Caliper open-boundary escape gaps (cross-checked with `ftqc_decoders` Blossom), and single-shot 3D tricycle $\to$ 4D quadcycle `CCZ` factories (repaired via `ftqc_decoders` metachecks). Its pipeline composer enforces `INDEPENDENT_SINGLE`, `BATCH_CORRELATED`, and `CATALYST_POISONED` rules before exporting `ftqc_compose` ancilla contracts and `ftqc_uncompute` pricing records. [Magic factory guide](ftqc_magic/GUIDE.md)
 
 ## Follow a gross-code measurement into the audit tool
 
@@ -170,12 +174,23 @@ python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb144_peierls_cluste
 python3 -m ftqc_decoders verify "$out/bb144_ler.receipt.json"
 ```
 
-## Reproduce the integration checks
+## Certify a recycled factory and a flagged cultivation pipeline
 
-From BootLoops, run the eight established suites, including the separate audit and ZX engine batteries, then run the cross-engine checks. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+On the Bravyi–Haah `49T -> 1T` ($d = 5$, $1411 p^5$) factory, mid-circuit check measurement and reset compresses 14 logical rows down to **5** active qubits. On `MSC-3` magic-state cultivation, exact $O(n^3)$ simulation of propagated Clifford errors $H_{\pm} = (X \pm Y)/\sqrt{2}$ exposes 4 weight-two malignant faults on $|T\rangle$ ($d_T = 2$ despite $d_S = 3$ on $|S\rangle$) when unflagged, and certifies $d_T = 3$ once two $Z$-flag ancillas are added and chained through Caliper open-boundary escape into a recycled Litinski 15-to-1 stage. [Factory examples](ftqc_magic/examples) · [Magic guide](ftqc_magic/GUIDE.md)
 
 ```sh
-python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute
+python3 -m ftqc_magic check tools/ftqc_magic/examples/bh49_recycled_5qubits.json -o "$out/bh49.receipt.json"
+python3 -m ftqc_magic verify tools/ftqc_magic/examples/bh49_recycled_5qubits.json "$out/bh49.receipt.json"
+python3 -m ftqc_magic check tools/ftqc_magic/examples/flagged_cultivation_caliper_15to1.json -o "$out/cult_pipe.receipt.json"
+python3 -m ftqc_magic verify tools/ftqc_magic/examples/flagged_cultivation_caliper_15to1.json "$out/cult_pipe.receipt.json"
+```
+
+## Reproduce the integration checks
+
+From BootLoops, run the nine suites, including the separate audit and ZX engine batteries, then run the cross-engine checks. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise external SAT+LRAT and stabilizer checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+
+```sh
+python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute ftqc_magic
 python3 run_selftests.py ftqc_faults
 ```
 
