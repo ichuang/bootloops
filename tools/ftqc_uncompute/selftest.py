@@ -469,11 +469,31 @@ def _regress_receipt_replay() -> str:
     return "source binding, replay options, strict JSON and evidence checked"
 
 
+def _regress_audit_feedback() -> str:
+    from tools.ftqc_uncompute.adapters.ftqc_bridge import kmx_clifford_to_ftqc_audit_ticks
+
+    ops = ["Z q0 if b0", "BIT_STORE1 b0", "Z q0 if b0", "HMR q1 b0",
+           "BIT_INVERT b0", "Z q0 if b0", "HMR q1 b0", "Z q0 if b0",
+           "BIT_STORE0 b0", "Z q0 if b0"]
+    ticks = kmx_clifford_to_ftqc_audit_ticks(KickMixCircuit.from_kmx("\n".join(ops)))
+    assert [tick[0] for tick in ticks[1:]] == [
+        ("S", 0), ("S", 0), ("MX", 1), ("R", 1), ("S", 0), ("S", 0), ("Z_IF", 0, 0),
+        ("MX", 1), ("R", 1), ("Z_IF", 0, 1)]
+    try:
+        kmx_clifford_to_ftqc_audit_ticks(KickMixCircuit.from_kmx("BIT_INVERT b0 if b1"))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unsupported conditional write silently exported")
+    return "zero, one, complemented and overwritten records export the correct Z feedback"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
         ("_regress_global_budget", _regress_global_budget),
         ("_regress_receipt_replay", _regress_receipt_replay),
+        ("_regress_audit_feedback", _regress_audit_feedback),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),

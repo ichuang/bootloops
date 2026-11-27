@@ -61,7 +61,8 @@ def kmx_clifford_to_ftqc_audit_ticks(
     if prep_tick:
         ticks.append(prep_tick)
 
-    bit_to_record: dict[int, int] = {}
+    # Each bit holds a constant XOR an optional absolute MX record index.
+    bit_values: dict[int, tuple[bool, int | None]] = {}
     meas_counter = 0
 
     for op in circuit.ops:
@@ -76,9 +77,12 @@ def kmx_clifford_to_ftqc_audit_ticks(
         if op.condition is not None:
             if kind != "Z":
                 raise ValueError(f"ftqc_audit supports 1-qubit `Z_IF` feedback, got `{kind} ... if b{op.condition}`")
-            if op.condition not in bit_to_record:
-                raise ValueError(f"Condition bit b{op.condition} not bound to an earlier MX measurement record")
-            ticks.append([("Z_IF", op.qubits[0], bit_to_record[op.condition])])
+            inverted, record = bit_values.get(op.condition, (False, None))
+            q = op.qubits[0]
+            if inverted:
+                ticks.extend([[("S", q)], [("S", q)]])
+            if record is not None:
+                ticks.append([("Z_IF", q, record)])
             continue
 
         if kind == "X":
@@ -94,6 +98,8 @@ def kmx_clifford_to_ftqc_audit_ticks(
         elif kind == "Z_POW":
             assert op.angle is not None
             q = op.qubits[0]
+            if op.angle == 0:
+                continue
             if op.angle == Fraction(1, 2):
                 ticks.append([("S", q)])
             elif op.angle == Fraction(-1, 2) or op.angle == Fraction(3, 2):
@@ -121,12 +127,19 @@ def kmx_clifford_to_ftqc_audit_ticks(
             q = op.qubits[0]
             b = op.bits[0]
             ticks.append([("MX", q)])
-            bit_to_record[b] = meas_counter
+            bit_values[b] = (False, meas_counter)
             meas_counter += 1
             ticks.append([("R", q)])
-        elif kind in ("BIT_STORE0", "BIT_STORE1", "BIT_INVERT", "NEG"):
-            if kind == "BIT_STORE0":
-                bit_to_record.pop(op.bits[0], None)
+        elif kind in ("BIT_STORE0", "BIT_STORE1"):
+            bit_values[op.bits[0]] = (kind == "BIT_STORE1", None)
+        elif kind == "BIT_INVERT":
+            b = op.bits[0]
+            inverted, record = bit_values.get(b, (False, None))
+            bit_values[b] = (not inverted, record)
+        elif kind == "NEG":
+            continue  # An unconditional global phase has no stabilizer observable.
+        else:
+            raise ValueError(f"Unsupported ftqc_audit operation {kind!r}")
 
     return ticks
 
