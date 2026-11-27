@@ -95,7 +95,14 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   not need. `factories.test` compares the rule with propagation set by set.
   `levels.reduction(..., factories={role: receipt})` replaces an assumed outer ancilla
   by its factory and records K: the runs with K or more junk leaves are the junk
-  event, which the receipt leaves to a probability bound.
+  event, which the receipt leaves to a probability bound. `Tree.bounds` is such a
+  bound, under one hypothesis (faults of different leaves and of different checks
+  are independent): from per-leaf and per-check failure probabilities it gives, by
+  the recursion printed as `factories.RECURSION`, the junk probability given
+  acceptance, a lower bound on each check's acceptance and the expected number of
+  leaves consumed. It is tested against sampling and against the formulas written
+  out; it credits a check with accepting only when both inputs are clean, so it is
+  loose, and for wide blocks with frequent leaf failures it gives nothing.
 - **independent_of_input**: which decoders' check values no input error can change.
   For repeated error correction (`steane_ec:CODE,rounds=2`) the later rounds have
   this property and the first does not: after one round, what a block does next is
@@ -176,7 +183,7 @@ gadget.
 
 ## GATES
 
-`python3 tools/ftqc_gadgets/selftest.py` (about 22 s, 6887 checks; `--heavy` adds the
+`python3 tools/ftqc_gadgets/selftest.py` (about 24 s, 6900 checks; `--heavy` adds the
 Golay gadgets at t = 3 and larger two-level tests, about 5 minutes):
 
 - **Against a state-vector simulation**: seven small gadgets (teleportation and
@@ -238,6 +245,11 @@ Golay gadgets at t = 3 and larger two-level tests, about 5 minutes):
   than K junk leaves, leave the output within that weight, and two mirrored junk
   faults defeat it. Levels receipts with factories; refusals for a loose, foreign or
   wrong-state factory and for missing inner receipts.
+
+Six more were planted in the probability recursion (sum and product exchanged,
+fresh dirt or the partner's pattern dropped, acceptance not depending on the inputs,
+retries not counted, a leaf's rate counting one location). Three needed exact
+formula checks before the battery failed on them; sampling alone did not see them.
 
 Twenty-one defects were planted in the factory code (the intersection taken without
 the weight condition, step faults dropped on either side, the two sectors' rules

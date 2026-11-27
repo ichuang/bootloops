@@ -62,6 +62,26 @@ LEMMA = (
     "qubit) with wire faults only on coordinates of faulty local and step locations.")
 
 
+RECURSION = (
+    "Probabilities, under one hypothesis: the faults of different leaves and of different checks "
+    "are independent of one another (nothing is assumed inside a leaf or inside a check).  For an "
+    "accepted subtree T and a sector s let pi_s(T) bound the probability, given that every check "
+    "of T accepted, that the flag J_s(T) is true, and u_s(T) the probability that the s pattern "
+    "of T's output is not trivial.  Leaf: pi_s is the probability that a junk-capable location "
+    "is faulty, u_s the probability that a location with any s effect is faulty.  Check of sector "
+    "s on A and B, with a the probability of a fault at a gate or survivor idle of the step and b "
+    "at a gate or measurement: if both s patterns are trivial and no gate or measurement is "
+    "faulty the check accepts, so it accepts with probability at least alpha = (1 - u_s(A)) "
+    "(1 - u_s(B)) (1 - b).  A non-trivial s pattern on the survivor needs a step fault on its "
+    "side or a non-trivial pattern from A, and acceptance then needs a non-trivial pattern on "
+    "B's side: u_s <= (a + u_s(A) (u_s(B) + b)) / alpha.  In the other sector patterns add: "
+    "u <= (u(A) + u(B) + a) / alpha.  The flags follow the filter rule: pi_s <= pi_s(A) pi_s(B) / "
+    "alpha and, in the other sector, pi <= (pi(A) + pi(B)) / alpha.  Dividing by alpha is "
+    "conditioning on acceptance: an event together with acceptance is no more likely than the "
+    "event.  A check that rejects discards both subtrees, so the expected number of leaves "
+    "consumed is (E(A) + E(B)) / alpha.")
+
+
 class TreeError(GadgetError):
     def __init__(self, message, where=None):
         super().__init__(message)
@@ -399,6 +419,46 @@ class Tree:
             memo[("node", i)] = {t: min(INF, a[t] + b[t]) if t == nd["sector"] else min(a[t], b[t])
                                  for t in "XZ"}
         return memo[self.root]
+
+    def bounds(self, leaf_junk, leaf_dirty, step_a, step_b):
+        """Upper bounds at the root, given acceptance (RECURSION).  leaf_junk, leaf_dirty:
+        {sector: probability} for one leaf; step_a, step_b: probabilities for one check.
+        Use fractions.Fraction for exact arithmetic.  Returns dict(junk={X,Z}, dirty={X,Z},
+        accept_lower=[one per check], expected_leaves=...) or None when some check's
+        acceptance bound is not positive (the recursion gives nothing)."""
+        memo, accs = {}, []
+        one = type(step_a)(1) if not isinstance(step_a, float) else 1.0
+        for b in self.leaves:
+            memo[("leaf", b)] = (dict(leaf_junk), dict(leaf_dirty), one)
+        for i, nd in enumerate(self.nodes):
+            (pa, ua, ea), (pb, ub, eb) = memo[nd["childA"]], memo[nd["childB"]]
+            s = nd["sector"]
+            alpha = (1 - ua[s]) * (1 - ub[s]) * (1 - step_b)
+            if alpha <= 0:
+                return None
+            accs.append(alpha)
+            pi, u = {}, {}
+            for t in "XZ":
+                if t == s:
+                    pi[t] = min(one, pa[t] * pb[t] / alpha)
+                    u[t] = min(one, (step_a + ua[t] * (ub[t] + step_b)) / alpha)
+                else:
+                    pi[t] = min(one, (pa[t] + pb[t]) / alpha)
+                    u[t] = min(one, (ua[t] + ub[t] + step_a) / alpha)
+            memo[("node", i)] = (pi, u, (ea + eb) / alpha)
+        pi, u, e = memo[self.root]
+        return dict(junk=pi, dirty=u, accept_lower=accs, expected_leaves=e)
+
+    def iid_rates(self, p):
+        """Inputs of `bounds` when every location is faulty independently with probability p."""
+        cls = self.shapes[0]["classes"]
+        if len(self.shapes) != 1:
+            raise TreeError("leaves of different shapes: give the rates of each kind yourself")
+        n = self.n
+        keep = 1 - p
+        junk = {t: 1 - keep ** sum(1 for r in cls if r[t][0] == "junk") for t in "XZ"}
+        dirty = {t: 1 - keep ** sum(1 for r in cls if r[t][0] != "none") for t in "XZ"}
+        return junk, dirty, 1 - keep ** (2 * n), 1 - keep ** (2 * n)
 
     def sequence(self):
         """Sectors of the checks along the output block, first to last."""

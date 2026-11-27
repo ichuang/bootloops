@@ -1190,6 +1190,78 @@ def t_factories(heavy):
     check("factory: on a cyclic code a minimum weight the search cannot reach is taken from the BCH bound",
           c["tree"] and c["wmin"] == dict(X=7, Z=7)
           and any("BCH" in v.get("bound_from", "") for v in c["wmin_proof"].values()), str(c)[:300])
+    # ---- probabilities: the recursion against sampling with independent location faults
+    from fractions import Fraction
+    for spec, p, shots in (("prep:steane,zero,tree=XZ", Fraction(1, 200), 60000),
+                           ("prep:steane,plus,tree=ZXZ", Fraction(1, 400), 40000),
+                           ("prep:steane,zero,tree=XZ,rounds=1", Fraction(1, 300), 40000)):
+        g = library.load(spec)
+        tr = factories.Tree(g)
+        an = Analysis(g)
+        bd = tr.bounds(*tr.iid_rates(p))
+        n = tr.n
+        low = (1 << n) - 1
+        mask = dict(X=sum(1 << i for i, v in enumerate(an.canon) if not v & low),
+                    Z=sum(1 << i for i, v in enumerate(an.canon) if not v >> n))
+        table = [[an.sig(*eff) for eff in loc.faults.values()] for loc in an.model.locations]
+        rnd = random.Random(11)
+        pf = float(p)
+        acc = 0
+        hit = dict(junkX=0, junkZ=0, dirtyX=0, dirtyZ=0)
+        for _ in range(shots):
+            sg, locs = 0, []
+            for i, labs in enumerate(table):
+                if rnd.random() < pf:
+                    sg ^= rnd.choice(labs)
+                    locs.append(i)
+            if sg & an.DET:
+                continue
+            acc += 1
+            if locs:
+                pred = tr.predict(locs)
+                e = sg >> an.shift
+                for t in "XZ":
+                    hit["junk" + t] += pred[t][0]
+                    hit["dirty" + t] += bool(e & mask[t])
+        want_acc = 1.0
+        for a_ in bd["accept_lower"]:
+            want_acc *= float(a_)
+        slack = lambda k, bound: hit[k] / acc <= float(bound) + 3 * (float(bound) / acc) ** 0.5 + 3 / acc
+        check(f"factory probabilities {spec}: acceptance is at least the product of the bounds",
+              acc / shots >= want_acc - 0.01 and acc > shots // 4, f"{acc / shots:.4f} vs {want_acc:.4f}")
+        check(f"factory probabilities {spec}: sampled junk and non-trivial rates do not exceed the bounds",
+              all(slack(k + t, bd[k][t]) for k in ("junk", "dirty") for t in "XZ")
+              and hit["dirtyX"] + hit["dirtyZ"] > 50,
+              str({k: round(v / acc, 5) for k, v in hit.items()}) + " vs "
+              + str({k: {t: round(float(v), 5) for t, v in bd[k].items()} for k in ("junk", "dirty")}))
+        check(f"factory probabilities {spec}: expected leaves at least the number of leaves",
+              bd["expected_leaves"] >= len(tr.leaves))
+    tr = factories.Tree(library.load("prep:steane,zero,tree=XZXZ"))
+    bd = tr.bounds(dict(X=Fraction(1, 100), Z=Fraction(1, 100)), dict(X=Fraction(0), Z=Fraction(0)),
+                   Fraction(0), Fraction(0))
+    check("factory probabilities: with no dirt the junk bound is the polynomial of the rule (8 x^4 and 64 z^4)",
+          bd["junk"] == dict(X=8 * Fraction(1, 100) ** 4, Z=64 * Fraction(1, 100) ** 4)
+          and bd["expected_leaves"] == 16, str(bd["junk"]))
+    # one X check, every input non-zero, against the formulas written out
+    tr1 = factories.Tree(library.load("prep:steane,zero,tree=X"))
+    F = Fraction
+    jx, jz, ux, uz, sa, sb = F(1, 7), F(1, 11), F(1, 5), F(1, 9), F(1, 13), F(1, 17)
+    b1 = tr1.bounds(dict(X=jx, Z=jz), dict(X=ux, Z=uz), sa, sb)
+    al = (1 - ux) ** 2 * (1 - sb)
+    check("factory probabilities: one check, all four formulas and the retry count",
+          b1["accept_lower"] == [al] and b1["junk"] == dict(X=jx * jx / al, Z=2 * jz / al)
+          and b1["dirty"] == dict(X=(sa + ux * (ux + sb)) / al, Z=(2 * uz + sa) / al)
+          and b1["expected_leaves"] == 2 / al, str(b1))
+    rj, rd, ra, rb = tr1.iid_rates(F(1, 100))
+    k1 = factories.certificate(library.load("prep:steane,zero,tree=X"))["leaf_kinds"][0]
+    cls = tr1.shapes[0]["classes"]
+    check("factory probabilities: rates for independent location faults count the right locations",
+          rj == {t: 1 - F(99, 100) ** k1[f"junk_capable_{t}"] for t in "XZ"}
+          and rd == {t: 1 - F(99, 100) ** sum(1 for r in cls if r[t][0] != "none") for t in "XZ"}
+          and ra == rb == 1 - F(99, 100) ** 14 and rj["X"] != rj["Z"] and rj["X"] < rd["X"])
+    check("factory probabilities: no bound when a check cannot be shown to accept",
+          tr.bounds(dict(X=Fraction(1, 2), Z=Fraction(1, 2)), dict(X=Fraction(1), Z=Fraction(1)),
+                    Fraction(0), Fraction(0)) is None)
     # ---- receipts
     g = library.load("prep:steane,zero,tree=XZ,rounds=2")
     rec = certify.build(g, tree=dict(strict=True))
