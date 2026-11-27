@@ -18,6 +18,7 @@ Contents:
 - [Point-count shortcuts: one charpoly call replaces brute enumeration](#point-count-shortcuts-one-charpoly-call-replaces-brute-enumeration)
 - [Boundary constants from the operator's arithmetic mod p](#boundary-constants-from-the-operators-arithmetic-mod-p)
 - [Spectral densities by DE transport](#spectral-densities-by-de-transport)
+- [Measurement-based uncomputation, spooky pebbling, and superposition masking](#measurement-based-uncomputation-spooky-pebbling-and-superposition-masking)
 
 ---
 
@@ -405,6 +406,25 @@ gates), and the dispersion-quadrature consumer it pairs with ships as the
 `nestor.dispersion` member of [`tools/nestor`](../../tools/nestor/GUIDE.md), whose
 guide records the paired pattern (1669 nodes at 99.9 digits, cross-validated at 3
 points).
+
+---
+
+## Measurement-based uncomputation, spooky pebbling, and superposition masking
+
+**What it does:** eliminates up to 100% of reverse-pass Toffoli gates (and $O(L) \to O(\log L)$ workspace registers) in reversible quantum arithmetic by trading unitary uncomputation for mid-circuit Hadamard-Measure-Reset (`HMR`) + classically conditioned diagonal fixups (`del_and`, `del_gf2_mul`, `del_lookup`), KMRV26 parallel spooky pebbling (`Blast`/`Unblast` at exact depth $2\ell$), or group/runway superposition masks ($\lvert M_N\rangle$, $\lvert R_N\rangle$, $\lvert\mathrm{grad}_w\rangle$).
+
+**Use when:**
+
+- compiling or auditing reversible adders, $\mathrm{GF}(2^m)$ multipliers, QROM lookups, DQI syndrome decoders, or Shor/Regev modular exponentiation ladders;
+- deciding whether a reverse uncomputation pass can be replaced by 0-Toffoli `HMR` cleanup (`R1`–`R3`), parallel spooky pebbling (`R4`), streamed ancilla recycling (`R5`), or a superposition mask (`R6`–`R7`).
+
+**Checks (mandatory):**
+
+1. **Branch injectivity (`NON-INJECTIVE-KICKMIX-BRANCH`)** — verify every fixed-outcome branch $V_r$ is injective on computational-basis inputs BEFORE applying the KickMix coherent trace-distance bound $D_{\mathrm{tr}} \le 2\sqrt{\varepsilon^+} + 2\pi\tau$; computational-basis trajectory checks on non-injective `HMR` circuits silently miss superposition collapse.
+2. **Clean resets & phase cancellation (`DIRTY-RESET-HAZARD`, `UNCOMPENSATED-HMR-PHASE`, `UNCLEANED-GHOST-AT-EXIT`)** — every `R` must hit $|0\rangle$, every `HMR` phase kickback $(-1)^{b \cdot f(x)}$ must cancel across all branches, and every spooky ghost must be re-pebbled and unpebbled before exit.
+3. **Worst-case support under masking (`MASK-SUPPORT-OVERFLOW-HAZARD`)** — never pair superposition masks or Fibonacci-conjugated traveling eigenstates with average-case-truncated Euclidean/Dialog subroutines ($1.413n$ steps); require full worst-case $2n - 1$ iterations and $\gcd(g(z), N) = 1$ (`MASK-NON-BIJECTIVE-GARBAGE`).
+
+**Implementation:** ships in [`tools/ftqc_uncompute`](../../tools/ftqc_uncompute/GUIDE.md) (`check`, `verify`, `suggest --apply`, `pebble`, `mask`, `convert`).
 
 ---
 
