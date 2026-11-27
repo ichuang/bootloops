@@ -20,6 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
+    "injection": ("method memory logicals", "preparation"),
     "pbc": ("blocks bridges magic_supplies gates target max_degree", "outcomes"),
     "surgery_zx": ("memory operation max_degree", ""),
     "modular_expansion": ("vertices edges components layers target", ""),
@@ -84,6 +85,10 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     if backend == "sat" and kind not in ("circuit", "t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "injection":
+            from .injection import analyze
+
+            return analyze(s)
         if kind == "fixed_graph":
             from .fixed_graph import analyze
 

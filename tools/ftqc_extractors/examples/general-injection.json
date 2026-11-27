@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "kind": "injection",
+  "method": "general",
+  "memory": {
+    "n": 4,
+    "hx": [
+      15
+    ],
+    "hz": [
+      15
+    ]
+  },
+  "logicals": [
+    [
+      3,
+      5,
+      1,
+      0
+    ],
+    [
+      5,
+      3,
+      0,
+      1
+    ]
+  ]
+}
