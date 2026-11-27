@@ -42,3 +42,19 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(receipt(dict(s,routes=[1,7]))["result"]["obligation"],"even-subset routing")
         with self.assertRaises(ValueError):
             receipt(dict(s,checks=["-IIII","+ZZZZ"]))
+
+class SequenceTests(unittest.TestCase):
+    def test_sequence_and_boundaries(self):
+        import json
+        from pathlib import Path
+        s=json.loads((Path(__file__).parent/"examples/three-block-sequence.json").read_text())
+        r=receipt(s)
+        self.assertEqual(r["result"]["distance_lower"],2)
+        verify(s,r)
+        for key,value in [("padding",[0,2]),("operations",[s["operations"][0]]*2)]:
+            with self.assertRaises(ValueError):
+                receipt(dict(s,**{key:value}))
+        del s["operations"][0]["metachecks"][:]
+        with self.assertRaises(ValueError):
+            receipt(s)
+        self.assertEqual(receipt(dict(SMALL,target=3))["result"]["status"],"counterexample")

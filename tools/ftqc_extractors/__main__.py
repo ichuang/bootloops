@@ -20,6 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
+    "surgery_sequence": ("memory operations padding max_degree target", ""),
     "fixed_graph": ("n checks vertices edges ports cycles routes max_degree logical target", "couplers"),
     "block_reading": ("memory blocks pattern axis target", "expected"),
     "gross_circuit": ("rounds target", "spacetime fault_witnesses"),
@@ -77,6 +78,9 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     try:
         if kind == "fixed_graph":
             from .fixed_graph import analyze
+            return analyze(s, budget)
+        if kind == "surgery_sequence":
+            from .surgery_sequence import analyze
             return analyze(s, budget)
         if kind == "block_reading":
             from .block_reading import analyze
