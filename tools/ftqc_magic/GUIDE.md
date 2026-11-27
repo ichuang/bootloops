@@ -251,3 +251,16 @@ postselection follows A. Mehta, V. Menon, H. Zhou, M. D. Lukin and J. P. Bonilla
 [MMZLA26]; and single-shot 3D tricycle $\to$ 4D quadcycle qLDPC `CCZ` factories and AOD
 shuttle budgets follow V. Menon, A. Mehta, H. Zhou, M. D. Lukin and J. P. Bonilla Ataides
 [MMZLA26q]. Bracketed keys resolve in `REFERENCES.md` at the repository root.
+
+### Delivery to encoded consumers
+
+Use `ftqc_magic.delivery.read_delivery(spec, receipt)` for a strict replay
+with normalized phases, ordered state groups, Clifford corrections,
+acceptance, correlations and rational resource bounds. For binary producers
+the two mask tables give the joint mass with acceptance and its conditional
+law. Other supported producers can carry a state bound alone. Cost per
+batch, per grouped quantum state and per native output are recorded
+separately. For example, a binary CCZ can have three native output wires
+but only one deliverable three-qubit state. Strict v1 receipts bind the
+producer Python sources. To use a historical spec at a new revision,
+reissue its receipt with `python3 -m ftqc_magic check`.

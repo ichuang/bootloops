@@ -91,6 +91,13 @@ def read_delivery(spec, receipt):
         modulus=t.modulus,
         phases=list(t.phases),
         groups=groups,
+        resource_wires=t.k,
+        states_per_batch=len(groups),
+        native_output_count=c.k_outputs,
+        expected_wire_ticks_per_batch_upper=str(c.expected_wire_ticks_per_batch_upper),
+        expected_wire_ticks_per_state_upper=str(
+            c.expected_wire_ticks_per_batch_upper / len(groups)
+        ),
         wire_order="little-endian",
         frame="canonical-positive",
         correlation=c.correlation_mode.value,

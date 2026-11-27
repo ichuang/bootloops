@@ -103,7 +103,16 @@ class BatchTests(unittest.TestCase):
         self.assertEqual({v for m, v in law.items() if m != "0"}, {"1/98"})
         ccz = batch(dict(kind="factory", catalog="cube_8_3_2_ccz"), [[0, 1, 2]])
         ccz["twirl"] = "joint_3twirl"
-        atoms = consume_batch(ccz)["conditional_joint_atoms"]
+        result = consume_batch(ccz)
+        evidence = result["source"]
+        self.assertEqual(
+            (evidence["resource_wires"], evidence["states_per_batch"]), (3, 1)
+        )
+        self.assertEqual(
+            evidence["expected_wire_ticks_per_state_upper"],
+            evidence["expected_wire_ticks_per_batch_upper"],
+        )
+        atoms = result["conditional_joint_atoms"]
         self.assertEqual(len(atoms), 8)
         self.assertEqual(len({a["conditional_mass"] for a in atoms if a["mask"]}), 1)
         s = batch(dict(kind="factory", catalog="bh_14_2_2_t"), [[0], [1]])
