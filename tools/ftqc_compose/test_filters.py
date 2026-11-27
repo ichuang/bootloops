@@ -127,10 +127,11 @@ class Arithmetic(unittest.TestCase):
         """A check of two single-mode blocks without junk: every number written out."""
         n, w = 5, 3
         a = dict(X=fl.sector(0, [(1, F(1, 10))]), Z=fl.sector(F(1, 50), [(1, F(1, 20))]))
-        step = dict(fresh=dict(X=F(1, 100), Z=F(1, 200)), partner=F(1, 50), clean=F(9, 10))
+        step = dict(fresh=dict(X=F(1, 100), Z=F(1, 200)), partner=F(1, 50), clean=F(2, 7))
         c, alpha = fl.check(a, a, "X", n, w, step, False, True)
         nu = 1 - F(9, 10) ** n
-        self.assertEqual(alpha, fl.down((1 - nu) ** 2 * F(9, 10)))
+        self.assertEqual(alpha, fl.down((1 - nu) ** 2 * F(2, 7)))
+        self.assertLess(alpha, (1 - nu) ** 2 * F(2, 7))
         tb = 1 - F(9, 10) * F(49, 50)
         p_w = binomial_tail(n, w - 1, fl.up(1 - F(9, 10) * (1 - tb)))
         self.assertEqual(c["X"]["pi"], fl.up(p_w / alpha))
@@ -253,6 +254,25 @@ class AgainstPhysicalTrees(unittest.TestCase):
                         worst = max(worst, true / bound)
         return worst, exact
 
+    def test_profile_is_read_as_counted(self):
+        _, tr, _ = steane_tree("zero", "XZ")
+        profile = tr.profile()
+        p = F(1, 1000)
+        leaves, nodes, root = fl.physical_tree(profile, p)
+        sh = profile["shapes"][0]
+        self.assertEqual((sh["X"]["junk"], max(sh["X"]["local"]), sh["Z"]["junk"], max(sh["Z"]["local"])), (6, 2, 5, 3))
+        self.assertEqual(len(leaves), 4)
+        for lf in leaves.values():
+            self.assertEqual(lf["X"], fl.leaf(p, 6, 2))
+            self.assertEqual(lf["Z"], fl.leaf(p, 5, 3))
+            self.assertEqual(lf["cost"], sh["locations"])
+        self.assertEqual([nd["sector"] for nd in nodes], ["X", "X", "Z"])
+        two = 1 - (1 - p) ** 2
+        for nd in nodes:                                        # per coordinate: a gate, a measurement, an idle
+            self.assertEqual(nd["step"], dict(fresh=dict(X=two, Z=two), partner=two, clean=(1 - p) ** 14, cost=21))
+        self.assertEqual(root, ("node", 2))
+        self.assertEqual(nodes[2]["A"][0], "node")
+
     def test_steane_trees_under_uniform_faults(self):
         worst, exact = self.compare("zero", "XZ", F(1, 1000))
         self.assertGreater(worst, 0.25)
@@ -355,6 +375,17 @@ class Study(unittest.TestCase):
             with self.assertRaises(ValueError):
                 fl.filter_contract_result(wrong)
 
+    def test_banked_example(self):
+        import json
+        from pathlib import Path
+
+        spec = json.loads((Path(__file__).parent / "examples" / "filter-contract-golay.json").read_text())
+        r = receipt(spec)["result"]
+        self.assertEqual(r["status"], "conditional")
+        self.assertEqual(r["tree"]["leaves"], 64)
+        self.assertEqual((r["junk"]["X"], r["junk"]["Z"]), ("1.597e-15", "3.042e-13"))
+        self.assertTrue(all(F(9, 10) < F(a) < 1 for a in r["accept_lower"]))
+
     def test_sources_of_one_column(self):
         rows = fl.shared_sources("XZXZ")
         self.assertEqual([r["sector"] for r in rows], list("XZXZ"))
@@ -370,12 +401,41 @@ class Study(unittest.TestCase):
         for s in "XZ":
             self.assertGreater(F(r["contract"][s]["pi"]), 0)
             self.assertLess(F(r["contract"][s]["pi"]), F(r["raw"]["junk"][s]))       # purification helps
+        # one check, from the tail bounds of its three decoding events
+        from .tails import event_bounds, sci
+
+        for s, gate in (("X", ["CX", "A", "B"]), ("Z", ["CX", "B", "A"])):
+            prog = dict(name="one check", inputs=[], outputs=["A"],
+                        layers=[[["NEW", "std", "A", "B"], gate], [["MZ" if s == "X" else "MX", "B"], ["ECa", "A"]],
+                                [["ECb", "A"]]])
+            probs, _ = event_bounds(dict(kind="cone-bound", noise="independent", p="1/100000", inner={"n": 7, "t": 1},
+                                         contracts=INNER, program=prog))
+            meas, eca, ecb = probs[0], probs[1], probs[2]
+            self.assertEqual(r["step"][s]["partner"], sci(meas))
+            self.assertEqual(r["step"][s]["fresh"], {"X": sci(eca), "Z": sci(ecb)})
+            self.assertEqual(r["step"][s]["clean_lower"], fl.decimal(fl.down(fl.down(1 - 7 * (meas + eca + ecb)), 12)))
+            self.assertGreater(meas, 0)
         self.assertEqual(r["cost_unit"], "raw preparations")
         self.assertGreater(F(r["expected_cost"]), 4)
         self.assertLess(F(r["expected_cost"]), F(41, 10))
         priced = fl.filter_contract_result(encoded(costs={"raw": "1000", "X": "10", "Z": "20"}))
         self.assertGreater(F(priced["expected_cost"]), 4000 + 2 * 10 + 20)
         self.assertEqual(priced["contract"], r["contract"])
+
+    def test_encoded_tree_from_a_factory_receipt(self):
+        from ftqc_gadgets import certify, library
+
+        g = library.load("prep:steane,zero,tree=XZ,rounds=1")
+        strict = certify.build(g, tree=dict(strict=True, light=True))
+        spec = encoded()
+        del spec["tree"]
+        r = fl.filter_contract_result(dict(spec, factory=strict))
+        self.assertEqual(r["tree"]["sequence"], "XZ")
+        self.assertEqual(r["contract"], fl.filter_contract_result(encoded())["contract"])
+        # classes that trust more of the leaf than its last round do not describe an encoded tree
+        loose = certify.build(g, tree=dict(strict=False, light=True))
+        with self.assertRaisesRegex(ValueError, "strict"):
+            fl.filter_contract_result(dict(spec, factory=loose))
 
     def test_encoded_refusals(self):
         # the first of the two rounds is not local to a block: its cones reach the blocks it was entangled with
@@ -386,6 +446,10 @@ class Study(unittest.TestCase):
         short["layers"] = short["layers"][:-2]
         with self.assertRaisesRegex(ValueError, "shares sources"):
             fl.filter_contract_result(encoded(raw={"program": short, "last_layers": 2}))
+        idle = copy.deepcopy(RAW)
+        idle["layers"].append([])
+        with self.assertRaisesRegex(ValueError, "just corrected"):
+            fl.filter_contract_result(encoded(raw={"program": idle, "last_layers": 3}))
         nothing = copy.deepcopy(RAW)
         nothing["layers"] = nothing["layers"][:-4]
         with self.assertRaises(ValueError):

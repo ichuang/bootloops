@@ -8,6 +8,7 @@ Exit 0 only if every check that ran passed.
 """
 import copy
 import itertools
+import math
 import json
 import os
 import random
@@ -1114,6 +1115,52 @@ def t_factories(heavy):
                         break
             check(f"factory {spec}: junk leaves needed ({t}) is the least number that raises the flag", best == want,
                   f"{best} vs {want}")
+        # the profile a probability calculus reads, and the exact law of the accepted output
+        pf = tr.profile()
+        kind0 = c["leaf_kinds"][0]
+        check(f"factory {spec}: the profile counts every location of the tree once",
+              pf["coordinates"] == tr.n and len(pf["leaves"]) == c["leaves"] and len(pf["nodes"]) == c["checks"]
+              and all(pf["shapes"][0][t]["junk"] == kind0[f"junk_capable_{t}"]
+                      and max(pf["shapes"][0][t]["local"]) == kind0[f"max_local_per_coordinate_{t}"] for t in "XZ")
+              and all(nd["gates"] == [1] * tr.n and nd["meas"] == [1] * tr.n for nd in pf["nodes"])
+              and sum(pf["shapes"][k]["locations"] for k in pf["leaves"].values())
+              + sum(sum(nd[x]) for nd in pf["nodes"] for x in ("gates", "meas", "idles")) == len(an.model.locations)
+              and pf["wmin"] == c["wmin"] and tuple(pf["root"]) == tr.root, str(pf)[:300])
+        if spec in ("prep:steane,zero,tree=X", "prep:steane,zero,tree=Z", "prep:steane,zero,tree=XZ"):
+            p_ = 1e-5
+            ex = factories.accepted_law(g, p_, tr, an)
+            acc_all = 1.0
+            for a_ in ex["accept"]:
+                acc_all *= a_
+            L_ = len(an.model.locations)
+            flt = [(loc.index, an.sig(*eff), 1.0 / len(loc.faults)) for loc in an.model.locations
+                   for eff in loc.faults.values()]
+            series = {0: (1 - p_) ** L_}
+            for _, sg, w_ in flt:
+                if not sg & an.DET:
+                    series[sg >> an.shift] = series.get(sg >> an.shift, 0.0) + p_ * w_ * (1 - p_) ** (L_ - 1)
+            for i_, (l1, s1, w1) in enumerate(flt):
+                for l2, s2, w2 in flt[i_ + 1:]:
+                    if l1 != l2 and not (s1 ^ s2) & an.DET:
+                        e_ = (s1 ^ s2) >> an.shift
+                        series[e_] = series.get(e_, 0.0) + p_ * p_ * w1 * w2 * (1 - p_) ** (L_ - 2)
+            third = math.comb(L_, 3) * p_ ** 3
+            second = sum(v for e_, v in series.items() if e_) - sum(
+                p_ * w_ * (1 - p_) ** (L_ - 1) for _, sg, w_ in flt if not sg & an.DET and sg >> an.shift)
+            worst = max(abs(ex["law"].get(e_, 0.0) * acc_all - v) for e_, v in series.items())
+            check(f"factory {spec}: the exact law of the accepted output agrees with the sum over one and two faults",
+                  worst <= third and second > 20 * third and abs(sum(ex["law"].values()) - 1) < 1e-12
+                  and set(ex["law"]) >= set(series), f"worst {worst:.3e}, third order {third:.3e}, pairs {second:.3e}")
+            cw = factories.class_weights(ex["single"]["X"], tr.n)
+            brute = {}
+            for pat in range(1 << tr.n):
+                e_ = 0
+                for q_ in range(tr.n):
+                    if (pat >> q_) & 1:
+                        e_ ^= ex["single"]["X"][q_]
+                brute[e_] = min(brute.get(e_, tr.n), bin(pat).count("1"))
+            check(f"factory {spec}: class weights are least numbers of coordinates",
+                  cw == brute and len(cw) == 2 ** len(tr.GZ) and max(cw.values()) > 1, str(sorted(cw.values())))
         # the contract implies refinement of the specification through K - 1 (on the Steane
         # code enumeration goes further: every Z pattern on |0_L> is equivalent to one error)
         if len(seq) <= 2 and "rounds" not in spec:
