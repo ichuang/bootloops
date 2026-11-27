@@ -37,6 +37,11 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="ftqc_gadgets", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    surgery = sub.add_parser("surgery", help="certify a signed projective measurement")
+    surgery.add_argument("spec")
+    surgery.add_argument("--order", type=int, default=1)
+    surgery.add_argument("--cap", type=int, default=1000000)
+    surgery.add_argument("-o", "--out")
     a = sub.add_parser("analyze")
     a.add_argument("spec")
     a.add_argument("--check", action="append", default=[])
@@ -85,6 +90,14 @@ def main(argv=None):
         return txt
 
     try:
+        if args.cmd == "surgery":
+            from .surgery import receipt
+            with open(args.spec) as f:
+                r = receipt(json.load(f), args.order, args.cap)
+            txt = emit(r, args.out)
+            if not args.out:
+                print(txt, end="")
+            return {"proved":0,"counterexample":1,"inconclusive":3}[r["faults"]["status"]]
         if args.cmd == "cones":
             from . import cones
             with open(args.program) as f:
@@ -98,6 +111,11 @@ def main(argv=None):
         if args.cmd == "verify":
             with open(args.receipt) as f:
                 rec = json.load(f)
+            if rec.get("schema") == "ftqc_gadgets-surgery-1":
+                from .surgery import verify
+                verify(rec)
+                print("verified signed surgery instrument")
+                return 0
             if rec.get("schema") == "ftqc_gadgets-cones-1":
                 from . import cones
                 for line in cones.verify(rec):
@@ -164,7 +182,7 @@ def main(argv=None):
     except certify.Refusal as e:
         print("REFUSED:", e, file=sys.stderr)
         return 1
-    except (GadgetError, OSError, json.JSONDecodeError) as e:
+    except (ValueError, KeyError, TypeError, IndexError, OSError) as e:
         print("error:", e, file=sys.stderr)
         return 2
 
