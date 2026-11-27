@@ -1738,6 +1738,7 @@ def main():
     suite = unittest.defaultTestLoader.loadTestsFromNames([
         "ftqc_gadgets.test_surgery", "ftqc_gadgets.test_surgery_build",
         "ftqc_gadgets.test_surgery_geometry", "ftqc_gadgets.test_surgery_operational",
+        "ftqc_gadgets.test_occupied_transfer",
     ])
     check("signed surgery regressions", unittest.TextTestRunner().run(suite).wasSuccessful())
     heavy = "--heavy" in sys.argv

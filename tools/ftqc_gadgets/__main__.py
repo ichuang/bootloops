@@ -46,6 +46,9 @@ def main(argv=None):
     surgery.add_argument("--order", type=int, default=1)
     surgery.add_argument("--cap", type=int, default=1000000)
     surgery.add_argument("-o", "--out")
+    transfer = sub.add_parser("magic-transfer", help="certify a fresh CSS encoding or occupied-slot SWAP")
+    transfer.add_argument("spec")
+    transfer.add_argument("-o","--out")
     a = sub.add_parser("analyze")
     a.add_argument("spec")
     a.add_argument("--check", action="append", default=[])
@@ -94,6 +97,14 @@ def main(argv=None):
         return txt
 
     try:
+        if args.cmd == "magic-transfer":
+            from .magic_transfer import transfer_receipt
+            with open(args.spec) as f:
+                rec = transfer_receipt(json.load(f))
+            txt = emit(rec,args.out)
+            if not args.out:
+                print(txt,end="")
+            return 0
         if args.cmd == "build-surgery":
             from .surgery_design import build
             with open(args.spec) as f:
@@ -125,6 +136,11 @@ def main(argv=None):
         if args.cmd == "verify":
             with open(args.receipt) as f:
                 rec = json.load(f)
+            if rec.get("schema") in ("ftqc-gadgets-fresh-transfer-1","ftqc-gadgets-occupied-swap-1"):
+                from .magic_transfer import verify_transfer
+                verify_transfer(rec)
+                print("verified magic transfer")
+                return 0
             if rec.get("schema") == "ftqc_gadgets-surgery-1":
                 from .surgery import verify
                 verify(rec)

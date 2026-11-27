@@ -422,3 +422,15 @@ matched fresh ancilla specifications have their own boundary contracts.
 ## Signed surgery instruments
 
 See [the surgery interface and replay examples](../ftqc_gadgets/SURGERY.md) for physical measurement receipts, installed feed-forward schedules and conditional residual laws.
+
+### Magic transfer certificates
+
+Run `python3 -m ftqc_gadgets magic-transfer spec.json -o receipt.json` and
+`python3 -m ftqc_gadgets verify receipt.json`. A `fresh` input specifies
+`n`, CSS check masks `hx` and `hz`, and a port with the block name, ordered
+logical X/Z masks and frame/correction. Its equal-amplitude cosets and erased
+input wire certify the open isometry. A `swap` input specifies a block with
+signed checks, a complete ordered logical basis, and the destination slot.
+Checking the Pauli images certifies transfer into that slot and identity on
+every spectator, including its reference. The physical circuit and its wire
+order are part of the receipt.

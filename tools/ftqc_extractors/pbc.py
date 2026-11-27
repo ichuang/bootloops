@@ -168,4 +168,7 @@ def analyze(s, budget):
     if "surgery_installation" in s:
         from .pbc_surgery import bind
         result["surgery_installation"]=bind(result,s,budget)
+    if "magic_delivery" in s:
+        from .magic_delivery import bind as bind_delivery
+        result["magic_delivery"] = bind_delivery(result,s)
     return result
