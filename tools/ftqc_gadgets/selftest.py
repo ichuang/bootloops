@@ -1587,6 +1587,91 @@ def t_cones(heavy):
           not pat["corrects_after_every_step"] and pat["steps"] == 7 and pat["uncorrected"] == 4 and pat["corrected"] == 1
           and pat["measured"] == 1 and pat["ended"] == 1 and pat["gates_not_followed_by_correction"] == 4
           and pat["runs"] == {"1": 1, "3": 2} and pat["longest_run"] == 3, str(pat))
+    # ---- the conventional arrangement: an inner correction after every gate and idle tick
+    bare = cones.Program([[("NEW", "zero2", "Q"), ("CX", "A", "B")], [("NEW", "and2", "a", "b", "t"), ("CX", "A", "a"), ("CX", "B", "b")],
+                          [("MZ", "a", "m"), ("MZ", "b", "n")], [("CXg", "B", "t", "m"), ("CX", "A", "Q")], [("CXg", "A", "t", "n")],
+                          [("CX", "t", "Q")], [("MX", "t", "r")], [("CZg", "A", "B", "r")]], ["A", "B"], ["A", "B", "Q"], "bare")
+    sched, n_outer = cones.strict_schedule(bare)
+    fs2 = cones.Flow(sched)
+    pat = cones.correction_pattern(sched, outer_atomic=True)
+    stripped = [[op for op in l if op[0] not in ("ECa", "ECb")] for l in sched.layers]
+    check("cones: the strict schedule is the program with an inner correction of every live block after every layer",
+          n_outer == 0 and [l for l in stripped if l] == [l for l in bare.layers] and pat["corrects_after_every_step"]
+          and pat["longest_run"] == 1 and pat["steps"] > 20 and len(sched.layers) == 3 * len(bare.layers)
+          and cones.ledger(fs2)["inner_corrections"] == sum(len(l) for l in sched.layers if l and l[0][0] == "ECa"),
+          str(pat))
+    _, _, tracked = cones._strict(bare)
+    sizes = {}
+    ev_src = {i for i, s_ in enumerate(fs2.sources) if s_["level"] == 2 and s_["kind"] == "event"}
+    for o in fs2.outer:
+        if o["tag"] == "out":
+            sizes[(str(o["block"]), o["sector"])] = len([i for i in cones._bits(fs2.cone_of[o["node"]]) if i in ev_src]) - 1
+    check("cones: the outer cones the scheduler tracks are the ones the flow computes",
+          sizes == {(b, s_): tracked[b][j].bit_count() for b in ("A", "B", "Q") for j, s_ in enumerate("XZ")}
+          and max(sizes.values()) > 6, f"{sizes} vs {tracked}")
+    sched3, n3 = cones.strict_schedule(bare, outer_after=3)
+    f3 = cones.Flow(sched3)
+    pat3, raw3 = cones.correction_pattern(sched3, outer_atomic=True), cones.correction_pattern(sched3)
+    check("cones: with a threshold the strict schedule adds outer corrections and stays strict",
+          n3 > 0 and cones.ledger(f3)["outer_corrections"] == n3 and pat3["corrects_after_every_step"]
+          and raw3["uncorrected"] == n3 and not cones.contained(sched3, f3, samples=2)["outside"]
+          and [l for l in [[op for op in l if op[0] not in ("ECa", "ECb", "EC2a", "EC2b")] for l in sched3.layers] if l]
+          == [l for l in bare.layers], f"{n3} {pat3} {raw3}")
+    _, _, tracked3 = cones._strict(bare, 3)
+    ev3 = {i for i, s_ in enumerate(f3.sources) if s_["level"] == 2 and s_["kind"] == "event"}
+    sizes3 = {(str(o["block"]), o["sector"]): len([i for i in cones._bits(f3.cone_of[o["node"]]) if i in ev3]) - 1
+              for o in f3.outer if o["tag"] == "out"}
+    check("cones: with outer corrections the tracked cones are still the flow's",
+          sizes3 == {(b, s_): tracked3[b][j].bit_count() for b in ("A", "B", "Q") for j, s_ in enumerate("XZ")},
+          f"{sizes3} vs {tracked3}")
+    # one block waits while two others are corrected at the outer level; the threshold is on the larger sector
+    chain = cones.Program([[("CX", "A", "B")]] * 6, ["A", "B", "C"], ["A", "B", "C"], "chain")
+    limit = 5
+    sets = {b: [set(), set()] for b in "ABC"}                   # the rule, with sets, written out here
+    label, expect = 0, []
+    for step in range(6):
+        sets["B"][0] |= sets["A"][0]
+        sets["A"][1] |= sets["B"][1]
+        for b in "ABC":
+            sets[b][0].add(label)
+            sets[b][1].add(label + 1)
+            label += 2
+        need = [b for b in "ABC" if max(len(sets[b][0]), len(sets[b][1])) > limit]
+        if need:
+            expect.append((step, need))
+            for b in "ABC":
+                if b in need:
+                    sets[b] = [{label}, {label + 1}]
+                else:
+                    sets[b][0].add(label)
+                    sets[b][1].add(label + 1)
+                label += 2
+            for b in "ABC":
+                sets[b][0].add(label)
+                sets[b][1].add(label + 1)
+                label += 2
+    lay_c, n_c, tracked_c = cones._strict(chain, limit)
+    got = []
+    step = -1
+    for l in lay_c:
+        if l and l[0][0] == "CX":
+            step += 1
+        twos = sorted(op[1] for op in l if op[0] == "EC2a")
+        if twos:
+            got.append((step, twos))
+    fc = cones.Flow(cones.Program(lay_c, chain.inputs, chain.outputs), two=True)
+    evc = {i for i, s_ in enumerate(fc.sources) if s_["level"] == 2 and s_["kind"] == "event"}
+    sizes_c = {(str(o["block"]), o["sector"]): len([i for i in cones._bits(fc.cone_of[o["node"]]) if i in evc]) - 1
+               for o in fc.outer if o["tag"] == "out"}
+    check("cones: outer corrections fall where the larger sector first exceeds the threshold, and waiting blocks are tracked",
+          got == expect and len(expect) >= 1 and any(len(n_) < 3 for _, n_ in expect) and n_c == sum(len(n_) for _, n_ in expect)
+          and sizes_c == {(b, s_): tracked_c[b][j].bit_count() for b in "ABC" for j, s_ in enumerate("XZ")}
+          and sizes_c == {(b, s_): len(sets[b][j]) for b in "ABC" for j, s_ in enumerate("XZ")}, f"{got} vs {expect}; {sizes_c}")
+    lazy = cones.strict_schedule(bare, outer_after=10 ** 6)
+    check("cones: a threshold no cone reaches gives the schedule without outer corrections",
+          lazy[1] == 0 and lazy[0].layers == sched.layers)
+    refuses("cones: a program that already holds corrections is not given a strict schedule",
+            lambda: cones.strict_schedule(sched), "without error correction", exc=GadgetError)
     # ---- algebra against the rule
     P = cones.Program([[("CX", "A", "C")], [("CX", "A", "B")], [("CX", "A", "B")]], ["A", "B", "C"],
                       ["A", "B", "C"], "twice")
