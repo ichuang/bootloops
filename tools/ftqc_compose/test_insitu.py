@@ -95,3 +95,26 @@ class DistillTests(unittest.TestCase):
                 bad["independent_attempts"] = False
             with self.assertRaises(ValueError):
                 evaluate(bad)
+
+    def test_retry_and_handoff(self):
+        from .__main__ import receipt as compose_receipt
+        from .test_magic_handoff import study as handoff
+
+        s = study(reject="1/4")
+        out = evaluate(
+            dict(
+                kind="insitu-retries",
+                factory=s,
+                lane_ticks=[2, 3, 4, 5],
+                factory_ticks=10,
+                factory_width=5,
+                transcript=["source-reject", "delivered"],
+            )
+        )
+        self.assertEqual(out["expected_wire_ticks_per_delivery"], "210")
+        self.assertEqual(out["wire_ticks"], 290)
+        gate = handoff("postselect")
+        gate.update(factory=s, factory_receipt=compose_receipt(s))
+        r = evaluate(gate)
+        self.assertEqual(r["instrument"]["transcripts"], 4)
+        self.assertEqual(r["resource_trace_distance_upper"], "1/1000")

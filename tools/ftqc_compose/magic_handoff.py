@@ -36,7 +36,8 @@ def consume_t(spec):
     attempt = spec["attempt"]
     if not isinstance(attempt, str) or not attempt.strip():
         raise ValueError("missing source attempt identity")
-    source = read_delivery(spec["factory"], spec["factory_receipt"])
+    from .__main__ import receipt as replay
+    source = read_delivery(spec["factory"], spec["factory_receipt"], replay_insitu=replay)
     if (
         source["state"] != "T"
         or source["groups"] != [[0]]
@@ -67,7 +68,7 @@ def consume_t(spec):
         spec,
         dict(
             upper=delta,
-            p=spec["factory_receipt"]["contract"]["input_error_rate"],
+            p=spec["factory_receipt"].get("contract", {}).get("input_error_rate","joint carrier law"),
             noise_evidence=source["premises"],
         ),
         locations=len(transfer["operations"]),

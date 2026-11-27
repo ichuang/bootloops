@@ -100,3 +100,32 @@ def evaluate(batches, independent_attempts):
         independent_attempts=independent_attempts,
         scope="one synchronized group of attempts; postselection; ideal factory Cliffords",
     )
+
+
+def output_delivery(spec, proof, replay):
+    rebuilt = replay(spec)
+    if canonical_json_sha256(rebuilt) != canonical_json_sha256(proof):
+        raise ValueError("in-situ output receipt differs from replay")
+    f = rebuilt["result"]["factory"]
+    if f["conditional_output_Z"] is None:
+        raise ValueError("no accepted output")
+    delta = Fraction(f["conditional_output_Z"])
+    return dict(
+        schema="ftqc-magic-delivery-1",
+        producer=dict(
+            spec_sha256=canonical_json_sha256(spec),
+            receipt_sha256=canonical_json_sha256(proof),
+        ),
+        state="T",
+        groups=[[0]],
+        phases=[0, 1],
+        modulus=8,
+        frame="canonical-positive",
+        law="exact-accepted-Z",
+        conditional_z_mass={"0": str(1 - delta), "1": str(delta)},
+        accepted_z_mass=f["accepted_mass"],
+        acceptance_exact=True,
+        acceptance_lower=f["final_accept"],
+        conditional_trace_distance_upper=str(delta),
+        premises=[f["scope"], "ideal logical input transfers and raw output interface"],
+    )
