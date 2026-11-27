@@ -37,6 +37,10 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="ftqc_gadgets", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    build = sub.add_parser("build-surgery", help="compile a finite constructor to a standalone instrument")
+    build.add_argument("spec")
+    build.add_argument("-o","--out")
+    build.add_argument("--geometry", help="write the finite geometry report")
     surgery = sub.add_parser("surgery", help="certify a signed projective measurement")
     surgery.add_argument("spec")
     surgery.add_argument("--order", type=int, default=1)
@@ -90,6 +94,16 @@ def main(argv=None):
         return txt
 
     try:
+        if args.cmd == "build-surgery":
+            from .surgery_design import build
+            with open(args.spec) as f:
+                design = build(json.load(f))
+            txt = emit(design["spec"],args.out)
+            if not args.out:
+                print(txt,end="")
+            if args.geometry:
+                emit(design["geometry"],args.geometry)
+            return 0
         if args.cmd == "surgery":
             from .surgery import receipt
             with open(args.spec) as f:
