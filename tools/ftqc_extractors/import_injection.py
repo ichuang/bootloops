@@ -51,6 +51,20 @@ def export(root, out, circuits):
             raise ValueError("unexpected physical coordinate order")
         mem = dict(n=n, hx=[mask(r) for r in code.Hx], hz=[mask(r) for r in code.Hz])
         xs, zs = code.get_logical_ops_stim()
+        general = dict(
+            schema=1,
+            kind="injection",
+            method="general",
+            memory=mem,
+            logicals=[
+                [mask(x.to_numpy()[0]), mask(z.to_numpy()[1]), 0, 0]
+                for x, z in zip(xs, zs, strict=True)
+            ],
+        )
+        prefix = "bb144" if n == 144 else "hgp225"
+        (out / f"{prefix}-injection-general.json").write_text(
+            json.dumps(general, indent=2) + "\n"
+        )
         for idx in ids:
             spec = InitCfgMgrV2().load(
                 code_id=code.identifier,

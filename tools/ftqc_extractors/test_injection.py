@@ -183,3 +183,40 @@ class ObjectiveTests(unittest.TestCase):
         self.assertEqual(
             receipt(optimize(s, "protected"))["result"]["status"], "proved"
         )
+
+
+class IndependentSourceTests(unittest.TestCase):
+    def test_general_full_rate(self):
+        for name, k in [("bb144", 12), ("hgp225", 9)]:
+            proof = receipt(example(name + "-injection-general"))
+            self.assertEqual(proof["result"]["status"], "proved")
+            self.assertEqual(len(proof["result"]["carriers"]), k)
+
+    def test_signed_y_after_physical_projection(self):
+        # Explicit unnormalized ten-qubit amplitudes. Project first onto X^10
+        # and then Z^10. The omitted common normalization cancels.
+        for name, expect in [("bell-injection", 1), ("split-bell-injection", 0)]:
+            s = example(name)
+            prep = s["preparation"]
+            v = []
+            for w in range(1024):
+                if any(w >> q & 1 for q in prep["zero"]) or any(
+                    (w >> a ^ w >> b) & 1 for a, b in prep["bells"]
+                ):
+                    v.append(0)
+                else:
+                    v.append(1j ** sum(w >> q & 1 for q in prep["carriers"]))
+            projected = [
+                (v[w] + v[w ^ 1023]) if w.bit_count() % 2 == 0 else 0
+                for w in range(1024)
+            ]
+            norm = sum(abs(a) ** 2 for a in projected)
+            for (x, z, _, _), target in zip(s["logicals"], (expect, 1)):
+                value = sum(
+                    a.conjugate()
+                    * 1j
+                    * (-1) ** ((w ^ x) & z).bit_count()
+                    * projected[w ^ x]
+                    for w, a in enumerate(projected)
+                )
+                self.assertAlmostEqual(value / norm, target)

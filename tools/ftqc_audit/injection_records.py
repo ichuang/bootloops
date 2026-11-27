@@ -182,6 +182,8 @@ def boundary(circuit, parsed, source, selected, rounds):
     ideal = circuit.without_noise()
     circuit.detector_error_model()  # Reject stochastic detectors and observables.
     reference = ideal.reference_sample()
+    if any(sum(int(reference[i]) for i in row) % 2 for row in det):
+        raise ValueError("noiseless detector parity must be even")
     for i, (xx, zz, sx, sz) in enumerate(source["logicals"]):
         if reference[-k + i] != (sx ^ sz ^ (((xx & zz).bit_count() - 1) // 2 % 2)):
             raise ValueError("wrong ideal signed logical Y")
