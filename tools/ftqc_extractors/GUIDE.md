@@ -115,3 +115,23 @@ Use an `injection_circuit` input with case `bb-uniform` (two rounds, correlation
 ## Signed surgery instruments
 
 See [the surgery interface and replay examples](../ftqc_gadgets/SURGERY.md) for physical measurement receipts, installed feed-forward schedules and conditional residual laws.
+
+### Installing an accepted Magic output in a PBC program
+
+An optional `magic_delivery` on a PBC input embeds a factory spec and strict
+receipt, realized attempts, physical transfer couplers, decoder/feed-forward
+latency in ticks and one ordered request per T. Each attempt names its wire
+inventory, output wire and half-open execution interval. A successful member
+occupies its raw wire until transfer. Rejected attempts release their wires.
+The same member may be used on mutually exclusive branches, once per branch.
+
+Gadgets checks a three-parity-CNOT SWAP into the reserved scratch slot and
+the identity on every other logical Pauli pair, including entangled
+spectators. The ledger serializes the chosen measurements and charges
+transfer, waiting, buffering and latency. Physical settings use their checked
+durations, placements and memory idles. With abstract settings a measurement
+uses one model tick. Peak reserved qubits and elapsed time describe the
+realized transcript. Factory time windows and independent retry noise are
+study assumptions. Whole-program noisy fault distance is open. See
+`test_magic_delivery.py` for the installed [[4,2,2]] lifted product, and
+`ftqc_gadgets/test_occupied_transfer.py` for the 32-logical HGP450 port check.
