@@ -106,6 +106,8 @@ Replay the research checkout’s `studies/replay.sh` against the candidate pin, 
 
 ## Future factory handoff
 
+**Follow-up at `827e0b9`.** The factory producer is now integrated. The [Magic handoff plan](magic-handoff.md) defines the remaining consumer and transfer work. The requirements below record the original surgery-round boundary.
+
 The future `ftqc_magic` producer and the extractor consumer need agreement on the encoded target state and sign, block and ordered slot, Pauli/Clifford frame, acceptance record, availability, quality metric and conditioning, joint errors across a batch, and the boundary at which preparation ends. The consumer supplies its signed injection or teleportation branches, encoder and transport assumptions, and per-branch residual guarantees. Composition would validate compatibility and account for shared fault sites, acceptance probability and retries. A marginal error rate alone cannot justify independent use of two outputs from one batch.
 
 This roadmap reserves that discussion for the factory maintainers. All milestones above can use existing explicit resource premises and conditional logical-T fixtures. Factory schemas, imports, adapters and executable integration belong to a later joint change.
