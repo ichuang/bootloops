@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="558" viewBox="0 0 840 558"
+     role="img" aria-labelledby="title desc">
+  <title id="title">How the eight FTQC tools fit together</title>
+  <desc id="desc">CSS checks from codes feed extractors and a syndrome model feeds decoders.
+    Scheduled extractor probes feed faults. Gadgets use fault propagation and decoder rules.
+    Uncompute uses ZX cost contracts. Compose uses gadget fault cones. The dashed connection
+    from magic to compose is a proposed magic-state factory guarantee.</desc>
+  <style>
+    svg { font-family: Arial, Helvetica, sans-serif; text-anchor: middle; }
+    .canvas { fill: #fff; }
+    .edges { fill: none; stroke: #475569; stroke-width: 1.8; }
+    .tip { fill: #475569; }
+    .labels { font-size: 14px; fill: #334155; stroke: #fff; stroke-width: 7px; stroke-linejoin: round; paint-order: stroke; }
+    .node rect { stroke-width: 2; rx: 7px; }
+    .node text { fill: #172033; font-size: 15px; }
+    .node .name { font-size: 20px; font-weight: bold; }
+    @media (prefers-color-scheme: dark) {
+      .canvas { fill: #0d1117; }
+      .edges { stroke: #aebac8; }
+      .tip { fill: #aebac8; }
+      .labels { fill: #dae2ed; stroke: #0d1117; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path class="tip" d="M0 0 L8 4 L0 8 Z"/>
+    </marker>
+  </defs>
+  <rect class="canvas" width="840" height="558"/>
+
+  <g class="edges" marker-end="url(#arrow)">
+    <path d="M360 80 C360 107 226 110 226 131"/>
+    <path d="M460 80 C460 107 565 110 565 131"/>
+    <path d="M226 195 V246"/>
+    <path d="M187 310 C187 333 138 337 138 368"/>
+    <path d="M269 310 C269 337 395 341 395 368"/>
+    <path d="M565 195 C565 279 472 294 451 368"/>
+    <path d="M417 432 C417 458 492 456 510 484"/>
+    <path d="M700 432 C700 458 625 456 607 484" stroke-dasharray="6 5"/>
+  </g>
+  <g class="labels">
+    <text x="288" y="111">CSS checks</text>
+    <text x="525" y="111">Syndrome model</text>
+    <text x="226" y="225">Scheduled probes</text>
+    <text x="151" y="344">ZX cost contracts</text>
+    <text x="330" y="342">Fault propagation</text>
+    <text x="500" y="300">Decoder rules</text>
+    <text x="458" y="463">Fault cones</text>
+    <text x="679" y="464">Proposed factory guarantee</text>
+  </g>
+
+  <g class="node" transform="translate(410 48)">
+    <rect x="-119" y="-31" width="238" height="62" fill="#CCFBF1" stroke="#0F766E"/>
+    <text class="name" y="-3">ftqc_codes</text>
+    <text y="19">CSS codes and distances</text>
+  </g>
+  <g class="node" transform="translate(226 163)">
+    <rect x="-119" y="-31" width="238" height="62" fill="#DBEAFE" stroke="#2563EB"/>
+    <text class="name" y="-3">ftqc_extractors</text>
+    <text y="19">Logical measurements</text>
+  </g>
+  <g class="node" transform="translate(565 163)">
+    <rect x="-119" y="-31" width="238" height="62" fill="#EDE9FE" stroke="#7C3AED"/>
+    <text class="name" y="-3">ftqc_decoders</text>
+    <text y="19">Syndrome decoding</text>
+  </g>
+  <g class="node" transform="translate(226 278)">
+    <rect x="-119" y="-31" width="238" height="62" fill="#FFE4D5" stroke="#C2410C"/>
+    <text class="name" y="-3">ftqc_faults</text>
+    <text y="19">Circuit and ZX proofs</text>
+  </g>
+  <g class="node" transform="translate(138 400)">
+    <rect x="-119" y="-31" width="238" height="62" fill="#FCE7F3" stroke="#BE185D"/>
+    <text class="name" y="-3">ftqc_uncompute</text>
+    <text y="19">Reversible cleanup</text>
+  </g>
+  <g class="node" transform="translate(417 400)">
+    <rect x="-119" y="-31" width="238" height="62" fill="#DCFCE7" stroke="#15803D"/>
+    <text class="name" y="-3">ftqc_gadgets</text>
+    <text y="19">Encoded operations</text>
+  </g>
+  <g class="node" transform="translate(700 400)">
+    <rect x="-123" y="-31" width="246" height="62" fill="#E0F2FE" stroke="#0369A1" stroke-dasharray="6 4"/>
+    <text class="name" y="-3">ftqc_magic<tspan font-size="13" font-weight="normal"> · planned</tspan></text>
+    <text y="19">Magic-state factories</text>
+  </g>
+  <g class="node" transform="translate(558 516)">
+    <rect x="-119" y="-31" width="238" height="62" fill="#FEF3C7" stroke="#A16207"/>
+    <text class="name" y="-3">ftqc_compose</text>
+    <text y="19">End-to-end guarantees</text>
+  </g>
+</svg>
