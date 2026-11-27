@@ -602,6 +602,17 @@ def _regress_directed_bounds() -> str:
     return "reported confidence and distance endpoints enclose exact rational inequalities"
 
 
+def _regress_mask_factors() -> str:
+    for factors in ([], [3], [15]):
+        try:
+            uniform_residue_mask_bound(15, prime_factors_list=factors)
+        except ValueError:
+            continue
+        raise AssertionError("invalid factors produced an exact totient bound")
+    assert uniform_residue_mask_bound(45, prime_factors_list=[3, 5])["phi_n"] == 24
+    return "exact totients require a complete set of proved prime factors"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
@@ -614,6 +625,7 @@ def run_selftest() -> int:
         ("_regress_rewrite_action", _regress_rewrite_action),
         ("_regress_pricing", _regress_pricing),
         ("_regress_directed_bounds", _regress_directed_bounds),
+        ("_regress_mask_factors", _regress_mask_factors),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),

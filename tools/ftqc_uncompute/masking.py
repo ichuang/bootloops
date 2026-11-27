@@ -40,10 +40,16 @@ def euler_totient_from_factors(n: int, prime_factors_list: Sequence[int] | None 
         raise ValueError("modulus N must be >= 2")
     if prime_factors_list is not None:
         phi = n
-        for p in sorted(set(int(x) for x in prime_factors_list)):
-            if p < 2 or n % p != 0:
+        remaining = n
+        for p in sorted(set(prime_factors_list)):
+            if (type(p) is not int or p < 2 or n % p != 0
+                    or euler_totient_from_factors(p) != p - 1):
                 raise ValueError(f"{p} is not a prime factor of {n}")
             phi = (phi // p) * (p - 1)
+            while remaining % p == 0:
+                remaining //= p
+        if remaining != 1:
+            raise ValueError("Incomplete prime factor list")
         return phi
 
     rem = int(n)
@@ -94,8 +100,8 @@ def uniform_residue_mask_bound(
 
     if min_prime_factor is not None and prime_factors_list is None:
         b_min = int(min_prime_factor)
-        if b_min < 2:
-            raise ValueError("min_prime_factor must be >= 2")
+        if not 2 <= b_min <= modulus:
+            raise ValueError("min_prime_factor must lie in [2, modulus]")
         # Number of prime factors k <= floor(log_{b_min}(modulus))
         max_k = 1
         prod = b_min
