@@ -64,6 +64,9 @@ def evaluate(spec):
         from .magic_batch import consume_batch
 
         return consume_batch(spec)
+    if spec["kind"] == "insitu-rm15":
+        from .insitu import factory
+        return factory(spec)
     if spec["kind"] == "magic-logical-t":
         from .magic_handoff import consume_t
 
