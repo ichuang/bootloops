@@ -1,6 +1,6 @@
 # Composable signed Pauli measurements
 
-Gadgets certifies a physical projective measurement on an arbitrary encoded input. Extractors binds these circuits to a shared apparatus, allocates record bits, inserts feedback and checks the complete resulting circuit. Compose can consume the accepted diagonal-Pauli contract or calculate a joint accepted error law. The implementation roadmap and original-paper links are in [Composable extractors and code surgery](../../PLANS/extractor-surgery.md).
+Gadgets certifies a physical projective measurement on an arbitrary encoded input. Extractors binds these circuits to a shared apparatus, allocates record bits, inserts feedback and checks the complete resulting circuit. Compose can consume the accepted diagonal-Pauli contract or calculate a joint accepted error law. For the delivered features, outstanding work and original paper links, see the [milestone status for the surgery round](../../PLANS/extractor-surgery.md#implementation-status-at-6613a17).
 
 ## Run a measurement
 
@@ -41,5 +41,5 @@ Compose's `surgery` leaf takes `instance`, ordered data `wires` and a Gadgets `r
 
 `ftqc_extractors.surgery_bench --help` lists finite HGP, cyclic, radial, PCPP, product-connection and architecture cases. Padded HGP emits a sequence-checker input. Radial, PCPP and product-connection cases emit Gadgets designs. Installed cases emit Extractors check inputs. Set `noise_locations` to `phenomenological` on a linear or graph merge design to charge one data/merged-qubit error per qubit at each round boundary and noisy syndrome/split measurements, with ideal coupling gates. Match the noise locations and target subgroup before comparing costs.
 
-The companion research checkout banks results and full replay commands under `studies/surgery/`, including the authors' trapped-ion QIR, raw-histogram analysis and a separate simulated and decoded comparison. The optional Stim backend accelerates large Choi tests. The finite radial example uses the paper's protographs with a dense rank-one equivariant map. The cellulated cone and coherent fanout have finite witnesses for their generated geometries. Published optimal-distance, asymptotic-overhead and native scheduling claims require additional hypotheses.
+The companion research checkout banks results and full replay commands under `studies/surgery/`, including checksums and a downloader for the authors' trapped-ion QIR and shot files, raw-histogram analysis and a separate simulated and decoded comparison. The optional Stim backend accelerates large Choi tests. The finite radial example uses the paper's protographs with a dense rank-one equivariant map. The cellulated cone and coherent fanout have finite witnesses for their generated geometries. Published optimal-distance, asymptotic-overhead and native scheduling claims require additional hypotheses.
 
