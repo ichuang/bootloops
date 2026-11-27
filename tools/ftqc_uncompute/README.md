@@ -7,13 +7,13 @@ See [`GUIDE.md`](GUIDE.md) for full documentation, refusal codes, known hazards,
 ## Quickstart
 
 ```sh
-# Run the <2 s zero-dependency acceptance battery (L0-L6, N1-N6, M1-M4)
+# Run the acceptance battery, including verifier regressions
 python3 tools/ftqc_uncompute/selftest.py
 
 # Certify a .kmx circuit and re-verify its zero-float receipt
 python3 -m tools.ftqc_uncompute check tools/ftqc_uncompute/examples/gidney_adder_4bit.kmx -o /tmp/adder.receipt.json
-python3 -m tools.ftqc_uncompute verify /tmp/adder.receipt.json
+python3 -m tools.ftqc_uncompute verify /tmp/adder.receipt.json --target tools/ftqc_uncompute/examples/gidney_adder_4bit.kmx
 
-# Rank and apply MBUC simplifications (R1-R7)
+# Apply supported KickMix rewrites
 python3 -m tools.ftqc_uncompute suggest my_circuit.kmx --apply -o my_circuit_opt.kmx
 ```

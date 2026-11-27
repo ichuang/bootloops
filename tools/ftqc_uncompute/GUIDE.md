@@ -1,8 +1,6 @@
 # ftqc_uncompute — measurement-based uncomputation, spooky pebbling, and superposition masking
 
-Tool page: https://bootloops.ai/tools/ftqc_uncompute.html (listed in the tools index; see also [`../FTQC.md`](../FTQC.md))
-
-NAME: `ftqc_uncompute` is the logical reversible-arithmetic and measurement-based uncomputation (MBUC) verifier and simplification advisor in the BootLoops FTQC stack (`tools/ftqc_uncompute`). Where [`ftqc_codes`](../ftqc_codes/GUIDE.md), [`ftqc_audit`](../ftqc_audit/GUIDE.md), [`ftqc_gadgets`](../ftqc_gadgets/GUIDE.md), [`ftqc_extractors`](../ftqc_extractors/README.md), [`ftqc_zx`](../ftqc_zx/GUIDE.md) and [`ftqc_compose`](../ftqc_compose/GUIDE.md) certify memory codes, physical Clifford schedules, encoded gadgets, syndrome extractors, ZX fault-equivalence and composed logical-$T$ noise bounds, `ftqc_uncompute` sits at the logical algorithm layer above them: it proves that mid-circuit Hadamard-Measure-Reset (`HMR`) cleanup, spooky pebbling schedules, and superposition-masked streaming circuits preserve quantum coherence, and it synthesizes certified rewrites (`R1`–`R7`) that cut Toffoli, $T$, qubit, and spacetime costs.
+`ftqc_uncompute` verifies logical measurement-based uncomputation, validates spooky pebbling and superposition-mask specifications, and estimates arithmetic rewrite costs. Its CLI and examples are in this package. [FTQC integration guide](../FTQC.md)
 
 KIND: library + CLI (`python3 -m tools.ftqc_uncompute` / `python3 tools/ftqc_uncompute/selftest.py`), 100% Python standard library (`fractions.Fraction`, `decimal.Decimal`, `int` bit-packing; zero floating-point literals or `float()` calls across all certified modules and JSON receipts). Verification class: **selftest** (runs green in ~1 s from a cold clone with zero external packages). Optional bridges under `adapters/` connect to sibling `ftqc_audit` and `ftqc_zx` packages in-tree, pure-stdlib OpenQASM 3 dynamic circuits, and optional external `qualtran`, `cirq`, `qiskit`, and `kickmix` installations (which skip cleanly by name when absent).
 
@@ -21,7 +19,11 @@ Reversible quantum arithmetic routinely spends half its non-Clifford gates and w
    - Validates exact ($\lvert M_N\rangle$, $\lvert +\rangle^{\otimes w}$, $\lvert\mathrm{grad}_w\rangle$) and approximate ($\lvert R_N\rangle$, carry-runway) masks, refusing non-coprime branch multipliers (`MASK-NON-BIJECTIVE-GARBAGE`) and average-case-truncated subroutines (`MASK-SUPPORT-OVERFLOW-HAZARD`, catching $1.413n$ Euclidean Dialog truncation vs worst-case $2n - 1$ steps on full-support masked eigenstates).
    - Symbolic $\mathrm{GL}_2(\mathbb{Z})$ prover (`verify_streaming_fibonacci_ladder`) certifying that `Fib`/`Fib^-1` conjugation decouples streamed IQPE controls from $\lvert M_N\rangle\otimes\lvert u_\theta\rangle$ with zero reverse uncomputation pass, paired with factor-free outward-rounded `Decimal` bounds $\sqrt{1 - \varphi(N)/N}$.
 4. **Simplification advisor & verified rewriter** (`suggest.py`):
-   - Scans `.kmx` circuits and Qualtran-style `ArithDAG`s for rules `R1_TEMP_AND_HMR`, `R2_BILINEAR_HMR`, `R3_LOOKUP_HMR`, `R4_SPOOKY_PEBBLE`, `R5_STREAM_MBUC`, `R6_SUPERPOS_MASK`, and `R7_ADDER_PHASE_GRAD`, prices physical FTQC wire-tick savings against `ftqc_zx-contract-v1` contracts, and with `--apply` emits **and automatically verifies** the rewritten circuit.
+   - Scans `.kmx` circuits and Qualtran-style `ArithDAG`s for rules `R1_TEMP_AND_HMR`, `R2_BILINEAR_HMR`, `R3_LOOKUP_HMR`, `R4_SPOOKY_PEBBLE`, `R5_STREAM_MBUC`, `R6_SUPERPOS_MASK`, and `R7_ADDER_PHASE_GRAD`, prices physical FTQC wire-tick savings against `ftqc_zx-contract-v1` contracts, and reports which rules were applied. KickMix verification compares the public basis map and phase of both circuits. Verified DAG rewriting requires a concrete lowering and checks its HMR obligations.
+
+A global proof that exceeds its symbolic budget produces `SYMBOLIC-BUDGET-EXCEEDED`. Affine maps use exact binary rank. Nonlinear maps with at most twelve input bits can use exhaustive enumeration. A reversible circuit with restored scratch can establish injectivity directly. An unresolved wider nonlinear map produces `INJECTIVITY-NOT-PROVED`. A refused result cannot establish coherent cleanup.
+
+`verify` resolves the source or accepts an explicit `--target`, rechecks the digest and compares every regenerated field, including the trajectory and Kraus options. Trajectory bounds refer to the selected oracle and sampling assumptions. A trace-preservation probe has a separate mode in the receipt.
 
 ## USE-WHEN
 
@@ -41,7 +43,7 @@ Run from the BootLoops repository root:
 ```sh
 # Validate a .kmx circuit or JSON spec and emit a zero-float receipt
 python3 -m tools.ftqc_uncompute check tools/ftqc_uncompute/examples/dqi_rs_tiny_mbuc.kmx -o /tmp/dqi.receipt.json
-python3 -m tools.ftqc_uncompute verify /tmp/dqi.receipt.json
+python3 -m tools.ftqc_uncompute verify /tmp/dqi.receipt.json --target tools/ftqc_uncompute/examples/dqi_rs_tiny_mbuc.kmx
 
 # Suggest and apply MBUC simplifications (with automatic post-rewrite verification)
 python3 -m tools.ftqc_uncompute suggest my_circuit.kmx --apply -o my_circuit_opt.kmx
@@ -69,7 +71,7 @@ python3 tools/ftqc_uncompute/selftest.py
 
 ## ACCEPTANCE BATTERY
 
-- `python3 tools/ftqc_uncompute/selftest.py` (registered in `tools/BATTERIES.json` under `ftqc_uncompute`, `cwd: root`) runs 9 self-contained stdlib legs in `< 2 s`:
+- `python3 tools/ftqc_uncompute/selftest.py` (registered in `tools/BATTERIES.json` under `ftqc_uncompute`, `cwd: root`) runs the following checks together with regressions for proof budgets, injectivity, evidence replay, feedback, rewrites, mask inputs and numerical bounds.
   - `L0_purity_and_lineage`: AST zero-float/zero-complex scan across all package modules and disjoint-lineage import check on `kraus_oracle.py`.
   - `L1_ir_gf2_qasm3`: $\mathrm{GF}(2^m)$ field/LUP/bilinear identities, `.kmx` canonical SHA-256 invariance, and OpenQASM 3 dynamic-circuit round-trip.
   - `L2_hmr_sim_kraus_dual`: Dual-lineage agreement (`hmr.py` + `kickmix_sim.py` + 44-digit `kraus_oracle.py` with $D_{\mathrm{tr}} = 0$) on `del_and`, 4-bit Gidney `iadd`, 0-Toffoli `del_gf2_mul`, and QROM `del_lookup`.
