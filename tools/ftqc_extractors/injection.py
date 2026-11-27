@@ -152,6 +152,12 @@ def analyze(s):
             for i, w in enumerate(checks)
             if not w & mask(sites) and not subsystem_error(w, incompatible, bells)
         ]
+    chosen = s.get("postselect", fixed)
+    if not isinstance(chosen, dict) or set(chosen) != {"X", "Z"}:
+        raise ValueError("expected X and Z postselection check indices")
+    for axis, checks in (("X", hx), ("Z", hz)):
+        if not set(site_list(chosen[axis], len(checks))) <= set(fixed[axis]):
+            raise ValueError("postselection includes a random first-round check")
     for i, (q, p) in enumerate(zip(sites, reps)):
         for axis, w, sign, incompatible in (
             ("X", p[0], p[2], zero),
@@ -176,6 +182,7 @@ def analyze(s):
         carrier_gates=gates,
         representatives=reps,
         fixed_checks=fixed,
+        postselect=chosen,
         syndrome_frame={
             "Z": frame(hx, [p[0] for p in reps], n),
             "X": frame(hz, [p[1] for p in reps], n),
