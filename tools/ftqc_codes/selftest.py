@@ -21,7 +21,19 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-from ftqc_codes import certify, cnf, codes, constructions, gf2, interchange, lrat, minweight, sat  # noqa: E402
+from ftqc_codes import (  # noqa: E402
+    basis,
+    certify,
+    cnf,
+    codes,
+    constructions,
+    gf2,
+    interchange,
+    lrat,
+    minweight,
+    sat,
+    symmetry,
+)
 
 PASS, FAIL, SKIP = [], [], []
 
@@ -76,10 +88,10 @@ def t_minweight():
         n = rnd.randint(2, 16)
         k = rnd.randint(1, min(n, 9))
         gens = [rnd.getrandbits(n) for _ in range(k)]
-        basis = gf2.Echelon(gens).basis
-        sub = [b for b in basis if rnd.random() < 0.4]
-        if rnd.random() < 0.3 and len(basis) >= 2:
-            sub.append(basis[0] ^ basis[1])
+        ebasis = gf2.Echelon(gens).basis
+        sub = [b for b in ebasis if rnd.random() < 0.4]
+        if rnd.random() < 0.3 and len(ebasis) >= 2:
+            sub.append(ebasis[0] ^ ebasis[1])
         want, _ = minweight.brute_min_weight(gens, n, sub)
         got = minweight.min_weight(gens, n, sub)
         if want is None:
@@ -340,11 +352,11 @@ def t_bch():
                     nxt[i] ^= bch._pmulmod(c, a, p)
                 coeffs = nxt
             g = sum(c << i for i, c in enumerate(coeffs))
-            basis = codes.cyclic_span(g, n)
-            r = bch.code_bound(basis, n)
+            cb_basis = codes.cyclic_span(g, n)
+            r = bch.code_bound(cb_basis, n)
             check(f"bch n={n}: zero set recovered", r["zeros"] == len(Z)
                   and set(r["zero_coset_leaders"]) == set(pick))
-            true = minweight.min_weight(basis, n)["lower"]
+            true = minweight.min_weight(cb_basis, n)["lower"]
             check(f"bch n={n}: bound <= true minimum weight", r["bound"] <= true,
                   f"zeros {pick}: bound {r['bound']} > {true}")
     for spec, d in (("cyclic:31,1,3", 5), ("cyclic:63,1,3,5", 7), ("cyclic:15,1", 3)):
@@ -667,7 +679,6 @@ def t_interchange_and_constructions():
     check("group_lifted_product on C_3 matches cyclic LP(6,2) row-for-row",
           glp_c3.sha256() == lp6.sha256())
 
-    # S_3 on 6 elements (permutations of (0,1,2))
     import itertools
     s3_elems = list(itertools.permutations(range(3)))
     s3_idx = {p: i for i, p in enumerate(s3_elems)}
@@ -686,7 +697,7 @@ def t_interchange_and_constructions():
           and glp_s3.meta["construction"]["seed_inputs"]["abelian"] is False
           and s3_left != s3_right)
 
-    bad_right = copy.deepcopy(s3_left)  # S_3 left != right; claiming both equal violates L(g1,g2)==R(g2,g1)
+    bad_right = copy.deepcopy(s3_left)
     refuses("control: inconsistent nonabelian left/right group action refused",
             lambda: constructions.group_lifted_product(6, s3_left, bad_right, [[[0, 1]]], [[[0, 1]]]),
             "inconsistent left/right")
@@ -754,7 +765,6 @@ def t_interchange_and_constructions():
           and pp_srec["facts"]["d"]["upper"] == 12
           and pp_srec["facts"]["d"]["lower"] is None)
 
-    # Non-CSS & duplicate coordinate controls on interchange
     non_css = copy.deepcopy(lp_manifest)
     non_css["code_type"] = "non_css"
     refuses("interchange control: non-CSS code refused with symplectic message",
@@ -809,6 +819,197 @@ def t_interchange_and_constructions():
             "static_receipt_ref")
 
 
+# ---------------------------------------------------------------- 5g. addressable logical bases & lift symmetries
+def t_basis_and_symmetry():
+    ex_dir = os.path.join(HERE, "examples")
+    lp6 = constructions.lifted_product([[3]], [[3]], 3, name="LP(6,2)")
+    b_lp6 = basis.derive_paired_basis(lp6)
+    check("LP(6,2) derived basis verifies", bool(basis.verify_basis_receipt(lp6, b_lp6)) and b_lp6["k"] == 2)
+
+    # Imported lower-weight / external candidate bases verify through the same verifier
+    for fname, want_k in (
+        ("qldpc_bb144.import.json", 12),
+        ("qldpc_lp6_2.import.json", 2),
+        ("pp256_q4_j3_l8_p16.import.json", 64),
+    ):
+        c_imp = codes.load(os.path.join(ex_dir, fname))
+        b_imp = basis.build_basis_receipt(c_imp, source="imported_candidate")
+        check(f"imported candidate basis {fname} verifies (k={want_k})",
+              bool(basis.verify_basis_receipt(c_imp, b_imp)) and b_imp["k"] == want_k)
+
+    # 1. Slot swap on LP(6,2): preserves code_sha256, changes basis_sha256 and physical operator for Z on q0
+    b_swapped, swap_tr = basis.dress_basis(lp6, b_lp6, permute_slots=[1, 0], new_slot_names=["q0", "q1"])
+    z_q0_orig = basis.embed_named_pauli(b_lp6, [("q0", "Z")])
+    z_q0_swap = basis.embed_named_pauli(b_swapped, [("q0", "Z")])
+    check("LP(6,2) slot swap preserves code_sha256, changes basis_sha256 and physical Z(q0)",
+          b_swapped["code_sha256"] == b_lp6["code_sha256"]
+          and b_swapped["basis_sha256"] != b_lp6["basis_sha256"]
+          and z_q0_orig != z_q0_swap)
+    refuses("LP(6,2) slot swap without conversion rejected by verify_logical_target",
+            lambda: basis.verify_logical_target(lp6, b_lp6, [("q0", "Z")], z_q0_swap),
+            "different logical")
+
+    # Read-only compatibility check with ftqc_gadgets.surgery.validate_basis
+    try:
+        from ftqc_gadgets import surgery as gad_surg
+        exp_b = basis.export_surgery_basis(b_lp6, measured_slots=["q0"])
+        checks_g = [
+            gad_surg.pauli(basis.pauli_from_xz(lp6.n, r, 0, 0), lp6.n) for r in lp6.hx
+        ] + [
+            gad_surg.pauli(basis.pauli_from_xz(lp6.n, 0, r, 0), lp6.n) for r in lp6.hz
+        ]
+        gad_surg.validate_basis(
+            exp_b["surgery_basis"],
+            checks_g,
+            [gad_surg.pauli(z_q0_orig, lp6.n)],
+            lp6.n,
+        )
+        check("exported surgery_basis accepted by ftqc_gadgets.surgery.validate_basis", True)
+    except ImportError:
+        skip("ftqc_gadgets.surgery.validate_basis check", "ftqc_gadgets not present")
+
+    # 2. Valid stabilizer dressing (including mixed X/Z stabilizers creating Y entries) + tampered dressing refusal
+    b_dressed, dress_tr = basis.dress_basis(
+        lp6,
+        b_lp6,
+        dress_x_hx=[[0], [1]],
+        dress_x_hz=[[1], []],
+        dress_z_hx=[[], [0]],
+        dress_z_hz=[[2], [1]],
+    )
+    check("stabilizer-dressed LP(6,2) basis and transform verify",
+          bool(basis.verify_basis_receipt(lp6, b_dressed))
+          and basis.verify_basis_transform(lp6, b_lp6, b_dressed, dress_tr))
+    z_q0_dressed = basis.embed_named_pauli(b_dressed, [("q0", "Z")])
+    check("dressed Z(q0) accepted as equivalent logical target on original basis",
+          basis.verify_logical_target(lp6, b_lp6, [("q0", "Z")], z_q0_dressed) == z_q0_orig)
+
+    bad_tr = copy.deepcopy(dress_tr)
+    bad_tr["dressings"]["z_hz"][0] = [0]
+    refuses("control: wrong stabilizer dressing rejected by verify_basis_transform",
+            lambda: basis.verify_basis_transform(lp6, b_lp6, b_dressed, bad_tr),
+            "mismatch")
+
+    # 3. Wrong sign in a mixed-Pauli (Y) measurement
+    st = codes.steane()
+    b_st = basis.derive_paired_basis(st)
+    y_true = basis.embed_named_pauli(b_st, [("q0", "Y")])
+    y_wrong_sign = ("+" if y_true[0] == "-" else "-") + y_true[1:]
+    check("Steane logical Y valid sign accepted",
+          basis.verify_logical_target(st, b_st, [("q0", "Y")], y_true) == y_true)
+    refuses("control: wrong sign in mixed-Pauli (Y) measurement refused",
+            lambda: basis.verify_logical_target(st, b_st, [("q0", "Y")], y_wrong_sign),
+            "wrong sign")
+    # Also test stabilizer-dressed Y on LP(6,2)
+    y_lp_dressed = basis.embed_named_pauli(b_dressed, [("q0", "Y")])
+    y_lp_flipped = ("+" if y_lp_dressed[0] == "-" else "-") + y_lp_dressed[1:]
+    check("LP(6,2) dressed mixed-Pauli Y accepted against base basis",
+          bool(basis.verify_logical_target(lp6, b_lp6, [("q0", "Y")], y_lp_dressed)))
+    refuses("control: LP(6,2) dressed mixed-Pauli Y with flipped sign refused",
+            lambda: basis.verify_logical_target(lp6, b_lp6, [("q0", "Y")], y_lp_flipped),
+            "wrong sign")
+
+    # 4. Duplicated slot refusal
+    dup_slots = copy.deepcopy(b_lp6["slots"])
+    dup_slots[1]["name"] = dup_slots[0]["name"]
+    refuses("control: duplicated slot name in basis refused",
+            lambda: basis.build_basis_receipt(lp6, dup_slots),
+            "duplicated")
+    refuses("control: duplicated measured slot in consumer export refused",
+            lambda: basis.export_surgery_basis(b_lp6, measured_slots=["q0", "q0"]),
+            "duplicated")
+    refuses("control: duplicated slot in embed_named_pauli refused",
+            lambda: basis.embed_named_pauli(b_lp6, [("q0", "X"), ("q0", "Z")]),
+            "duplicated")
+
+    # 5. Seed-orbit coverage (Zheng et al., arXiv:2607.28605): partial vs full coverage
+    z0_supp = basis.parse_pauli(b_lp6["slots"][0]["z"], lp6.n)[1]
+    z1_supp = basis.parse_pauli(b_lp6["slots"][1]["z"], lp6.n)[1]
+    cov_partial = symmetry.verify_seed_orbit_coverage(lp6, b_lp6, [z0_supp], 3, sector="Z")
+    cov_full = symmetry.verify_seed_orbit_coverage(lp6, b_lp6, [z0_supp, z1_supp], 3, sector="Z")
+    check("LP(6,2) single invariant seed covers 1/2 slots; two seeds cover 2/2",
+          cov_partial["covered_rank"] == 1 and not cov_partial["full_coverage"]
+          and cov_full["covered_rank"] == 2 and cov_full["full_coverage"])
+
+    # Zheng et al. Ex. III.6: LP_5^{2x4} = [[100, 26, 4]] (a is 2x4, b = a^T is 4x2)
+    a_z100 = [[1, 1, 1, 1], [1, 2, 4, 8]]
+    b_z100 = [[a_z100[i][j] for i in range(2)] for j in range(4)]
+    lp100 = constructions.lifted_product(a_z100, b_z100, 5, name="LP100_26")
+    b_lp100 = basis.derive_paired_basis(lp100)
+    left_mask_only = [
+        v for v in gf2.nullspace(lp100.hx, lp100.n)
+        if (v >> 80) == 0
+    ]
+    cov_left_all = symmetry.verify_seed_orbit_coverage(lp100, b_lp100, left_mask_only, 5, sector="Z")
+    check("Zheng LP_5^{2x4} [[100, 26]]: partial seed-orbit coverage strictly < 26 detected",
+          lp100.n == 100 and b_lp100["k"] == 26
+          and cov_left_all["covered_rank"] == 22
+          and cov_left_all["full_coverage"] is False)
+
+    # 6. Lee odd-order Abelian spectroscopy (arXiv:2607.05386) + fail-closed even-order check
+    refuses("spectral basis refuses even cyclic lift L=4 fail-closed",
+            lambda: symmetry.spectral_abelian_basis(4, [[[0, 1]]], [[[0, 1]]]),
+            "odd-order")
+    refuses("spectral basis refuses even Abelian group Z_3 x Z_2 fail-closed",
+            lambda: symmetry.spectral_abelian_basis([3, 2], [[[[0, 0]]]], [[[[0, 0]]]]),
+            "odd-order")
+    # Binary elimination remains available on even lifts
+    even_lp = constructions.lifted_product([[3]], [[3]], 4, name="LP_even4")
+    check("binary elimination remains available on even lift L=4",
+          basis.derive_paired_basis(even_lp)["k"] == 2)
+
+    # Odd cyclic lifts: LP(6,2) (L=3), nontrivial packet C_3 (1+x+x^2 -> k=4), radial90 (L=5 -> k=8), L=15
+    c_sp3, b_sp3, rep_sp3 = symmetry.spectral_abelian_basis(3, [[[0, 1]]], [[[0, 1]]], name="LP(6,2)")
+    check("spectral basis on LP(6,2) (C_3) matches k=2 and c6860dd462fe",
+          c_sp3.sha256() == lp6.sha256() and b_sp3["k"] == 2 and rep_sp3["odd_order_checked"])
+
+    c_pkt3, b_pkt3, rep_pkt3 = symmetry.spectral_abelian_basis(3, [[[0, 1, 2]]], [[[0, 1, 2]]])
+    check("spectral basis on C_3 nontrivial degree-2 packet gives k=4 paired slots",
+          b_pkt3["k"] == 4 and any(p["degree"] == 2 and p["binary_logical_slots"] == 4 for p in rep_pkt3["packets"]))
+
+    rad_a = [[[2], [3], [4]], [[1], [4], [1]], [[4], [3], [2]]]
+    rad_b = [[[2], [2], [0]], [[4], [0], [4]], [[1], [3], [0]]]
+    c_rad_sp, b_rad_sp, rep_rad_sp = symmetry.spectral_abelian_basis(5, rad_a, rad_b, name="Radial90")
+    check("spectral basis on radial90 (C_5) matches b656926c5959 and k=8",
+          c_rad_sp.sha256().startswith("b656926c5959") and b_rad_sp["k"] == 8)
+
+    # Lee T_{2,4}^{15} over Z_15 (n=300, k=66 across 5 cyclotomic packets of degrees 1, 2, 4)
+    p15_a = [[[0], [0], [0], [0]], [[0], [1], [2], [3]]]
+    p15_b = [[[0], [0]], [[0], [14]], [[0], [13]], [[0], [12]]]
+    c_p15, b_p15, rep_p15 = symmetry.spectral_abelian_basis(15, p15_a, p15_b, name="T_2_4_15")
+    check("spectral basis on Z_15 2x4 lift T_{2,4}^{15} (n=300, k=66) verifies across degree 1,2,4 packets",
+          c_p15.n == 300 and b_p15["k"] == 66 and len(rep_p15["packets"]) == 5)
+
+    # Noncyclic odd Abelian group G = Z_3 x Z_3 (|G| = 9, n = 36, k = 4)
+    z3z3_a = [[[[0, 0], [1, 0]], [[0, 0], [0, 1]]]]
+    c_z33, b_z33, rep_z33 = symmetry.spectral_abelian_basis([3, 3], z3z3_a, z3z3_a, name="Z3xZ3_LP")
+    check("spectral basis on noncyclic Z_3 x Z_3 lift verifies against binary elimination",
+          c_z33.n == 36 and b_z33["k"] == 4 == rep_z33["binary_crosscheck_k"])
+
+    # 7. Group-extension lift chain maps (Hirasaki & Lee, arXiv:2607.28621): even vs odd fiber extensions
+    src_c, tgt_c, src_b, tgt_b, maps_pb2, cert_pb2 = symmetry.build_cyclic_extension_chain_map(
+        [[3]], [[3]], base_lift=3, ext_factor=2, mode="pullback"
+    )
+    _, _, _, _, _, cert_pf2 = symmetry.build_cyclic_extension_chain_map(
+        [[3]], [[3]], base_lift=3, ext_factor=2, mode="pushforward"
+    )
+    _, _, _, _, _, cert_pb3 = symmetry.build_cyclic_extension_chain_map(
+        [[3]], [[3]], base_lift=3, ext_factor=3, mode="pullback"
+    )
+    _, _, _, _, _, cert_pf3 = symmetry.build_cyclic_extension_chain_map(
+        [[3]], [[3]], base_lift=3, ext_factor=3, mode="pushforward"
+    )
+    check("cyclic extension chain maps Z_3<->Z_6 (rank 1) and Z_3<->Z_9 (rank 2) commute with boundaries and satisfy M_X == M_Z^T",
+          cert_pb2["commutes_boundary_1"] and cert_pb2["commutes_boundary_2"] and cert_pb2["rank_mz"] == 1
+          and cert_pf2["rank_mz"] == 1
+          and cert_pb3["rank_mz"] == 2 and cert_pf3["rank_mz"] == 2)
+    bad_f1 = list(maps_pb2[0])
+    bad_f1[0] ^= 1
+    refuses("control: corrupted lift chain map fails boundary commutation",
+            lambda: symmetry.verify_chain_map(src_c, tgt_c, bad_f1, maps_pb2[1], maps_pb2[2]),
+            "commutation")
+
+
 # ---------------------------------------------------------------- 6. SAT leg (needs cadical)
 def t_sat(heavy):
     if not sat.find_cadical():
@@ -850,7 +1051,6 @@ def t_sat(heavy):
         res = sat.solve(F, wd, "g", 300)
         check("sat golay raw solve unsat", res[0] == "unsat")
         proof = open(os.path.join(wd, "g.lrat"), "rb").read().splitlines()
-        # remove a lemma that the refutation really uses: a hint of the empty clause
         adds = {st[1]: st for st in lrat.steps(b"\n".join(proof) + b"\n") if st[0] == "a"}
         ncl = len(F.clauses)
         final = next(st for st in adds.values() if not st[2])
@@ -899,7 +1099,7 @@ def t_cli():
         p = run("spec", "steane", "-o", os.path.join(wd, "s.json"))
         p2 = run("certify", os.path.join(wd, "s.json"))
         check("cli spec file round trip", p.returncode == 0 and p2.returncode == 0 and "d=3" in p2.stdout)
-        # Tagged construction JSON + CLI construct & verify
+        # Tagged construction JSON + CLI construct, basis & verify
         cspec = os.path.join(wd, "lp6.spec.json")
         json.dump({
             "schema": constructions.SPEC_SCHEMA,
@@ -911,12 +1111,16 @@ def t_cli():
         }, open(cspec, "w"))
         srec_out = os.path.join(wd, "lp6.static.json")
         crec_out = os.path.join(wd, "lp6.construct.json")
+        brec_out = os.path.join(wd, "lp6.basis.json")
         p_s = run("certify", cspec, "-o", srec_out)
         p_c = run("construct", cspec, "--static-receipt", srec_out, "-o", crec_out)
         p_v = run("verify", crec_out, "--static-receipt", srec_out)
-        check("cli tagged construction spec + construct + verify exits 0",
+        p_b = run("basis", cspec, "--method", "spectral", "-o", brec_out)
+        p_vb = run("verify", brec_out, "--code", cspec)
+        check("cli tagged construction + construct + spectral basis + verify exits 0",
               p_s.returncode == 0 and p_c.returncode == 0 and p_v.returncode == 0
-              and "c6860dd462fe" in p_c.stdout, p_c.stderr[-200:] + p_v.stderr[-200:])
+              and p_b.returncode == 0 and p_vb.returncode == 0
+              and "c6860dd462fe" in p_c.stdout, p_b.stderr[-200:] + p_vb.stderr[-200:])
         for ex in ("steane.receipt.json", "golay.receipt.json"):
             ex_rec = json.load(open(os.path.join(HERE, "examples", ex)))
             check(f"banked example {ex} verifies", bool(certify.verify(ex_rec, full=True)))
@@ -978,6 +1182,7 @@ def main():
         (t_concat, ()),
         (t_hier, ()),
         (t_interchange_and_constructions, ()),
+        (t_basis_and_symmetry, ()),
         (t_sat, (heavy,)),
         (t_cli, ()),
         (t_lean, (lean,)),

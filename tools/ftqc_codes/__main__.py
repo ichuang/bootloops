@@ -2,7 +2,8 @@
 
   certify   SPEC [-o receipt.json] [--legs A,B,C,D,E|none] [--target q=v ...] [--max-combos N]
   construct SPEC [-o construction.receipt.json] [--static-receipt receipt.json]
-  verify    RECEIPT.json [--full] [--static-receipt receipt.json]
+  basis     SPEC [-o basis.receipt.json] [--method binary|candidate|spectral]
+  verify    RECEIPT.json [--full] [--static-receipt receipt.json] [--code SPEC]
   spec      SPEC [-o code.json]          write the code's matrices as JSON
   families                               list family constructors
 SPEC is a code/import/construction JSON file or family[:args], e.g. golay, qr:47, toric:5, bb72, radial90.
@@ -15,7 +16,7 @@ import json
 import os
 import sys
 
-from . import certify, codes, constructions
+from . import basis, certify, codes, constructions, symmetry
 
 
 def _targets(items):
@@ -48,10 +49,15 @@ def main(argv=None):
     cs.add_argument("spec")
     cs.add_argument("-o", "--out")
     cs.add_argument("--static-receipt")
+    bs = sub.add_parser("basis")
+    bs.add_argument("spec")
+    bs.add_argument("-o", "--out")
+    bs.add_argument("--method", choices=("binary", "candidate", "spectral"), default="binary")
     v = sub.add_parser("verify")
     v.add_argument("receipt")
     v.add_argument("--full", action="store_true")
     v.add_argument("--static-receipt")
+    v.add_argument("--code")
     s = sub.add_parser("spec")
     s.add_argument("spec")
     s.add_argument("-o", "--out")
@@ -88,6 +94,34 @@ def main(argv=None):
                     json.dump(crec, f, indent=1)
                     f.write("\n")
             return 0
+        if a.cmd == "basis":
+            code = codes.load(a.spec)
+            if a.method == "binary":
+                brec = basis.derive_paired_basis(code)
+            elif a.method == "candidate":
+                brec = basis.build_basis_receipt(code, source="imported_candidate")
+            else:
+                cmeta = code.meta.get("construction") or {}
+                if cmeta.get("kind") != "lifted_product":
+                    raise certify.Refusal("spectral basis CLI requires a cyclic lifted_product spec")
+                si = cmeta["seed_inputs"]
+                gc = cmeta["generator_convention"]
+                _, brec, _ = symmetry.spectral_abelian_basis(
+                    si["lift"],
+                    si["a_reduced_exponents"],
+                    si["b_reduced_exponents"],
+                    coeff_encoding="exponents",
+                    coordinate_order=gc["coordinate_order"],
+                    name=code.name,
+                )
+            basis.verify_basis_receipt(code, brec)
+            print(f"{code.name}: k={brec['k']} source={brec['source']} "
+                  f"code_sha256={brec['code_sha256'][:12]} basis_sha256={brec['basis_sha256'][:12]}")
+            if a.out:
+                with open(a.out, "w") as f:
+                    json.dump(brec, f, indent=1)
+                    f.write("\n")
+            return 0
         if a.cmd == "verify":
             with open(a.receipt) as f:
                 rec = json.load(f)
@@ -102,6 +136,14 @@ def main(argv=None):
                 m = rec["metrics"]
                 print(f"{rec['payload']['name']}: n={m['n']} k={m['k']} rate={m['rate'][0]}/{m['rate'][1]} "
                       f"ancestry={rec['payload']['ancestry']}")
+                return 0
+            if rec.get("schema") == basis.SCHEMA:
+                if not a.code:
+                    raise codes.SpecError("verifying a basis receipt requires --code SPEC")
+                code = codes.load(a.code)
+                for line in basis.verify_basis_receipt(code, rec):
+                    print("ok  ", line)
+                print(f"{rec['code_name']}: k={rec['k']} basis_sha256={rec['basis_sha256'][:12]}")
                 return 0
             for line in certify.verify(rec, full=a.full):
                 print("ok  ", line)
