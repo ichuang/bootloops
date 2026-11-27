@@ -67,6 +67,9 @@ def evaluate(spec):
     if spec["kind"] == "insitu-retries":
         from .insitu import retries
         return retries(spec)
+    if spec["kind"] == "bb144-rm15":
+        from .bicycle_install import install
+        return install(spec)
     if spec["kind"] == "insitu-rm15":
         from .insitu import factory
         return factory(spec)
