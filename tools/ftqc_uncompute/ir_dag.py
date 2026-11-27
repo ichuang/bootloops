@@ -18,6 +18,7 @@ from .gf2 import GF2Field
 from .ir_kickmix import CircuitBuilder, KickMixCircuit, TOFFOLI_LIKE_OPS
 
 
+LOWERABLE_KINDS = frozenset({"and_gate", "gf2_mul", "qrom_lookup", "int_add", "int_sub", "phase_by_bits"})
 VALID_REG_KINDS = frozenset({"quint", "qgf2", "qmodint", "mask", "classical"})
 VALID_ROLES = frozenset({"input", "output", "io", "scratch", "mask", "classical"})
 VALID_CHIRALITIES = frozenset({"compute", "uncompute", "inplace", "phase", "stream_probe"})

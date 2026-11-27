@@ -1020,11 +1020,9 @@ def apply_dag_rewrites(
     )
 
     if verify_lowered_kmx:
-        concrete_kinds = {"and_gate", "gf2_mul", "qrom_lookup", "int_add", "int_sub", "phase_by_bits"}
-        if all(n.op_kind in concrete_kinds for n in rewritten_dag.nodes):
-            kmx = rewritten_dag.lower_to_kmx()
-            hmr_res = verify_hmr_circuit(kmx)
-            if not hmr_res.valid:
-                raise RuntimeError(f"DAG-REWRITE-VERIFICATION-FAILED: {hmr_res.to_dict()}")
+        kmx = rewritten_dag.lower_to_kmx()
+        hmr_res = verify_hmr_circuit(kmx)
+        if not hmr_res.valid:
+            raise RuntimeError(f"DAG-REWRITE-VERIFICATION-FAILED: {hmr_res.to_dict()}")
 
     return rewritten_dag, applied

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from .hmr import verify_hmr_circuit
-from .ir_dag import ArithDAG
+from .ir_dag import LOWERABLE_KINDS, ArithDAG
 from .ir_kickmix import KickMixCircuit
 from .kickmix_sim import simulate_trajectories
 from .kraus_oracle import verify_channel_kraus
@@ -166,10 +166,10 @@ def build_receipt_for_spec_dict(
         dag = ArithDAG.from_dict(spec)
         costs = dag.estimate_costs()
         sugs = [s.to_dict() for s in suggest_for_dag(dag)]
-        concrete_kinds = {"and_gate", "gf2_mul", "qrom_lookup", "int_add", "int_sub", "phase_by_bits"}
+        unlowered = [n.node_id for n in dag.nodes if n.op_kind not in LOWERABLE_KINDS]
         lowered_hmr: dict[str, Any] | None = None
-        valid = True
-        if all(n.op_kind in concrete_kinds for n in dag.nodes):
+        valid = not unlowered
+        if valid:
             kmx = dag.lower_to_kmx()
             h_res = verify_hmr_circuit(kmx)
             lowered_hmr = h_res.to_dict()
@@ -185,6 +185,7 @@ def build_receipt_for_spec_dict(
             "source_name": source_name,
             "target_sha256": target_hash,
             "verdict": "CERTIFIED" if valid else "REFUSED",
+            **({"unlowered_nodes": unlowered} if unlowered else {}),
             "dag_name": dag.name,
             "estimated_costs": costs,
             "lowered_hmr_verification": lowered_hmr,

@@ -509,6 +509,23 @@ def _regress_injectivity() -> str:
     return "wide nonlinear obligations, affine witnesses and standalone trajectory bounds checked"
 
 
+def _regress_abstract_dag() -> str:
+    from tools.ftqc_uncompute.certify import build_receipt_for_spec_dict
+
+    dag = ArithDAG("abstract", (RegDecl("a", "quint", 3),),
+                   (DAGNode("square", "mod_sqr", ("a",), ("a",)),))
+    receipt = build_receipt_for_spec_dict(dag.to_dict(), raw_bytes=dag.to_json().encode())
+    assert receipt["verdict"] == "REFUSED" and receipt["unlowered_nodes"] == ["square"]
+    assert receipt["lowered_hmr_verification"] is None
+    try:
+        apply_dag_rewrites(dag)
+    except ValueError as exc:
+        assert "square" in str(exc)
+    else:
+        raise AssertionError("claimed verification of an unlowered DAG")
+    return "abstract DAGs retain estimates and identify the unproved node"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
@@ -516,6 +533,7 @@ def run_selftest() -> int:
         ("_regress_receipt_replay", _regress_receipt_replay),
         ("_regress_audit_feedback", _regress_audit_feedback),
         ("_regress_injectivity", _regress_injectivity),
+        ("_regress_abstract_dag", _regress_abstract_dag),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),
