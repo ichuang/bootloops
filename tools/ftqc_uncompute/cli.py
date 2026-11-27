@@ -111,7 +111,7 @@ def _cmd_suggest(ns: argparse.Namespace) -> int:
             if ns.output:
                 Path(ns.output).write_text(rewritten.to_kmx(), encoding="utf-8")
             payload = {
-                "applied": True,
+                "applied": bool(sugs),
                 "before_toffolis": circ.operation_statistics().num_toffoli_like,
                 "after_toffolis": rewritten.operation_statistics().num_toffoli_like,
                 "before_qubits": circ.num_qubits,
@@ -130,7 +130,7 @@ def _cmd_suggest(ns: argparse.Namespace) -> int:
         if ns.output:
             Path(ns.output).write_text(rew_dag.to_json() + "\n", encoding="utf-8")
         payload = {
-            "applied": True,
+            "applied": bool(sugs),
             "before_costs": dag.estimate_costs(),
             "after_costs": rew_dag.estimate_costs(),
             "suggestions": [s.to_dict() for s in sugs],

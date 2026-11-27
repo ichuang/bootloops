@@ -263,7 +263,7 @@ def _symbolic_verify_ops(
     allow_branch_global_phase: bool,
     check_scratch_clean: bool,
     max_monomials: int,
-) -> HMRVerificationResult:
+) -> tuple[HMRVerificationResult, tuple[ANF, ...], PhasePoly]:
     num_x = len(pub_qids)
     total_hmr = sum(1 for op in ops if op.kind == "HMR")
 
@@ -471,7 +471,7 @@ def _symbolic_verify_ops(
         and phase_cancelled
     )
 
-    return HMRVerificationResult(
+    result = HMRVerificationResult(
         valid=is_valid,
         branch_injective=branch_injective,
         dirty_reset_free=dirty_reset_free,
@@ -485,6 +485,25 @@ def _symbolic_verify_ops(
         output_degree_max=out_deg_max,
         findings=tuple(findings),
     )
+
+
+    return result, tuple(q_anf[q] for q in pub_qids), phase_poly
+
+
+def verified_quantum_action(circuit: KickMixCircuit) -> tuple[tuple[ANF, ...], PhasePoly]:
+    """Return a proven outcome-independent basis map and phase on ordered public wires."""
+    if any(r.kind == "b" for r in circuit.registers):
+        raise ValueError("Rewrite equivalence with public classical outputs is unsupported")
+    try:
+        result, outputs, phase = _symbolic_verify_ops(
+            circuit.ops, tuple(sorted(circuit.public_qubits())), circuit.num_qubits, circuit.num_bits,
+            allow_branch_global_phase=False, check_scratch_clean=True, max_monomials=8192,
+        )
+    except _SymbolicOverflow as exc:
+        raise ValueError("Rewrite equivalence exceeded the symbolic budget") from exc
+    if not result.valid:
+        raise ValueError(f"Unproved rewrite action: {result.to_dict()}")
+    return outputs, phase
 
 
 def verify_hmr_circuit(
@@ -515,7 +534,7 @@ def verify_hmr_circuit(
             allow_branch_global_phase=allow_branch_global_phase,
             check_scratch_clean=check_scratch_clean,
             max_monomials=max_monomials,
-        )
+        )[0]
     except _SymbolicOverflow:
         return HMRVerificationResult(
             valid=False, branch_injective=False, dirty_reset_free=False,

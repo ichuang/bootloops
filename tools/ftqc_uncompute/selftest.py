@@ -544,6 +544,21 @@ def _regress_public_wires() -> str:
     return "implicit public wires and classical-only registers agree across engines"
 
 
+def _regress_rewrite_action() -> str:
+    from tools.ftqc_uncompute.hmr import verified_quantum_action
+
+    ops = ['REGISTER r0 "x"', "APPEND_TO_REGISTER q0 r0", "APPEND_TO_REGISTER q1 r0",
+           "BIT_STORE0 b0", "X q0 if b0", "CCX q0 q1 q2", "Z q2", "CCX q0 q1 q2"]
+    source = KickMixCircuit.from_kmx("\n".join(ops))
+    rewritten, applied = apply_kmx_rewrites(source)
+    assert applied and verified_quantum_action(source) == verified_quantum_action(rewritten)
+    for suffix in ("X q0", "Z q1"):
+        changed = KickMixCircuit.from_kmx(rewritten.to_kmx() + suffix)
+        assert verify_hmr_circuit(changed).valid
+        assert verified_quantum_action(changed) != verified_quantum_action(source)
+    return "verified rewrites preserve the complete public basis map and phase"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
@@ -553,6 +568,7 @@ def run_selftest() -> int:
         ("_regress_injectivity", _regress_injectivity),
         ("_regress_abstract_dag", _regress_abstract_dag),
         ("_regress_public_wires", _regress_public_wires),
+        ("_regress_rewrite_action", _regress_rewrite_action),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),

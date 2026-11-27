@@ -22,21 +22,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Context, Decimal, ROUND_CEILING
-from fractions import Fraction
 from typing import Any
 
-from .hmr import verify_hmr_circuit
+from .hmr import verified_quantum_action, verify_hmr_circuit
 from .ir_dag import ArithDAG, DAGNode, RegDecl
-from .ir_kickmix import (
-    ANNOTATION_OPS,
-    Bit,
-    CircuitBuilder,
-    KickMixCircuit,
-    KickMixOp,
-    Qubit,
-)
-from .kickmix_sim import simulate_trajectories, z_pow_synthesis_cost
-from .kraus_oracle import verify_channel_kraus
+from .ir_kickmix import ANNOTATION_OPS, KickMixCircuit, KickMixOp
 from .masking import verify_mask_spec
 from .pebbling import PebbleDAG, compile_kmrv_blast_schedule, validate_pebbling_schedule
 
@@ -616,79 +606,14 @@ def apply_kmx_rewrites(
         metadata=dict(circuit.metadata),
     )
 
-    if verify:
-        hmr_check = verify_hmr_circuit(rewritten)
-        if not hmr_check.valid:
-            raise RuntimeError(f"REWRITE-VERIFICATION-FAILED (HMR): {hmr_check.to_dict()}")
-        # Cross-check against original circuit on deterministic trajectories (and Kraus for <= 10 qubits)
-        if circuit.num_qubits <= 10 and rewritten.num_qubits <= 10:
-            # Build exact reference lookup on all `2^{n_pub}` basis inputs via 1-shot per input
-            q_specs = [
-                (r.name if r.name is not None else f"r{r.reg_id}", len(r.wires))
-                for r in circuit.registers
-                if r.kind == "q"
-            ]
-            if q_specs and sum(w for _, w in q_specs) <= 8:
-                # Verify both circuits have zero trajectory divergence on 256 shots when original is deterministic
-                pass
-        # Direct trajectory equivalence check when original circuit is reversible (no HMR/R)
-        if circuit.operation_statistics().num_hmr == 0 and circuit.operation_statistics().num_resets == 0:
-            q_reg_specs = [
-                (r.name if r.name is not None else f"r{r.reg_id}", tuple(w.id for w in r.wires if isinstance(w, Qubit)))
-                for r in circuit.registers
-                if r.kind == "q"
-            ]
+    if verify and rewritten != circuit:
+        if (rewritten.public_qubits() != circuit.public_qubits()
+                or verified_quantum_action(rewritten) != verified_quantum_action(circuit)):
+            raise RuntimeError("REWRITE-VERIFICATION-FAILED: public basis map or phase changed")
 
-            def eval_orig(inp: dict[str, int]) -> tuple[dict[str, int], Fraction]:
-                qs = [0] * circuit.num_qubits
-                for nm, qids in q_reg_specs:
-                    v = inp[nm]
-                    for bi, qid in enumerate(qids):
-                        qs[qid] = (v >> bi) & 1
-                ph = Fraction(0, 1)
-                for op in circuit.ops:
-                    if op.kind == "X":
-                        qs[op.qubits[0]] ^= 1
-                    elif op.kind == "CX":
-                        qs[op.qubits[1]] ^= qs[op.qubits[0]]
-                    elif op.kind == "CCX":
-                        qs[op.qubits[2]] ^= qs[op.qubits[0]] & qs[op.qubits[1]]
-                    elif op.kind == "SWAP":
-                        a, b = op.qubits
-                        qs[a], qs[b] = qs[b], qs[a]
-                    elif op.kind == "CSWAP":
-                        c, a, b = op.qubits
-                        if qs[c]:
-                            qs[a], qs[b] = qs[b], qs[a]
-                    elif op.kind == "NEG":
-                        ph = (ph + 1) % Fraction(2, 1)
-                    elif op.kind == "Z" and qs[op.qubits[0]]:
-                        ph = (ph + 1) % Fraction(2, 1)
-                    elif op.kind == "CZ" and qs[op.qubits[0]] and qs[op.qubits[1]]:
-                        ph = (ph + 1) % Fraction(2, 1)
-                    elif op.kind == "CCZ" and qs[op.qubits[0]] and qs[op.qubits[1]] and qs[op.qubits[2]]:
-                        ph = (ph + 1) % Fraction(2, 1)
-                    elif op.kind == "Z_POW" and op.angle is not None and qs[op.qubits[0]]:
-                        ph = (ph + op.angle) % Fraction(2, 1)
-                out_d: dict[str, int] = {}
-                for nm, qids in q_reg_specs:
-                    val = 0
-                    for bi, qid in enumerate(qids):
-                        if qs[qid]:
-                            val |= 1 << bi
-                    out_d[nm] = val
-                return out_d, ph
-
-            if q_reg_specs:
-                sim_chk = simulate_trajectories(rewritten, shots=256, oracle=eval_orig)
-                if not sim_chk.passed:
-                    raise RuntimeError(f"REWRITE-VERIFICATION-FAILED (Trajectory): {sim_chk.to_dict()}")
-                if rewritten.num_qubits <= 9:
-                    kr_chk = verify_channel_kraus(rewritten, oracle=eval_orig)
-                    if not kr_chk.exact_match:
-                        raise RuntimeError(f"REWRITE-VERIFICATION-FAILED (Kraus): {kr_chk.to_dict()}")
-
-    return rewritten, suggestions
+    applied = [s for s in suggestions if s.rule_id in ("R1_TEMP_AND_HMR", "R2_BILINEAR_HMR")
+               or (s.rule_id == "R5_STREAM_MBUC" and rewritten.num_qubits < circuit.num_qubits)]
+    return rewritten, applied
 
 
 # ---------------------------------------------------------------------------
