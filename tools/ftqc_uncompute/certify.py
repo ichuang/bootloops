@@ -46,7 +46,16 @@ def parse_strict_json(text: str) -> dict[str, Any]:
             f"Floating-point literal {token!r} forbidden in certified JSON; encode rationals/Decimals as strings",
         )
 
-    obj = json.loads(text, parse_float=_reject_float)
+    def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ReceiptRefusalError("DUPLICATE-KEY", key)
+            result[key] = value
+        return result
+
+    obj = json.loads(text, parse_float=_reject_float, parse_constant=_reject_float,
+                     object_pairs_hook=unique_object)
     if not isinstance(obj, dict):
         raise ReceiptRefusalError("INVALID-RECEIPT-ROOT", "Receipt root must be a JSON object")
     return obj
@@ -125,6 +134,7 @@ def build_receipt_for_kmx(
     return {
         "schema": RECEIPT_SCHEMA,
         "target_kind": "kmx_circuit",
+        "verification_options": {"shots": shots, "salt": salt, "run_kraus": do_kraus},
         "source_name": source_name,
         "target_sha256": circuit.sha256(),
         "verdict": verdict,
@@ -258,51 +268,42 @@ def verify_receipt_file(
         errors.append(f"INVALID-VERDICT: {verdict!r}")
         return False, errors
 
-    # Check string-typed Decimal bounds inside receipt cannot be malformed
-    traj = receipt.get("fiat_shamir_trajectories")
-    if isinstance(traj, dict):
-        eps_s = traj.get("epsilon_upper")
-        if not isinstance(eps_s, str):
-            errors.append("NON-STRING-DECIMAL: epsilon_upper must be encoded as a string")
-        else:
-            eps_d = Decimal(eps_s)
-            if not (Decimal(0) <= eps_d <= Decimal(1)):
-                errors.append(f"OUT-OF-RANGE-EPSILON: {eps_s}")
-
-    # Re-execute against target file if provided (or resolved relative to receipt/cwd)
-    resolved_target: Path | None = None
-    if target_path is not None:
-        resolved_target = Path(target_path)
+    source = receipt.get("source_name")
+    if not isinstance(source, str):
+        return False, ["MISSING-SOURCE-NAME"]
+    candidates = [Path(target_path)] if target_path is not None else [Path(source), rpath.parent / source]
+    target = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if target is None:
+        return False, ["TARGET-REQUIRED: supply the original input with --target"]
+    raw = target.read_bytes()
+    if receipt.get("target_kind") == "kmx_circuit":
+        circuit = KickMixCircuit.from_kmx(raw.decode("utf-8"))
+        if circuit.sha256() != receipt.get("target_sha256"):
+            return False, ["TARGET-HASH-MISMATCH"]
+        legacy = "verification_options" not in receipt
+        options = receipt.get("verification_options")
+        if legacy:
+            trajectory = receipt.get("fiat_shamir_trajectories")
+            if not isinstance(trajectory, dict):
+                return False, ["MISSING-TRAJECTORIES"]
+            options = {"shots": trajectory.get("shots"), "salt": "ftqc_uncompute-fs-v1",
+                       "run_kraus": receipt.get("kraus_verification") is not None}
+        if (not isinstance(options, dict) or set(options) != {"shots", "salt", "run_kraus"}
+                or type(options["shots"]) is not int or options["shots"] < 1
+                or not isinstance(options["salt"], str) or type(options["run_kraus"]) is not bool):
+            return False, ["INVALID-VERIFICATION-OPTIONS"]
+        rebuilt = build_receipt_for_kmx(circuit, source_name=source, **options)
+        if legacy:
+            del rebuilt["verification_options"]
     else:
-        src_nm = receipt.get("source_name", "")
-        if src_nm and not src_nm.startswith("<"):
-            cand = Path(src_nm)
-            if cand.exists():
-                resolved_target = cand
-            elif (rpath.parent / src_nm).exists():
-                resolved_target = rpath.parent / src_nm
+        if _sha256_bytes(raw) != receipt.get("target_sha256"):
+            return False, ["TARGET-HASH-MISMATCH"]
+        rebuilt = build_receipt_for_spec_dict(parse_strict_json(raw.decode("utf-8")),
+                                              raw_bytes=raw, source_name=source)
 
-    if resolved_target is not None:
-        tkind = receipt.get("target_kind")
-        if tkind == "kmx_circuit":
-            circ = KickMixCircuit.from_kmx(resolved_target.read_text(encoding="utf-8"))
-            if circ.sha256() != receipt.get("target_sha256"):
-                errors.append(
-                    f"TARGET-HASH-MISMATCH: expected {receipt.get('target_sha256')}, got {circ.sha256()}"
-                )
-            shots = int(traj.get("shots", 512)) if isinstance(traj, dict) else 512
-            rebuilt = build_receipt_for_kmx(circ, source_name=str(resolved_target), shots=shots)
-            if rebuilt["verdict"] != verdict:
-                errors.append(f"VERDICT-MISMATCH: receipt claims {verdict}, re-audit got {rebuilt['verdict']}")
-            if isinstance(traj, dict) and rebuilt["fiat_shamir_trajectories"]["fiat_shamir_seed_hex"] != traj.get("fiat_shamir_seed_hex"):
-                errors.append("FIAT-SHAMIR-SEED-MISMATCH")
-        else:
-            raw_b = resolved_target.read_bytes()
-            if _sha256_bytes(raw_b) != receipt.get("target_sha256"):
-                errors.append("TARGET-HASH-MISMATCH")
-            spec_obj = parse_strict_json(raw_b.decode("utf-8"))
-            rebuilt = build_receipt_for_spec_dict(spec_obj, raw_bytes=raw_b, source_name=str(resolved_target))
-            if rebuilt["verdict"] != verdict:
-                errors.append(f"VERDICT-MISMATCH: receipt claims {verdict}, re-audit got {rebuilt['verdict']}")
-
-    return (len(errors) == 0 and verdict == "CERTIFIED"), errors
+    # Canonical JSON distinguishes booleans from integers and ignores object key order.
+    for key in sorted(set(receipt) | set(rebuilt)):
+        if (key not in receipt or key not in rebuilt or
+                json.dumps(receipt[key], sort_keys=True) != json.dumps(rebuilt[key], sort_keys=True)):
+            errors.append(f"EVIDENCE-MISMATCH: {key}")
+    return not errors and verdict == "CERTIFIED", errors

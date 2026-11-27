@@ -433,10 +433,47 @@ def _regress_global_budget() -> str:
     return "identity padding cannot certify a missing phase fixup"
 
 
+def _regress_receipt_replay() -> str:
+    import json
+
+    with tempfile.TemporaryDirectory() as tmp:
+        directory = Path(tmp)
+        target = directory / "relocated.kmx"
+        target.write_text("X q0\nX q0\n")
+        path = directory / "receipt.json"
+        path.write_text(json.dumps({"schema": "ftqc_uncompute-receipt-1", "verdict": "CERTIFIED"}))
+        assert not verify_receipt_file(path)[0]
+        circuit = KickMixCircuit.from_kmx(target.read_text())
+        receipt = build_receipt_for_kmx(circuit, source_name="<memory>", shots=7,
+                                        salt="custom", run_kraus=False)
+        path.write_text(json.dumps(receipt))
+        assert not verify_receipt_file(path)[0]
+        assert verify_receipt_file(path, target_path=target) == (True, [])
+        for section, key, value in (("hmr_verification", "phase_cancelled", False),
+                                    ("summary", "num_qubits", True),
+                                    ("fiat_shamir_trajectories", "epsilon_upper", "0")):
+            edited = dict(receipt)
+            edited[section] = {**receipt[section], key: value}
+            path.write_text(json.dumps(edited))
+            assert not verify_receipt_file(path, target_path=target)[0]
+        legacy = build_receipt_for_kmx(circuit, shots=9)
+        del legacy["verification_options"]
+        path.write_text(json.dumps(legacy))
+        assert verify_receipt_file(path, target_path=target) == (True, [])
+        for malformed in ('{"x":1,"x":2}', '{"x":Infinity}', '{"x":NaN}'):
+            try:
+                parse_strict_json(malformed)
+            except ReceiptRefusalError:
+                continue
+            raise AssertionError(malformed)
+    return "source binding, replay options, strict JSON and evidence checked"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
         ("_regress_global_budget", _regress_global_budget),
+        ("_regress_receipt_replay", _regress_receipt_replay),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),
