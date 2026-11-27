@@ -16,6 +16,8 @@ import hashlib
 import math
 from typing import Any, Callable
 
+from .decimal_bounds import sqrt_upper
+
 from .ir_kickmix import (
     ANNOTATION_OPS,
     KickMixCircuit,
@@ -132,10 +134,10 @@ def clopper_pearson_upper_bound(
         if p_cand > Decimal(1):
             p_cand = Decimal(1)
         if _binom_cdf_upper(0, trials, p_cand, ctx_ceil) <= delta_lo:
-            return +ctx_out.create_decimal(p_cand)
+            return ctx_out.create_decimal(p_cand)
 
     # Certified bisection on [0, 1] using outward-rounded `_binom_cdf_upper`.
-    lo = Decimal(failures) / Decimal(trials) if failures > 0 else Decimal(0)
+    lo = ctx_floor.divide(Decimal(failures), Decimal(trials)) if failures > 0 else Decimal(0)
     hi = Decimal(1)
     steps = max(120, decimal_digits * 4)
     half = Decimal("0.5")
@@ -147,7 +149,7 @@ def clopper_pearson_upper_bound(
             hi = mid
         else:
             lo = mid
-    return +ctx_out.create_decimal(hi)
+    return ctx_out.create_decimal(hi)
 
 
 def coherent_trace_distance_bound(
@@ -173,13 +175,13 @@ def coherent_trace_distance_bound(
     if tau < Decimal(0):
         raise ValueError("phase_tol_turns must be >= 0")
 
-    root_eps = ctx_ceil.sqrt(epsilon_upper)
+    root_eps = sqrt_upper(epsilon_upper, ctx_ceil)
     term1 = ctx_ceil.multiply(Decimal(2), root_eps)
     term2 = ctx_ceil.multiply(ctx_ceil.multiply(Decimal(2), PI_UPPER), tau)
     bound = ctx_ceil.add(term1, term2)
     if bound >= Decimal(1):
         return Decimal(1)
-    return +ctx_out.create_decimal(bound)
+    return ctx_out.create_decimal(bound)
 
 
 def z_pow_synthesis_cost(
@@ -229,7 +231,7 @@ def dqi_repetition_factor(epsilon_upper: Decimal, decimal_digits: int = 18) -> D
     denom = ctx_floor.multiply(one_minus, one_minus)
     if denom <= Decimal(0):
         return None
-    return +ctx_ceil.divide(Decimal(1), denom)
+    return ctx_ceil.divide(Decimal(1), denom)
 
 
 def _min_circular_half_turn_diff(a: Fraction, b: Fraction) -> Fraction:

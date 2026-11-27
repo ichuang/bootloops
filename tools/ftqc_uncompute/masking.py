@@ -23,6 +23,8 @@ import math
 from typing import Any, Sequence
 
 
+from .decimal_bounds import sqrt_upper
+
 VALID_MASK_KINDS = frozenset({
     "mult_mod_n",      # |M_N> = (1/sqrt(phi(N))) sum_{gcd(r,N)=1} |r>
     "uniform_mod_n",   # |R_N> = (1/sqrt(N)) sum_{r=0}^{N-1} |r>  (approxs |M_N> without knowing phi(N))
@@ -117,7 +119,7 @@ def uniform_residue_mask_bound(
         one_minus_hi = ctx_ceil.divide(Decimal(modulus - phi_exact), Decimal(modulus))
         method = "exact_totient"
 
-    single_dtr = ctx_ceil.sqrt(one_minus_hi)
+    single_dtr = sqrt_upper(one_minus_hi, ctx_ceil)
     total_dtv = ctx_ceil.multiply(Decimal(runs), single_dtr)
     if total_dtv > Decimal(1):
         total_dtv = Decimal(1)
@@ -126,9 +128,9 @@ def uniform_residue_mask_bound(
         "modulus": modulus,
         "phi_n": phi_exact,
         "method": method,
-        "single_mask_trace_distance_upper": str(+ctx_out.create_decimal(single_dtr)),
+        "single_mask_trace_distance_upper": str(ctx_out.create_decimal(single_dtr)),
         "runs": runs,
-        "total_tv_distance_upper": str(+ctx_out.create_decimal(total_dtv)),
+        "total_tv_distance_upper": str(ctx_out.create_decimal(total_dtv)),
     }
 
 
@@ -177,7 +179,7 @@ def carry_runway_mask_bound(
     overlap_lo = ctx_floor.divide(Decimal(two_w - max_added_delta), Decimal(two_w))
     ov_sq_lo = ctx_floor.multiply(overlap_lo, overlap_lo)
     one_minus_hi = ctx_ceil.subtract(Decimal(1), ov_sq_lo)
-    single_hi = ctx_ceil.sqrt(one_minus_hi)
+    single_hi = sqrt_upper(one_minus_hi, ctx_ceil)
     tot_hi = ctx_ceil.multiply(Decimal(num_additions), single_hi)
     if tot_hi > Decimal(1):
         tot_hi = Decimal(1)
@@ -186,8 +188,8 @@ def carry_runway_mask_bound(
         "runway_bits": runway_bits,
         "max_added_delta": max_added_delta,
         "num_additions": num_additions,
-        "single_step_trace_distance_upper": str(+ctx_out.create_decimal(single_hi)),
-        "total_trace_distance_upper": str(+ctx_out.create_decimal(tot_hi)),
+        "single_step_trace_distance_upper": str(ctx_out.create_decimal(single_hi)),
+        "total_trace_distance_upper": str(ctx_out.create_decimal(tot_hi)),
     }
 
 

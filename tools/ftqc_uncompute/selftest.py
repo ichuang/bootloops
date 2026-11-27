@@ -586,6 +586,22 @@ def _regress_pricing() -> str:
     raise AssertionError("refused ZX contract used for savings")
 
 
+def _regress_directed_bounds() -> str:
+    from decimal import Context, localcontext
+    from tools.ftqc_uncompute.decimal_bounds import sqrt_upper
+    from tools.ftqc_uncompute.kickmix_sim import coherent_trace_distance_bound
+
+    with localcontext() as ctx:
+        ctx.prec = 2
+        eps = clopper_pearson_upper_bound(0, 4096)
+        assert (1 - Fraction(eps)) ** 4096 <= Fraction(1, 1 << 128)
+        assert Fraction(coherent_trace_distance_bound(Decimal("0.012"))) ** 2 >= Fraction(48, 1000)
+        mask = uniform_residue_mask_bound(15)
+        assert Fraction(mask["single_mask_trace_distance_upper"]) ** 2 >= Fraction(7, 15)
+        assert sqrt_upper(Decimal(2), Context(prec=2)) == Decimal("1.5")
+    return "reported confidence and distance endpoints enclose exact rational inequalities"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
@@ -597,6 +613,7 @@ def run_selftest() -> int:
         ("_regress_public_wires", _regress_public_wires),
         ("_regress_rewrite_action", _regress_rewrite_action),
         ("_regress_pricing", _regress_pricing),
+        ("_regress_directed_bounds", _regress_directed_bounds),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),
