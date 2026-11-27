@@ -107,3 +107,7 @@ From BootLoops, run the seven registered suites together. Install Stim and put C
 ```sh
 python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute
 ```
+
+## Supply states from inside a CSS memory
+
+The simultaneous injection checker verifies a fresh CSS source from the signed logical action on its carriers. Its BB144 and HGP225 inputs include the circuit-specific first-round selection mask. Four closed Y probes use native fault propagation, Stim cross-checks and optional BP+OSD sampling. The two-state S consumer conditions a joint error distribution on batch acceptance. A T consumption study requires suitable evidence for a T source. [Injection study and replay commands](ftqc_extractors/INJECTION.md) · [Exact batch contract](ftqc_compose/GUIDE.md#simultaneous-y-source-and-ideal-consumers)

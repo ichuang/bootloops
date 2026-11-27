@@ -45,3 +45,5 @@ The default exact backend and receipt replay run with the packages in this check
 The 12 port checks of the unprimed Z setting select one logical observable of the [[144,12,12]] bivariate bicycle memory. ftqc_extractors exports the ideal measurements, split-frame rule and merged CSS checks. The distance receipt proves that the resulting [[162,11,12]] code preserves distance 12 in both Pauli sectors. Its four lower bounds and four weight-12 witnesses can be replayed without an external solver. [Run the gross-code example](GROSS.md)
 
 With noisy syndrome extraction, the seven-round schedule has exact circuit distance 7 and the twelve-round schedule has exact distance 10. ftqc_extractors exports both CSS probes to ftqc_audit and verifies the lower bounds and matching physical faults. [Noisy schedule and replay instructions](GROSS_CIRCUIT.md)
+
+The [simultaneous injection study](INJECTION.md) constructs general CSS carrier Cliffords, checks selected Bell-pair preparations, and audits logical-Y source batches in the BB144 and HGP225 memories. [Injection example](examples/bb144-injection-4.json)
