@@ -108,6 +108,9 @@ class DistanceCertificate:
     lrat_info: dict[str, Any] | None = None
 
 
+_DISTANCE_MITM_CACHE: dict[tuple[Any, ...], DistanceCertificate] = {}
+
+
 @dataclass(frozen=True)
 class BinaryFactory:
     """Unified N x n binary magic-state factory G = (P; S) with k outputs and r checks."""
@@ -362,6 +365,9 @@ class BinaryFactory:
         leading harmful fault-set count A_d, and a replayable witness F*.
         When CaDiCaL is installed and `use_sat_if_available=True`, cross-certifies d via SAT+LRAT!
         """
+        cache_key = (self.k, self.r, self.n, self.output_rows, self.check_rows, max_exact_weight)
+        if not use_sat_if_available and cache_key in _DISTANCE_MITM_CACHE:
+            return _DISTANCE_MITM_CACHE[cache_key]
         syndromes = [self.column_syndrome(m) for m in range(self.n)]
         labels = [self.column_label(m) for m in range(self.n)]
 
@@ -494,7 +500,10 @@ class BinaryFactory:
                 {"checked_up_to": cap},
             )
         method = "exact_mitm+cadical_lrat" if lrat_info is not None else "exact_mitm"
-        return DistanceCertificate(found_d, found_count, found_witness, method, lrat_info)
+        cert = DistanceCertificate(found_d, found_count, found_witness, method, lrat_info)
+        if not use_sat_if_available:
+            _DISTANCE_MITM_CACHE[cache_key] = cert
+        return cert
 
     def exact_error_polynomials_dp(self) -> dict[str, Any]:
         """Exact all-orders dynamic programming over (syndrome, output_label) when r + k <= 16,
@@ -581,7 +590,8 @@ class BinaryFactory:
         one_minus_p = Fraction(1) - pf
 
         joint_z_prob: dict[int, Fraction] = {}
-        if (self.r + self.k) <= 14:
+        p_bits = max(pf.numerator.bit_length(), pf.denominator.bit_length())
+        if (self.r + self.k) <= 10 or ((self.r + self.k) <= 13 and p_bits <= 32):
             # Exact O(n * 2^(r+k)) rational DP at pf — zero truncation even for n = 200!
             dp: dict[int, Fraction] = {0: Fraction(1)}
             for m in range(self.n):
@@ -672,6 +682,43 @@ class BinaryFactory:
             },
             "optimality": lb_info,
         }
+
+    def to_source_contract(
+        self,
+        p: Fraction | str | int,
+        *,
+        mode: str = "postselect",
+        active_qubits_override: int | None = None,
+        use_sat_if_available: bool = False,
+    ) -> MagicSourceContract:
+        """Convenience wrapper returning `MagicSourceContract` with optional recycled qubit footprint."""
+        ec_mode = mode.strip().lower() in ("correct", "correcting", "ec")
+        dcert = None if ec_mode else self.certify_distance(use_sat_if_available=use_sat_if_available)
+        base_c, rep = self.evaluate_at_p(p, distance_cert=dcert, error_correcting_z=ec_mode)
+        aq = active_qubits_override if active_qubits_override is not None else base_c.active_qubits
+        raw_ticks = Fraction(self.n * aq)
+        exp_ticks = (raw_ticks / base_c.acceptance_lower) if base_c.acceptance_lower > 0 else raw_ticks
+        meta = {**dict(base_c.metadata), "algebraic": rep.get("algebraic")}
+        return MagicSourceContract(
+            name=base_c.name,
+            target=base_c.target,
+            n_inputs=base_c.n_inputs,
+            k_outputs=base_c.k_outputs,
+            distance=base_c.distance,
+            active_qubits=aq,
+            total_wires=base_c.total_wires,
+            correlation_mode=base_c.correlation_mode,
+            input_error_rate=base_c.input_error_rate,
+            acceptance_lower=base_c.acceptance_lower,
+            conditional_infidelity_upper=base_c.conditional_infidelity_upper,
+            unnormalized_failure_upper=base_c.unnormalized_failure_upper,
+            expected_wire_ticks_per_batch_upper=exp_ticks,
+            leading_order_coeff=base_c.leading_order_coeff,
+            joint_z_error_upper=base_c.joint_z_error_upper,
+            optimality_lower_bound_n=base_c.optimality_lower_bound_n,
+            premises=base_c.premises,
+            metadata=meta,
+        )
 
     def _evaluate_correcting_css_at_p(
         self,

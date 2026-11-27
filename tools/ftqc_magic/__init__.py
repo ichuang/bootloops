@@ -3,7 +3,26 @@
 100% Python standard library, MIT-licensed, zero floating-point literals or float()/complex() calls.
 """
 
+from .bridges import (
+    audit_ppr_check_frame,
+    to_compose_ancilla_contract,
+    to_compose_logical_t_summary,
+    to_extractors_magic_record,
+    to_uncompute_pricing_kwargs,
+    verify_zx_clifford_frame,
+)
+from .caliper import (
+    EscapeMechanism,
+    OpenBoundaryEscapeDEM,
+    adaptive_escape_spacetime_volume,
+    build_surface_escape_dem,
+    caliper_worst_case_gap,
+    compute_logical_parity_shortest_paths,
+    exact_coset_matching_weights,
+)
 from .catalog import CATALOG_NAMES, get_catalog_factory, list_catalog
+from .certify import SCHEMA, build_receipt, compute_package_source_sha256, verify_receipt
+from .cli import main
 from .cultivate import (
     CliffordTableau,
     analyze_cultivation_double_check,
@@ -40,12 +59,30 @@ from .limits import (
 )
 from .matrix import (
     BinaryFactory,
-    from_borrowed_identity,
     free_row_append,
+    from_borrowed_identity,
     parent_capacity,
     parity_lift,
     puncture_base_code,
     verify_puncture_downward_closure,
+)
+from .pipeline import (
+    LitinskiBlockSpec,
+    apply_catalyzed_ccz_to_2t,
+    apply_phase_catalysis_ladder,
+    build_raw_injection_contract,
+    compose_magic_pipeline,
+    suggest_pipelines,
+    verify_gidney_fowler_c2t_identity,
+)
+from .qldpc_factory import (
+    TricycleCodeSpec,
+    build_qldpc_singleshot_ccz_contract,
+    build_tricycle_code,
+    compute_aod_shuttle_budget,
+    verify_determinant_to_2ccz_collapse,
+    verify_quadcycle_jump_and_singleshot,
+    verify_tricycle_ccz_schedule,
 )
 from .recycle import (
     RecycledSchedule,
@@ -67,28 +104,37 @@ from .search import (
     verify_banked_spatial_nogo,
 )
 
-VERSION = "ftqc_magic-receipt-1"
+VERSION = SCHEMA
 
 __all__ = [
     "CATALOG_NAMES",
     "CliffordTableau",
+    "CorrelationMode",
+    "EscapeMechanism",
     "GF2Ext",
     "GaloisFactorySpec",
-    "RecycledSchedule",
-    "SpatialSATInstance",
-    "VERSION",
-    "BinaryFactory",
-    "CorrelationMode",
+    "LitinskiBlockSpec",
     "MagicRefusalError",
     "MagicSourceContract",
+    "OpenBoundaryEscapeDEM",
     "PhasePolynomialTarget",
     "PolyQ",
     "QSqrt2",
+    "RecycledSchedule",
+    "SCHEMA",
     "SignedStabilizerFactory",
+    "SpatialSATInstance",
+    "TricycleCodeSpec",
+    "VERSION",
     "ZOmega8",
     "ZSqrt2",
+    "BinaryFactory",
+    "adaptive_escape_spacetime_volume",
     "analytical_lower_bound_n",
     "analyze_cultivation_double_check",
+    "apply_catalyzed_ccz_to_2t",
+    "apply_phase_catalysis_ladder",
+    "audit_ppr_check_frame",
     "build_bgm_3t_to_cs_factory",
     "build_bgm_6t_to_cccz_factory",
     "build_bgm_9t_to_1t_factory",
@@ -99,6 +145,12 @@ __all__ = [
     "build_gprw_64t_2ccz_trace_factory",
     "build_itogawa_short_check_schedule",
     "build_msc3_double_check_schedule",
+    "build_qldpc_singleshot_ccz_contract",
+    "build_raw_injection_contract",
+    "build_receipt",
+    "build_surface_escape_dem",
+    "build_tricycle_code",
+    "caliper_worst_case_gap",
     "canonical_sqrt_t_theoretical_params",
     "canonical_t_theoretical_params",
     "certify_active_qubits_sat",
@@ -106,14 +158,20 @@ __all__ = [
     "colour_code_7_1_3_data",
     "colour_code_t_conditional_fidelity",
     "compare_global_vs_local_concatenation",
+    "compose_magic_pipeline",
+    "compute_aod_shuttle_budget",
+    "compute_logical_parity_shortest_paths",
+    "compute_package_source_sha256",
     "compress_active_qubits",
     "encode_spatial_nogo_cnf",
     "enumerate_jws_symmetry_orbits",
     "evaluate_active_trace",
+    "exact_coset_matching_weights",
     "free_row_append",
     "from_borrowed_identity",
     "get_catalog_factory",
     "list_catalog",
+    "main",
     "minimize_generator_weights",
     "parent_capacity",
     "parity_lift",
@@ -124,7 +182,18 @@ __all__ = [
     "search_symmetric_sn_family",
     "solve_or_verify_spatial_sat",
     "stabilizer_nullity",
+    "suggest_pipelines",
     "three_twirl_ccz_weight_transfer",
+    "to_compose_ancilla_contract",
+    "to_compose_logical_t_summary",
+    "to_extractors_magic_record",
+    "to_uncompute_pricing_kwargs",
     "verify_banked_spatial_nogo",
+    "verify_determinant_to_2ccz_collapse",
+    "verify_gidney_fowler_c2t_identity",
     "verify_puncture_downward_closure",
+    "verify_quadcycle_jump_and_singleshot",
+    "verify_receipt",
+    "verify_tricycle_ccz_schedule",
+    "verify_zx_clifford_frame",
 ]

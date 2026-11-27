@@ -34,6 +34,9 @@ class MagicRefusalError(ValueError):
         self.detail = message
         self.witness = witness or {}
 
+    def to_dict(self) -> dict[str, Any]:
+        return {"error": "MagicRefusalError", "code": self.code, "detail": self.detail, "witness": self.witness}
+
 
 class CorrelationMode(str, Enum):
     """Output error correlation discipline across delivered magic states."""
@@ -371,6 +374,11 @@ class MagicSourceContract:
         return self.expected_wire_ticks_per_batch_upper / self.k_outputs
 
     def to_receipt_summary(self, sig: int = DEFAULT_SIG) -> dict[str, Any]:
+        def _safe_frac_str(q: Fraction, *, upper: bool) -> str:
+            if q.numerator.bit_length() <= 1024 and q.denominator.bit_length() <= 1024:
+                return f"{q.numerator}/{q.denominator}" if q.denominator != 1 else str(q.numerator)
+            return round_up_str(q, sig) if upper else round_down_str(q, sig)
+
         gap = (
             self.n_inputs - self.optimality_lower_bound_n
             if self.optimality_lower_bound_n is not None
@@ -385,14 +393,16 @@ class MagicSourceContract:
             "total_wires": self.total_wires,
             "active_qubits": self.active_qubits,
             "correlation_mode": self.correlation_mode.value,
-            "input_error_rate": str(self.input_error_rate),
-            "acceptance_lower": str(self.acceptance_lower),
+            "input_error_rate": _safe_frac_str(self.input_error_rate, upper=True),
+            "acceptance_lower": _safe_frac_str(self.acceptance_lower, upper=False),
             "acceptance_lower_dec": round_down_str(self.acceptance_lower, sig),
-            "conditional_infidelity_upper": str(self.conditional_infidelity_upper),
+            "conditional_infidelity_upper": _safe_frac_str(self.conditional_infidelity_upper, upper=True),
             "conditional_infidelity_upper_dec": round_up_str(self.conditional_infidelity_upper, sig),
-            "unnormalized_failure_upper": str(self.unnormalized_failure_upper),
+            "unnormalized_failure_upper": _safe_frac_str(self.unnormalized_failure_upper, upper=True),
             "unnormalized_failure_upper_dec": round_up_str(self.unnormalized_failure_upper, sig),
-            "expected_wire_ticks_per_output_upper": str(self.expected_wire_ticks_per_output_upper()),
+            "expected_wire_ticks_per_output_upper": _safe_frac_str(
+                self.expected_wire_ticks_per_output_upper(), upper=True
+            ),
             "expected_wire_ticks_per_output_upper_dec": round_up_str(
                 self.expected_wire_ticks_per_output_upper(), sig
             ),
@@ -401,3 +411,6 @@ class MagicSourceContract:
             "optimality_gap_inputs": gap,
             "premises": list(self.premises),
         }
+
+    def to_dict(self, sig: int = DEFAULT_SIG) -> dict[str, Any]:
+        return self.to_receipt_summary(sig=sig)

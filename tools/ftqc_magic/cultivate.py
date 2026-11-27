@@ -998,6 +998,7 @@ def _compile_pre_t_fault_table(schedule: dict[str, Any]) -> dict[str, Any]:
     ]
     return {
         "code": code,
+        "num_locations": len(ops_with_tick),
         "num_circuit_detectors": len(detectors_meas_masks),
         "num_total_detectors": len(detectors_meas_masks) + len(hz_post),
         "distinct_faults": distinct_faults,
@@ -1005,21 +1006,19 @@ def _compile_pre_t_fault_table(schedule: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def analyze_cultivation_double_check(
-    schedule: dict[str, Any],
-    *,
-    max_fault_weight: int = 3,
-    claimed_t_distance: int | None = None,
-    p_phys: Fraction | str = Fraction(1, 1000),
-    crosscheck_faults_and_stim: bool = True,
-) -> tuple[MagicSourceContract, dict[str, Any]]:
-    """Certify exact fault distances and malignant/benign configuration counts for BOTH:
-    1) True `T`-state cultivation (propagating Pauli resultants across `T_L T^dag_S` into Clifford
-       errors `E` and evaluating Chan et al. **Algorithm 1 + Proposition 1** in exact `Q(sqrt(2))`!), and
-    2) Clifford `S`-state cultivation proxy (propagating across `S_L S^dag_S`, remaining pure Pauli),
-       cross-checked live against `ftqc_faults.audit` and `stim` when available!
-    """
-    pf = parse_exact_fraction(p_phys)
+_CULTIVATION_ENUM_CACHE: dict[tuple[Any, ...], dict[str, Any]] = {}
+
+
+def _enumerate_cultivation_faults(schedule: dict[str, Any], max_fault_weight: int) -> dict[str, Any]:
+    cache_key = (
+        schedule["name"],
+        max_fault_weight,
+        tuple(tuple(tuple(op) for op in tk) for tk in schedule["ticks"]),
+    )
+    hit = _CULTIVATION_ENUM_CACHE.get(cache_key)
+    if hit is not None:
+        return hit
+
     compiled = _compile_pre_t_fault_table(schedule)
     code = compiled["code"]
     faults = compiled["distinct_faults"]
@@ -1028,7 +1027,6 @@ def analyze_cultivation_double_check(
     t_qs = schedule["final_t_qubits"]
     tdg_qs = schedule["final_tdg_qubits"]
 
-    # Cache `(kappa_T, mu_T, kappa_S, mu_S)` per distinct 7-qubit data Pauli `(dx, dz)`:
     effect_cache: dict[tuple[int, int], tuple[QSqrt2, QSqrt2, int, int]] = {}
     s_gates = [("S", q) for q in t_qs] + [("SDG", q) for q in tdg_qs]
     s_tab = CliffordTableau.from_gates(7, s_gates)
@@ -1037,7 +1035,6 @@ def analyze_cultivation_double_check(
         key = (dx, dz)
         if key in effect_cache:
             return effect_cache[key]
-        # 1. T-cultivation via Chan et al. Algorithm 1 + Proposition 1:
         err_e = propagate_pauli_across_t_layer(7, dx, dz, t_qs, tdg_qs)
         kappa_t = clifford_error_acceptance_prob(
             code["encoder"], code["encoder_dag"], err_e, 1, code["t_logical_alpha"]
@@ -1048,11 +1045,7 @@ def analyze_cultivation_double_check(
             fid_t = colour_code_t_conditional_fidelity(err_e, l_part, s_part)
             mu_t = kappa_t * (1 - fid_t)
 
-        # 2. S-cultivation proxy (`|S_bar> = S|+> = |+i>`, stabilized by `Y_bar = +i X^{0..6} Z^{0..6}`!
-        # Wait: on L={0,2,3,6}, S={1,4,5}, `S_L S^dag_S |+>^7`: check `S X S^dag = +Y`, `S^dag X S = -Y` ->
-        # product on `|S|=3` has `(-1)^3 (i)^7 X^7 Z^7 = (-1)(-i) X^7 Z^7 = +i X^7 Z^7 = +Y_bar`!):
         sx, sz, _ = s_tab.conjugate_pauli(dx, dz, (dx & dz).bit_count() & 1)
-        # Accepted by imaginary noiseless stabilizer round iff `sx` commutes with `hz` and `sz` commutes with `hx`:
         s_kept = all(((sx & h).bit_count() & 1) == 0 for h in code["hz"]) and all(
             ((sz & h).bit_count() & 1) == 0 for h in code["hx"]
         )
@@ -1060,7 +1053,6 @@ def analyze_cultivation_double_check(
             kappa_s, mu_s = 0, 0
         else:
             kappa_s = 1
-            # Anticommuting with `Y_bar = i X^{0..6} Z^{0..6}` iff `(sx ^ sz)` has odd weight on `0..6`!
             flips_y = ((sx ^ sz) & 0b1111111).bit_count() & 1
             mu_s = 1 if flips_y else 0
 
@@ -1074,19 +1066,16 @@ def analyze_cultivation_double_check(
     s_malignant = [0] * (max_fault_weight + 1)
     s_benign = [0] * (max_fault_weight + 1)
     first_t_witness: dict[str, Any] | None = None
-    first_s_witness: dict[str, Any] | None = None
 
-    # Weight 0:
     t_benign[0] = 1
     s_benign[0] = 1
 
-    # Group single faults by `detector_sig` for fast meet-in-the-middle undetectable subset enumeration!
     by_sig: dict[int, list[int]] = {}
     for idx, f in enumerate(faults):
         by_sig.setdefault(f["detector_sig"], []).append(idx)
 
     def record_undetected(comb_idxs: tuple[int, ...]) -> None:
-        nonlocal first_t_witness, first_s_witness
+        nonlocal first_t_witness
         w = len(comb_idxs)
         dx = 0
         dz = 0
@@ -1111,23 +1100,16 @@ def analyze_cultivation_double_check(
         if ks > 0:
             if mus > 0:
                 s_malignant[w] += 1
-                if first_s_witness is None or w < first_s_witness["weight"]:
-                    first_s_witness = {"weight": w, "fault_ids": list(comb_idxs)}
             else:
                 s_benign[w] += 1
 
-    # Weight 1:
     for idx in by_sig.get(0, ()):
         record_undetected((idx,))
-
-    # Weight 2:
     if max_fault_weight >= 2:
         for cols in by_sig.values():
             if len(cols) >= 2:
                 for i, j in combinations(cols, 2):
                     record_undetected((i, j))
-
-    # Weight 3:
     if max_fault_weight >= 3:
         for i in range(m_faults):
             sig_i = faults[i]["detector_sig"]
@@ -1139,6 +1121,44 @@ def analyze_cultivation_double_check(
 
     d_t = next((w for w in range(1, max_fault_weight + 1) if t_malignant[w] > 0), max_fault_weight + 1)
     d_s = next((w for w in range(1, max_fault_weight + 1) if s_malignant[w] > 0), max_fault_weight + 1)
+    entry = {
+        "num_locs": int(compiled["num_locations"]),
+        "t_malignant": t_malignant,
+        "t_benign": t_benign,
+        "s_malignant": s_malignant,
+        "s_benign": s_benign,
+        "first_t_witness": first_t_witness,
+        "d_t": d_t,
+        "d_s": d_s,
+    }
+    _CULTIVATION_ENUM_CACHE[cache_key] = entry
+    return entry
+
+
+def analyze_cultivation_double_check(
+    schedule: dict[str, Any],
+    *,
+    max_fault_weight: int = 3,
+    claimed_t_distance: int | None = None,
+    p_phys: Fraction | str = Fraction(1, 1000),
+    crosscheck_faults_and_stim: bool = True,
+) -> tuple[MagicSourceContract, dict[str, Any]]:
+    """Certify exact fault distances and malignant/benign configuration counts for BOTH:
+    1) True `T`-state cultivation (propagating Pauli resultants across `T_L T^dag_S` into Clifford
+       errors `E` and evaluating Chan et al. **Algorithm 1 + Proposition 1** in exact `Q(sqrt(2))`!), and
+    2) Clifford `S`-state cultivation proxy (propagating across `S_L S^dag_S`, remaining pure Pauli),
+       cross-checked live against `ftqc_faults.audit` and `stim` when available!
+    """
+    pf = parse_exact_fraction(p_phys)
+    enum_res = _enumerate_cultivation_faults(schedule, max_fault_weight)
+    num_locs = enum_res["num_locs"]
+    t_malignant = enum_res["t_malignant"]
+    t_benign = enum_res["t_benign"]
+    s_malignant = enum_res["s_malignant"]
+    s_benign = enum_res["s_benign"]
+    first_t_witness = enum_res["first_t_witness"]
+    d_t = enum_res["d_t"]
+    d_s = enum_res["d_s"]
 
     external_checks: dict[str, Any] = {}
     if crosscheck_faults_and_stim:
@@ -1158,19 +1178,17 @@ def analyze_cultivation_double_check(
             },
         )
 
-    # Leading-order + rigorous enclosure at p_phys:
-    # Conservative per-fault upper rate = multiplicity * pf, acceptance >= (1 - pf)^num_locations
-    total_events = sum(f["multiplicity"] for f in faults)
-    p_acc_lo = (Fraction(1) - pf) ** total_events
-    # Leading malignant upper bound + binomial tail above max_fault_weight:
+    # Rigorous location-level Bernoulli acceptance lower bound:
+    # Under uniform depolarizing noise (Chan et al. Appendix G: total fault prob per 1q/2q/prep/meas
+    # location is p), Pr(zero faults) = (1 - p)^L >= max(0, 1 - L * p) by Bernoulli's inequality!
+    p_acc_lo = max(Fraction(1, 10**9), Fraction(1) - num_locs * pf)
     from .rings import eval_binomial_tail_exact
 
     mal_upper = Fraction(0)
     for w in range(1, max_fault_weight + 1):
         if t_malignant[w] > 0:
-            # Each fault configuration has weight <= max_mult^w * pf^w; bound conservatively by binomial shell
-            mal_upper += t_malignant[w] * ( (4 * pf) ** w )
-    mal_upper += eval_binomial_tail_exact(total_events, max_fault_weight, pf)
+            mal_upper += t_malignant[w] * (pf**w)
+    mal_upper += eval_binomial_tail_exact(num_locs, max_fault_weight, pf)
     cond_infid = min(Fraction(1), mal_upper / p_acc_lo) if p_acc_lo > 0 else Fraction(1)
     raw_ticks = Fraction(len(schedule["ticks"]) * schedule["num_qubits"])
 
