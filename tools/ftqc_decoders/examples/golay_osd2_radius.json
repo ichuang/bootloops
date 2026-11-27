@@ -1,0 +1,16 @@
+{
+  "budget_cap": 10000,
+  "decoder": {
+    "algorithm": "bp_osd",
+    "osd_order": 2,
+    "schedule": "serial"
+  },
+  "problem": {
+    "code": "golay",
+    "kind": "css_code",
+    "prior": "1/1000",
+    "sector": "X"
+  },
+  "study": "certify_radius",
+  "target_radius": 2
+}

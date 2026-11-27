@@ -177,9 +177,14 @@ class Analysis:
                                   for p in range(d.npos)])
             eff = None
             if d.rule is not None:
-                if d.rule.get("type") != "hier":
+                rtype = d.rule.get("type")
+                if rtype == "hier":
+                    eff = _HierTable(d.rule, d.checks, per)
+                elif rtype == "ftqc_decoders":
+                    from ftqc_decoders.bridges import GadgetDecoderRuleTable
+                    eff = GadgetDecoderRuleTable(d.rule, d.checks, d.npos, per)
+                else:
                     raise GadgetError(f"decoder {d.name}: unknown rule")
-                eff = _HierTable(d.rule, d.checks, per)
             if tab is not None:
                 eff = {}
                 for s, lead in tab.items():
@@ -191,7 +196,7 @@ class Analysis:
             self.dec_info.append(dict(name=d.name, kind=d.kind, positions=d.npos,
                                       checks=width, syndromes=None if tab is None else len(tab),
                                       unique_through=uniq, table=tab,
-                                      **({"rule": "hierarchical"} if d.rule is not None else {})))
+                                      **({"rule": "hierarchical" if d.rule.get("type") == "hier" else f"ftqc_decoders:{d.rule.get('algorithm', 'bp_osd')}"} if d.rule is not None else {})))
         self._effect_cache = {}
         self._sum_cache = {}
 
