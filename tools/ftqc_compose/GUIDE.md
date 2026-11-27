@@ -137,3 +137,20 @@ The `injection-batch` verifier rebuilds the actual location responses. Within on
 ## Signed surgery instruments
 
 See [the surgery interface and replay examples](../ftqc_gadgets/SURGERY.md) for physical measurement receipts, installed feed-forward schedules and conditional residual laws.
+
+### Magic-backed logical T
+
+Run `python3 -m ftqc_compose check study.json -o proof.json` and replay with
+`verify study.json proof.json`. A `magic-logical-t` study embeds the Magic
+factory spec and strict receipt, an attempt ID, a native extractor gate and
+receipt, and a Gadgets fresh-transfer receipt. Build the latter with
+`magic_handoff.transfer_for(gate, port)`. The port names its block, ordered
+logical X/Z pair, applied input frame and matching correction (I/I or Z/Z).
+The source reader re-evaluates the target phases and exact joint accepted
+Z-mask law. The consumer uses its conditional error once and reports the
+joint accepted failure per original factory attempt. An optional
+`encoded_origin` can forward the same verified encoded output with its ordered
+data wires. The original noisy transfer is charged once. Separate factory,
+transfer and online locations and a resource independent of the logical data,
+reference and later faults are required. A final conditional logical error
+requires a lower bound on the final acceptance probability.

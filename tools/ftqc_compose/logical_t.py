@@ -4,9 +4,9 @@ from fractions import Fraction
 from itertools import product
 from math import comb
 
-from ftqc_codes.gf2 import Echelon, dot
-from ftqc_extractors.__main__ import digest, verify
-from ftqc_extractors.algebra import bits, css_dimension, hgp, seed
+from ftqc_gadgets.magic_transfer import css_encoder, verify_fresh
+from ftqc_extractors.__main__ import verify
+from ftqc_extractors.algebra import hgp, seed
 from ftqc_extractors.magic import branches
 
 from .distill import phase_sum
@@ -14,86 +14,10 @@ from .stochastic import probability, stochastic_result
 from .supports import fields
 
 
-def css_encoder(n, hx, logical_x, logical_z):
-    """Prepare the positive X-check superposition, copy in bX, erase input b."""
-    group = Echelon(hx)
-    pivots = set(group.pivots)
-    ops = [("RX" if q in pivots else "R", q) for q in range(n)]
-    for p, row in zip(group.pivots, group.basis, strict=True):
-        ops.extend(("CX", p, q) for q in bits(row ^ (1 << p)))
-    ops.extend(("CX", n, q) for q in bits(logical_x))
-    ops.extend(("CX", q, n) for q in bits(logical_z))
-    return ops
-
-
 def encoding(gate):
     n, hx, hz = hgp(*seed(gate["a"]), *seed(gate["b"]))
-    k = css_dimension((n, hx, hz))
     x, z = gate["logical_x"], gate["logical_z"]
-    if not dot(x, z) or any(dot(x, h) for h in hz) or any(dot(z, h) for h in hx):
-        raise ValueError("invalid logical encoding port")
-    ops = css_encoder(n, hx, x, z)
-    # Each wire carries a binary linear form in b (bit zero) and the
-    # positive-superposition variables from RX. CX introduces no phases.
-    if (
-        [op[1] for op in ops[:n]] != list(range(n))
-        or any(op[0] not in ("R", "RX") for op in ops[:n])
-        or any(op[0] != "CX" for op in ops[n:])
-    ):
-        raise ValueError("encoder must initialize the memory once, followed by CNOTs")
-    forms = [0] * n + [1]
-    variables = 0
-    for op, *qs in ops:
-        if op == "RX":
-            variables += 1
-            forms[qs[0]] = 1 << variables
-        elif op == "CX":
-            c, t = qs
-            forms[t] ^= forms[c]
-        elif op != "R":
-            raise ValueError("unsupported CSS encoder operation")
-    columns = [
-        sum(((v >> j) & 1) << q for q, v in enumerate(forms[:n]))
-        for j in range(variables + 1)
-    ]
-    span = Echelon(hx)
-    if (
-        forms[n]
-        or columns[0] != x
-        or variables != span.rank
-        or Echelon(columns[1:]).rank != variables
-        or any(c not in span for c in columns[1:])
-    ):
-        raise ValueError(
-            "encoder does not realize the two logical cosets and erase its input"
-        )
-    # A Z fault on the raw input after its first fanout passes
-    # through the remaining erasure CNOTs as the full encoded logical Z.
-    site = next(i for i, op in enumerate(ops) if op[0] == "CX" and op[1] == n)
-    error = 1 << n
-    for _, control, target in ops[site + 1 :]:
-        if error >> target & 1:
-            error ^= 1 << control
-    if error != (1 << n) | z:
-        raise ValueError("encoder logical Z witness failed forward transport")
-    return {
-        "raw_to_gate_accepted_fault_distance": 1,
-        "logical_Z_witness": {
-            "location": site,
-            "op": list(ops[site]),
-            "after": "ZI",
-            "output": "logical Z on resource; Z on discarded zero wire",
-        },
-        "memory_qubits": n,
-        "logical_qubits": k,
-        "logical_x": x,
-        "logical_z": z,
-        "spectators": k - 1,
-        "positive_superposition_rank": variables,
-        "operation_count": len(ops),
-        "operations_sha256": digest(ops),
-        "ideal_map": "deterministic CSS encoding, resource spectators initialized to logical zero in a Z basis commuting with logical X",
-    }
+    return verify_fresh(n, hx, hz, x, z, css_encoder(n, hx, x, z))
 
 
 def instrument(native):
@@ -164,6 +88,10 @@ def logical_t_result(spec):
         raise ValueError("factory has an open output obligation")
     if spec["handoff"] != "fresh-product-css":
         raise ValueError("expected fresh resource and deterministic CSS encoding")
+    return _consume(spec, bound)
+
+
+def _consume(spec, bound, *, locations=None):
     gate, bank = spec["gate"], spec["gate_receipt"]
     if gate["kind"] != "t_gate" or gate["resource"] != "ideal-encoded-T":
         raise ValueError("expected an encoded logical T consumer")
@@ -175,7 +103,7 @@ def logical_t_result(spec):
     checked = instrument(result["ideal_branches"])
     rate, delta = probability(spec["online_p"]), Fraction(bound["upper"])
     encoder_p = probability(spec["encoder_p"])
-    encoder_tail = min(Fraction(1), adapter["operation_count"] * encoder_p)
+    encoder_tail = min(Fraction(1), (adapter["operation_count"] if locations is None else locations) * encoder_p)
     input_delta = min(Fraction(1), delta + encoder_tail)
     cases = {}
     online = {}

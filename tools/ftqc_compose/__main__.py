@@ -52,6 +52,10 @@ def evaluate(spec):
         from .filters import filter_contract_result
 
         return filter_contract_result(spec)
+    if spec["kind"] == "magic-logical-t":
+        from .magic_handoff import consume_t
+
+        return consume_t(spec)
     if spec["kind"] == "distilled-logical-t":
         from .logical_t import logical_t_result
 

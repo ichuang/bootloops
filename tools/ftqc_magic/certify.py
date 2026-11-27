@@ -65,12 +65,12 @@ def _export_bundle(contract: MagicSourceContract) -> dict[str, Any]:
     return exports
 
 
-def build_receipt(
+def evaluate_source(
     spec: Mapping[str, Any],
     *,
     crosscheck_external: bool = False,
-) -> dict[str, Any]:
-    """Build a source-pinned `ftqc_magic-receipt-1` certificate from `spec`."""
+) -> tuple[str, MagicSourceContract, dict, dict | None]:
+    """Evaluate the native producer with exact internal arithmetic."""
     kind = str(spec.get("kind", "pipeline")).strip().lower()
     p_in = parse_exact_fraction(spec.get("p_phys", spec.get("p_input", "1/1000")))
 
@@ -166,6 +166,11 @@ def build_receipt(
     else:
         raise ValueError(f"Unsupported spec kind {kind!r}")
 
+    return kind, contract, details, optimality_gap
+
+
+def build_receipt(spec: Mapping[str, Any], *, crosscheck_external: bool = False) -> dict[str, Any]:
+    kind, contract, details, optimality_gap = evaluate_source(spec, crosscheck_external=crosscheck_external)
     return {
         "schema": SCHEMA,
         "kind": kind,
