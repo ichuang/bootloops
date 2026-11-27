@@ -401,6 +401,81 @@ def _stabilizers_for_output(
     return _StabilizerSubspace((), n_out), _StabilizerSubspace((), n_out), n_out
 
 
+def propagate_single_fault(sched: TickSchedule, output_qubits: tuple[int, ...], target_loc_id: int, fx_qmask: int, fz_qmask: int) -> tuple[int, int, int]:
+    """Raw output Pauli and measurement displacements for a scheduled physical fault."""
+    xm = 0
+    zm = 0
+    meas_bits = 0
+    for tick_locs in sched.tick_ops:
+        for sloc in tick_locs:
+            isf = sloc.loc_id == target_loc_id
+            k = sloc.kind
+            if k in SINGLE_MEAS and isf:
+                xm ^= fx_qmask
+                zm ^= fz_qmask
+            if k in PREP_STATES:
+                q = sloc.qubits[0]
+                xm &= ~(1 << q)
+                zm &= ~(1 << q)
+            elif k == "H":
+                q = sloc.qubits[0]
+                xb, zb = (xm >> q) & 1, (zm >> q) & 1
+                xm = (xm & ~(1 << q)) | (zb << q)
+                zm = (zm & ~(1 << q)) | (xb << q)
+            elif k in ("S", "SDG"):
+                q = sloc.qubits[0]
+                if (xm >> q) & 1:
+                    zm ^= 1 << q
+            elif k == "Z":
+                pass
+            elif k == "X":
+                pass
+            elif k == "Y":
+                pass
+            elif k == "CX":
+                c, t = sloc.qubits
+                if (xm >> c) & 1:
+                    xm ^= 1 << t
+                if (zm >> t) & 1:
+                    zm ^= 1 << c
+            elif k == "CZ":
+                q0, q1 = sloc.qubits
+                if (xm >> q0) & 1:
+                    zm ^= 1 << q1
+                if (xm >> q1) & 1:
+                    zm ^= 1 << q0
+            elif k == "SWAP":
+                q0, q1 = sloc.qubits
+                x0, x1 = (xm >> q0) & 1, (xm >> q1) & 1
+                z0, z1 = (zm >> q0) & 1, (zm >> q1) & 1
+                xm = (xm & ~((1 << q0) | (1 << q1))) | (x1 << q0) | (x0 << q1)
+                zm = (zm & ~((1 << q0) | (1 << q1))) | (z1 << q0) | (z0 << q1)
+            elif k in SINGLE_MEAS:
+                q = sloc.qubits[0]
+                m_idx = sloc.meas_index
+                if k == "MEAS_Z":
+                    bit = (xm >> q) & 1
+                elif k == "MEAS_X":
+                    bit = (zm >> q) & 1
+                else:
+                    bit = ((xm >> q) ^ (zm >> q)) & 1
+                if bit:
+                    meas_bits |= 1 << m_idx
+                xm &= ~(1 << q)
+                zm &= ~(1 << q)
+            if (k not in SINGLE_MEAS) and isf:
+                xm ^= fx_qmask
+                zm ^= fz_qmask
+
+    out_x = 0
+    out_z = 0
+    for o_i, q in enumerate(output_qubits):
+        if (xm >> q) & 1:
+            out_x |= 1 << o_i
+        if (zm >> q) & 1:
+            out_z |= 1 << o_i
+    return out_x, out_z, meas_bits
+
 def build_gadget_contract(
     circuit: CliffordCircuit,
     p_phys: str | Fraction = "1e-4",
@@ -423,7 +498,6 @@ def build_gadget_contract(
 
     sched = schedule_circuit_ticks(circuit)
     n_out = len(circuit.output_qubits)
-    out_pos = {q: idx for idx, q in enumerate(circuit.output_qubits)}
 
     # Default operating mode: state-preparation circuits (`len(input_qubits) == 0`) postselect flags,
     # whereas inline syndrome-refresh circuits (`len(input_qubits) > 0`) run deterministically!
@@ -514,82 +588,6 @@ def build_gadget_contract(
 
     x_stabs, z_stabs, _ = _stabilizers_for_output(circuit, codespace)
 
-    # Helper to propagate a concrete single-location Pauli injection `(loc_id, px_mask, pz_mask)`
-    # across `sched.tick_ops`:
-    def propagate_single_fault(target_loc_id: int, fx_qmask: int, fz_qmask: int) -> tuple[int, int, int]:
-        xm = 0
-        zm = 0
-        meas_bits = 0
-        for tick_locs in sched.tick_ops:
-            for sloc in tick_locs:
-                isf = sloc.loc_id == target_loc_id
-                k = sloc.kind
-                if k in SINGLE_MEAS and isf:
-                    xm ^= fx_qmask
-                    zm ^= fz_qmask
-                if k in PREP_STATES:
-                    q = sloc.qubits[0]
-                    xm &= ~(1 << q)
-                    zm &= ~(1 << q)
-                elif k == "H":
-                    q = sloc.qubits[0]
-                    xb, zb = (xm >> q) & 1, (zm >> q) & 1
-                    xm = (xm & ~(1 << q)) | (zb << q)
-                    zm = (zm & ~(1 << q)) | (xb << q)
-                elif k in ("S", "SDG"):
-                    q = sloc.qubits[0]
-                    if (xm >> q) & 1:
-                        zm ^= 1 << q
-                elif k == "Z":
-                    pass
-                elif k == "X":
-                    pass
-                elif k == "Y":
-                    pass
-                elif k == "CX":
-                    c, t = sloc.qubits
-                    if (xm >> c) & 1:
-                        xm ^= 1 << t
-                    if (zm >> t) & 1:
-                        zm ^= 1 << c
-                elif k == "CZ":
-                    q0, q1 = sloc.qubits
-                    if (xm >> q0) & 1:
-                        zm ^= 1 << q1
-                    if (xm >> q1) & 1:
-                        zm ^= 1 << q0
-                elif k == "SWAP":
-                    q0, q1 = sloc.qubits
-                    x0, x1 = (xm >> q0) & 1, (xm >> q1) & 1
-                    z0, z1 = (zm >> q0) & 1, (zm >> q1) & 1
-                    xm = (xm & ~((1 << q0) | (1 << q1))) | (x1 << q0) | (x0 << q1)
-                    zm = (zm & ~((1 << q0) | (1 << q1))) | (z1 << q0) | (z0 << q1)
-                elif k in SINGLE_MEAS:
-                    q = sloc.qubits[0]
-                    m_idx = sloc.meas_index
-                    if k == "MEAS_Z":
-                        bit = (xm >> q) & 1
-                    elif k == "MEAS_X":
-                        bit = (zm >> q) & 1
-                    else:
-                        bit = ((xm >> q) ^ (zm >> q)) & 1
-                    if bit:
-                        meas_bits |= 1 << m_idx
-                    xm &= ~(1 << q)
-                    zm &= ~(1 << q)
-                if (k not in SINGLE_MEAS) and isf:
-                    xm ^= fx_qmask
-                    zm ^= fz_qmask
-
-        out_x = 0
-        out_z = 0
-        for q, o_i in out_pos.items():
-            if (xm >> q) & 1:
-                out_x |= 1 << o_i
-            if (zm >> q) & 1:
-                out_z |= 1 << o_i
-        return out_x, out_z, meas_bits
-
     # Audit every location and fault label!
     total_labels = 0
     accepted_labels = 0
@@ -651,7 +649,7 @@ def build_gadget_contract(
         z_hits_here = [0] * n_out
 
         for fx_m, fz_m in labels:
-            out_x, out_z, mbits = propagate_single_fault(sloc.loc_id, fx_m, fz_m)
+            out_x, out_z, mbits = propagate_single_fault(sched, circuit.output_qubits, sloc.loc_id, fx_m, fz_m)
             det_fired = any(((chk & mbits).bit_count() & 1) == 1 for chk in det_parity_checks)
 
             if (not det_fired) and mbits != 0 and outcome_frame_pivots:
