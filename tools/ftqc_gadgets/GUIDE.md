@@ -103,6 +103,13 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   leaves consumed. It is tested against sampling and against the formulas written
   out; it credits a check with accepting only when both inputs are clean, so it is
   loose, and for wide blocks with frequent leaf failures it gives nothing.
+  `Tree.profile()` (and `factories.profile(receipt)`, which verifies the receipt first) gives
+  the tree as plain data for a probability calculus: junk-capable and local locations of
+  every kind of leaf, and the gate, measurement and idle locations of every check; the
+  `filter-contract` study of `ftqc_compose` reads it. `factories.accepted_law(g, p)` sums
+  exactly over all fault sets and returns the law of the accepted output's error class under
+  independent faults; it is feasible when the state has few classes (Steane) and is what
+  that calculus is tested against.
 - **cones** (`cones` command, `cones.py`): fault cones of a whole program. A program
   is a list of layers of transversal operations on code blocks, with error
   correction placed wherever the schedule puts it (`ECa`, `ECb`), classically
@@ -405,3 +412,7 @@ Pauli-frame parities as raw record indices. Idles, Hadamards, preparations and
 destructive X/Z measurements have distinct roles. Unimplemented operations are
 refused even if marked ideal in the outer body. Input-error placeholders and
 matched fresh ancilla specifications have their own boundary contracts.
+
+## Signed surgery instruments
+
+See [the surgery interface and replay examples](../ftqc_gadgets/SURGERY.md) for physical measurement receipts, installed feed-forward schedules and conditional residual laws.

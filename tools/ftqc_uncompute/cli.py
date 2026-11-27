@@ -224,6 +224,27 @@ def _cmd_convert(ns: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_blocks(ns: argparse.Namespace) -> int:
+    from . import blocks
+
+    in_path = Path(ns.spec)
+    if not in_path.exists():
+        sys.stderr.write(f"error: spec file not found: {in_path}\n")
+        return 2
+    try:
+        spec = json.loads(in_path.read_text(encoding="utf-8"))
+        if ns.verify:
+            blocks.verify_receipt(spec, json.loads(Path(ns.verify).read_text(encoding="utf-8")))
+            print("verified receipt")
+            return 0
+        rec = blocks.receipt(spec)
+    except (ValueError, KeyError, TypeError) as exc:
+        sys.stderr.write(f"error: {exc}\n")
+        return 2 if not ns.verify else 1
+    _write_or_print(json.dumps(rec, indent=2, sort_keys=True), ns.output)
+    return 0 if rec["result"]["status"] == "proved" else 1
+
+
 def _cmd_selftest(_ns: argparse.Namespace) -> int:
     from .selftest import run_selftest
 
@@ -280,6 +301,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_cnv.add_argument("input")
     p_cnv.add_argument("-o", "--output", default=None)
     p_cnv.set_defaults(func=_cmd_convert)
+
+    p_blk = sub.add_parser("blocks", help="Certify a block program: deletions, integer relation, binding to layers")
+    p_blk.add_argument("spec")
+    p_blk.add_argument("--verify", default=None, help="a receipt to recompute and compare")
+    p_blk.add_argument("-o", "--output", default=None)
+    p_blk.set_defaults(func=_cmd_blocks)
 
     p_st = sub.add_parser("selftest", help="Run cold-clone positive, sabotage, and mutant battery")
     p_st.set_defaults(func=_cmd_selftest)

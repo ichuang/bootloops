@@ -4,41 +4,7 @@ Eight tools are available on `ftqc_integration`.
 
 The arrows show what one tool supplies to another in selected studies.
 
-```mermaid
-flowchart TD
-    accTitle: How the eight FTQC tools fit together
-    accDescr: Code checks feed extractor, decoder, and magic-state factory studies. Extractor circuits go to fault analysis. Decoder rules feed gadget and magic escape/metacheck checks. Composition uses gadget fault cones and magic-state factory contracts, and uncompute uses ZX cost contracts and magic pricing.
-
-    codes["<b>ftqc_codes</b><br/><small>CSS codes and distances</small>"]:::codes
-    extractors["<b>ftqc_extractors</b><br/><small>Logical measurements</small>"]:::extractors
-    decoders["<b>ftqc_decoders</b><br/><small>Syndrome decoding</small>"]:::decoders
-    faults["<b>ftqc_faults</b><br/><small>Circuit and ZX proofs</small>"]:::faults
-    gadgets["<b>ftqc_gadgets</b><br/><small>Encoded operations</small>"]:::gadgets
-    uncompute["<b>ftqc_uncompute</b><br/><small>Reversible circuit cleanup</small>"]:::uncompute
-    compose["<b>ftqc_compose</b><br/><small>End-to-end guarantees</small>"]:::compose
-    magic["<b>ftqc_magic</b><br/><small>Magic-state factories</small>"]:::magic
-
-    codes -->|CSS checks| extractors
-    codes -->|Syndrome model| decoders
-    codes -->|SAT and LRAT| magic
-    extractors -->|Scheduled probes| faults
-    faults -->|ZX cost contracts| uncompute
-    faults -->|Fault propagation| gadgets
-    decoders -->|Decoder rules| gadgets
-    decoders -->|Escape and metachecks| magic
-    gadgets -->|Fault cones| compose
-    magic -->|Factory contracts| compose
-    magic -->|Factory pricing| uncompute
-
-    classDef codes fill:#CCFBF1,stroke:#0F766E,stroke-width:2px,color:#172033
-    classDef extractors fill:#DBEAFE,stroke:#2563EB,stroke-width:2px,color:#172033
-    classDef decoders fill:#EDE9FE,stroke:#7C3AED,stroke-width:2px,color:#172033
-    classDef faults fill:#FFE4D5,stroke:#C2410C,stroke-width:2px,color:#172033
-    classDef gadgets fill:#DCFCE7,stroke:#15803D,stroke-width:2px,color:#172033
-    classDef uncompute fill:#FCE7F3,stroke:#BE185D,stroke-width:2px,color:#172033
-    classDef compose fill:#FEF3C7,stroke:#A16207,stroke-width:2px,color:#172033
-    classDef magic fill:#E0F2FE,stroke:#0369A1,stroke-width:2px,color:#172033
-```
+![FTQC tool relationships across the eight packages](figures/ftqc-tools.svg)
 
 | Tool | Input and question | Evidence |
 |---|---|---|
@@ -136,7 +102,7 @@ python3 -m ftqc_gadgets cones tools/ftqc_gadgets/examples/two-level-cones.json -
 python3 -m ftqc_gadgets verify "$out/cones.json"
 ```
 
-The receipt lists eight inner and four outer decoding events. In the X sector, the outer correction sees inner events 0 and 2. After that correction the output cone sees events 2, 4 and 6. This shows exactly where the earlier X error stops contributing, assuming successful decoding. Verification recomputes the cones and checks inner propagation over GF(2) for the tested control settings. The gadget suite also exercises physical one-level Clifford examples. A `cone-bound` study in `ftqc_compose` turns the cone into a conditional upper bound on decoding failure using a declared decoder radius, noise model and ancilla contracts. It supports independent faults at one or two levels and local-stochastic faults at one level. The two-level calculation also assumes independent columns. [Tail bounds and premises](ftqc_compose/GUIDE.md#tail-bounds-over-fault-cones) [Example schedule](ftqc_gadgets/examples/two-level-cones.json) · [Gadget guide](ftqc_gadgets/GUIDE.md#fault-cone-receipts)
+The receipt lists eight inner and four outer decoding events. In the X sector, the outer correction sees inner events 0 and 2. After that correction the output cone sees events 2, 4 and 6. This shows exactly where the earlier X error stops contributing, assuming successful decoding. Verification recomputes the cones and checks inner propagation over GF(2) for the tested control settings. The gadget suite also exercises physical one-level Clifford examples. A `cone-bound` study in `ftqc_compose` turns the cone into a conditional upper bound on decoding failure using a declared decoder radius, noise model and ancilla contracts. It supports independent faults at one or two levels and local-stochastic faults at one level. The two-level calculation also assumes independent columns. A `filter-contract` study derives the ancilla contracts themselves from a certified purification tree, with conditioning on acceptance, at the physical level and for a tree of encoded blocks. [Filter calculus](ftqc_compose/GUIDE.md#filter-calculus-for-purification-trees) · [Tail bounds and premises](ftqc_compose/GUIDE.md#tail-bounds-over-fault-cones) [Example schedule](ftqc_gadgets/examples/two-level-cones.json) · [Gadget guide](ftqc_gadgets/GUIDE.md#fault-cone-receipts)
 
 ## Carry a distillation bound into a logical T gate
 
@@ -158,6 +124,8 @@ python3 -m tools.ftqc_uncompute pebble --length 12 --mode kmrv -o "$out/pebble12
 python3 -m tools.ftqc_uncompute check "$out/pebble12.json" -o "$out/pebble12.receipt.json"
 python3 -m tools.ftqc_uncompute verify "$out/pebble12.receipt.json" --target "$out/pebble12.json"
 ```
+
+Wide arithmetic exceeds the global symbolic budget: a 16-bit ripple adder is already refused. The `blocks` command certifies such programs compositionally. It names intermediate values, proves every deletion locally, proves the arithmetic statement as one exact integer relation, and binds a correction schedule in the format of `ftqc_gadgets cones` to the program, so the schedule whose failure probability `cone-bound` bounds is shown to compute the stated function. [Cuts and block programs](ftqc_uncompute/GUIDE.md#wide-arithmetic-cuts-and-block-programs)
 
 Receipt verification needs the matching input and compares the complete regenerated evidence. The rewrite advisor recognizes seven rule families. For KickMix, `--apply` implements temporary-AND cleanup, bilinear cleanup and scratch reuse, then compares the symbolic public action. For arithmetic DAGs the verification checks the lowered circuit’s HMR obligations. Abstract nodes can still be costed and inspected. [Uncomputation guide](ftqc_uncompute/GUIDE.md) · [Packaged examples](ftqc_uncompute/examples)
 

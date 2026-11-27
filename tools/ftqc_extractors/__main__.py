@@ -20,10 +20,11 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
+    "installed_surgery": ("n checks targets couplers batches idles terminal_syndrome target", "transport"),
     "injection_circuit": ("case", ""),
     "injection_search": ("memory logicals count objective", ""),
     "injection": ("method memory logicals", "preparation postselect"),
-    "pbc": ("blocks bridges magic_supplies gates target max_degree", "outcomes"),
+    "pbc": ("blocks bridges magic_supplies gates target max_degree", "outcomes surgery_installation"),
     "surgery_zx": ("memory operation max_degree", ""),
     "modular_expansion": ("vertices edges components layers target", ""),
     "intermediate_reading": ("memory operations padding max_degree target rounds", ""),
@@ -87,6 +88,9 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     if backend == "sat" and kind not in ("circuit", "t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "installed_surgery":
+            from .installed_surgery import analyze
+            return analyze(s, budget)
         if kind == "injection_circuit":
             from .injection_circuit import run
 
@@ -217,6 +221,9 @@ def main():
     run.add_argument("--backend", choices=["exact", "sat"], default="exact")
     run.add_argument("--budget", type=int, default=2000000)
     run.add_argument("--seconds", type=int, default=60)
+    standalone=sub.add_parser("export-surgery",help="export an HGP circuit as a standalone signed instrument")
+    standalone.add_argument("spec",type=Path)
+    standalone.add_argument("-o",type=Path)
     export = sub.add_parser(
         "schedule", help="expand a conditional T gadget to physical fault locations"
     )
@@ -242,6 +249,14 @@ def main():
         if args.command == "injection":
             return command(args)
         s = json.loads(args.spec.read_text())
+        if args.command == "export-surgery":
+            from .surgery_export import export as export_instrument
+            text=json.dumps(export_instrument(s),indent=2)+"\n"
+            if args.o:
+                args.o.write_text(text)
+            else:
+                print(text,end="")
+            return 0
         if args.command == "measurement":
             from .gross import measurement
 

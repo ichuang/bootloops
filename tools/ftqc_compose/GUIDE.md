@@ -70,6 +70,30 @@ The result is `conditional`. Its premises are the cone theorem for the program, 
 
 The tests compare the binomial tail with enumeration, the threshold count with an explicit bad-support family of this package, mixtures with their exact expansion, every inner and outer term with the formula written out, and sampled failures of a physical circuit (through `ftqc_gadgets.cones.Direct`) with the bound. Seventeen planted defects each fail them; one needed a new check first.
 
+## Filter calculus for purification trees
+
+A `filter-contract` study derives the contract that a `cone-bound` study takes as a hypothesis: what an accepted purification tree delivers, given that every check on the way accepted. A contract of one sector is a junk probability `pi` and modes `[[w, q], ...]`. Apart from the junk event, the block's error is equivalent to one supported on a random set of dirty coordinates, and every increasing event of that set is at most the sum over modes of w times its probability under independent dirt of rate q.
+
+A leaf with J junk-capable locations and at most L local locations at one coordinate has pi = 1 − (1 − p)^J and one mode (1, 1 − (1 − p)^L). One check of sector s on a survivor A and a partner B follows the filter rule. The survivor is junk only if both blocks are, or if the dirty sets of the two sides together reach the minimum weight of the trivial patterns. Otherwise its old dirt survives only where the partner's side is dirty too, so rates multiply. When one side is junk the other side's dirt passes unmultiplied, with the junk probability as its weight. In the other sector junk probabilities and rates add. Every coefficient is divided by a lower bound on the probability of acceptance: (1 − ν_A)(1 − ν_B) times the probability that no step location that can cause rejection is faulty, with ν the probability that a block's pattern is not trivial. A reset step unites the fresh dirt of the check with the inherited part without letting the leading coefficient grow from check to check. Both statements are printed in the receipt (`check`, `reset`).
+
+Set `level` to `physical` or `encoded`.
+
+```json
+{"kind": "filter-contract", "level": "physical", "p": "1/10000",
+ "tree": {"n": 23, "wmin": {"X": 8, "Z": 7}, "sequence": "XZXZXZ"},
+ "leaf": {"locations": 151, "X": {"junk": 70, "local": 5}, "Z": {"junk": 71, "local": 5}}}
+```
+
+A physical tree is given by counts, as above, or by `factory`, a receipt of `ftqc_gadgets --tree`. The receipt is verified again, and the classes of the leaf locations and the gate, measurement and idle locations of every check are read from the recognised tree. Rates of disjoint sets of locations combine as 1 − (1 − a)(1 − b). The [banked example](examples/filter-contract-golay.json) is the 64-leaf Golay tree at p = 10⁻⁴.
+
+An encoded tree has code blocks for qubits, and its "locations" are decoding events of the level below. Supply `inner` (n and t), the `contracts` of the inner ancillas, and `raw`: the block-level program of the raw preparation with its corrections, and `last_layers`, the number of final layers that form its last round. The tree is given by `tree` or by a `factory` receipt with strict classes. The study bounds every decoding event of the raw preparation and of one check of each sector by the tail bound over its cone. Failures before the last round count as junk. Failures of the last round are local to a block, which is checked: their cones must share no source across blocks, and every block must end as a block just corrected.
+
+Decoding events of one column can share sources, so two things change. Rates are only added, never combined as independent. And the dirt a block received in its latest step is carried through the next check of its sector without being multiplied by the partner's rate, because it can depend on the same inner ancillas as the partner's measured syndrome. The study does not take this on trust. It builds one column of the whole tree, computes the cones, and reports for every level whether the survivor's older dirt is disjoint from the partner's side (required, or the study refuses) and whether its latest dirt shares sources with it (then it is carried).
+
+The result is `conditional`, or `no bound` when the acceptance bound of some check is not positive. It lists the contract in the form `cone-bound` reads, the acceptance bound of every level, the expected cost counting repetitions, and the premises: the filter rule for the tree, the noise condition, and for an encoded tree the cone theorem, the inner contracts and that dirt indicators are increasing functions of independent sources. The calculus itself is quoted, not proved here. `modes` (default 4) and `order` set how the final mixture is summarised: merging is upward and loses least for events that need `order` dirty coordinates. Bounds are rounded upward and acceptance downward at 50 significant digits.
+
+The tests compare the calculus with two exact computations. One follows the filter rule on two coordinates and sums over everything, for three acceptance rules, including one that accepts exactly the harmful outcomes; with shared sources it shows that multiplying the latest dirt gives bounds that are too small by a factor of two, and that carrying it is sound. The other is the exact law of the accepted output of Steane trees under independent faults (`ftqc_gadgets.factories.accepted_law`), for uniform and one-sided fault labels. Forty-two planted defects each fail the tests; six needed a new check first.
+
 ## Correcting 15-to-1 distillation
 
 Use `output_check: "distill15"` on a level-reduction circuit of 15 distinct `magic-source` preparations and one `rm15-ideal` processing vertex. The latter denotes a fault-free encoded-plus preparation, 15 coordinate-wise T injections, syndrome extraction with minimum-weight correction, and logical decoding. The output is unconditional. The sources are the fallible physical locations. An explicit support law must assign zero mass to faults on ideal sites.
@@ -109,3 +133,7 @@ A `block-reading-residual` input embeds the `gross_block_reading` specification 
 The [BB144 consumer example](examples/bb-injection-consumers.json) takes logical slots 2 and 3 of the four-output Y injection. In each ideal S gadget the data controls a CNOT into the resource, its Z measurement selects a Z correction on the data, and a wrong Y sign induces a Z after S. Replay checks both measurement branches on both input basis columns, which determines the linear map on an arbitrary data state. The interface assumes ideal terminal decoding and transfer. Its frame gives one detector-parity bit mask per resource in circuit detector order.
 
 The `injection-batch` verifier rebuilds the actual location responses. Within one physical channel its Pauli alternatives are exclusive. Distinct listed channels are independent and unlisted channels are ideal. A finite convolution tracks the complete postselection syndrome and all output signs, then conditions on their shared acceptance. Set locations to the literal string `all` to request every noisy channel. Exceeding the state budget leaves that guarantee unavailable. The example enables three channels including the noisy CX on physical sites 38 and 254. Conditional on acceptance the two consumers both acquire a Z with probability 1/14988. The receipt supplies the full joint distribution. The empirical BP+OSD histograms in the sampling study are a separate evidence type.
+
+## Signed surgery instruments
+
+See [the surgery interface and replay examples](../ftqc_gadgets/SURGERY.md) for physical measurement receipts, installed feed-forward schedules and conditional residual laws.

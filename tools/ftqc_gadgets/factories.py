@@ -301,12 +301,14 @@ class Tree:
             for r in nd["records"]:
                 owner[r] = i
         masks = [[] for _ in self.nodes]
+        self.det_owner = []
         for d in c.detectors:
             who = {owner.get(r) for r in d}
             if len(who) != 1 or None in who:
                 raise TreeError("a detector is not a parity of one check's measurement")
             i = who.pop()
             masks[i].append(sum(1 << self.nodes[i]["records"][r] for r in d))
+            self.det_owner.append(i)
         for i, nd in enumerate(self.nodes):
             want = self.GZ if nd["sector"] == "X" else self.GX
             if not _span_equal(masks[i], want):
@@ -471,6 +473,37 @@ class Tree:
     def physical(self):
         return all(self.shapes[leaf["shape"]]["physical"] for leaf in self.leaves.values())
 
+    def profile(self):
+        """What a probability calculus needs of the tree, as plain data: per kind of leaf and
+        sector the number of junk-capable locations and of local locations at each
+        coordinate; per check its sector, its children and the number of noisy gate,
+        measurement and survivor-idle locations at each coordinate."""
+        n = self.n
+        shapes = []
+        for sh in self.shapes:
+            row = dict(locations=len(sh["classes"]))
+            for t in "XZ":
+                local = [0] * n
+                for r in sh["classes"]:
+                    if r[t][0] == "local":
+                        local[r[t][1]] += 1
+                row[t] = dict(junk=sum(1 for r in sh["classes"] if r[t][0] == "junk"), local=local)
+            shapes.append(row)
+        nodes = []
+        for nd in self.nodes:
+            row = dict(sector=nd["sector"], A=list(nd["childA"]), B=list(nd["childB"]))
+            for kind in ("gates", "meas", "idles"):
+                v = [0] * n
+                for _, _, op in nd[kind]:
+                    if op.noisy:
+                        v[op.qs[0] % n] += 1
+                row[kind] = v
+            nodes.append(row)
+        return dict(coordinates=n, wmin={t: (None if v >= INF else v) for t, v in self.wmin.items()},
+                    strict=bool(self.strict), physical=self.physical(), shapes=shapes,
+                    leaves={str(b): leaf["shape"] for b, leaf in sorted(self.leaves.items())},
+                    nodes=nodes, root=list(self.root))
+
 
 def certificate(g, strict=False, wmin=None, cap=3_000_000):
     """The factory contract of a gadget, or dict(tree=False, reason=...)."""
@@ -608,3 +641,159 @@ def test(g, tree=None, exhaustive=1, samples=20000, seed=1, analysis=None, cap=3
                 items = items + [rnd.choice(fix)]
         judge(items)
     return out
+
+
+def profile(receipt, cap=3_000_000):
+    """The profile of the tree certified by a receipt, after verifying the receipt."""
+    from . import certify
+
+    certify.verify(receipt, cap=cap)
+    res = [r for r in receipt.get("results", []) if r.get("type") == "tree"]
+    if len(res) != 1 or not res[0].get("tree"):
+        raise TreeError("the receipt does not certify a purification tree")
+    tr = Tree(Gadget.from_json(receipt["gadget"]), res[0].get("strict", False), res[0].get("wmin_request"), cap)
+    return tr.profile()
+
+
+def _coords(basis, v):
+    """(coordinates of v in the basis, remainder); the basis is [(vector, pivot)] in the
+    order of insertion, each vector reduced by the earlier ones."""
+    c = 0
+    for j, (b, p) in enumerate(basis):
+        if (v >> p) & 1:
+            v ^= b
+            c |= 1 << j
+    return c, v
+
+
+def _span(vectors):
+    basis = []
+    for v in vectors:
+        _, r = _coords(basis, v)
+        if r:
+            basis.append((r, r.bit_length() - 1))
+    return basis
+
+
+def accepted_law(g, p, tree=None, analysis=None, weights=None, cap=3_000_000):
+    """The law of the output of an accepted factory, summed exactly over all fault sets:
+    every location is faulty independently with probability p and then carries one of its
+    fault labels, uniformly or with weights(location) -> {label: weight} summing to one.
+    The output is described by its class e modulo the patterns that act trivially (the error
+    part of a signature).  Feasible when the state has few classes (2^n of them: Steane,
+    not Golay).  Probabilities are floats; nothing is subtracted, so they are accurate to
+    rounding.  Returns dict(law={e: probability given acceptance}, accept=[probability that
+    check i accepts given that the checks below it did], classes=dict(X=mask, Z=mask),
+    single=dict(X=[...], Z=[...]) with the class of an error at each coordinate)."""
+    tr = tree or Tree(g, cap=cap)
+    an = analysis or Analysis(g, cap)
+    n = tr.n
+    low = (1 << n) - 1
+    by = {}
+    for loc in an.model.locations:
+        w = weights(loc) if weights else {label: 1.0 / len(loc.faults) for label in loc.faults}
+        by[loc.index] = [(an.sig(*eff), w[label]) for label, eff in loc.faults.items() if w.get(label)]
+    own = [0] * len(tr.nodes)                       # detector bits of each check
+    for d, i in enumerate(tr.det_owner):
+        own[i] |= 1 << d
+    step_locs = [[] for _ in tr.nodes]
+    leaf_locs = {b: [] for b in tr.leaves}
+    for loc, rec in tr.info.items():
+        (leaf_locs[rec[1]] if rec[0] == "leaf" else step_locs[rec[1]]).append(loc)
+    memo, accept = {}, [None] * len(tr.nodes)
+
+    def spread(law, moves):
+        for vecs in moves:                          # one location: [(coordinates, weight)]
+            new = {}
+            for c, pr in law.items():
+                new[c] = new.get(c, 0.0) + pr * (1 - p)
+                for dc, w in vecs:
+                    new[c ^ dc] = new.get(c ^ dc, 0.0) + pr * p * w
+            law = new
+        return law
+
+    def sub(node):
+        """(basis of the effects of the subtree outside its own detectors, law over the
+        coordinates in that basis given that the subtree accepted, own detector bits)."""
+        if node in memo:
+            return memo[node]
+        kind, i = node
+        if kind == "leaf":
+            locs = sorted(leaf_locs[i])
+            basis = _span(v for loc in locs for v, _ in by[loc])
+            moves = [[(_coords(basis, v)[0], w) for v, w in by[loc]] for loc in locs]
+            res = ([b for b, _ in basis], spread({0: 1.0}, moves), 0)
+        else:
+            nd = tr.nodes[i]
+            (ba, la, da), (bb, lb, db) = sub(nd["childA"]), sub(nd["childB"])
+            below, mine = da | db, own[i]
+            vecs = list(ba) + list(bb) + [v for loc in step_locs[i] for v, _ in by[loc]]
+            if any(v & below for v in vecs):
+                raise TreeError("a location acts on a check below it")
+            basis = _span(v & ~mine for v in vecs)
+            k = bin(mine).count("1")
+            bits = [d for d in range(an.nd) if (mine >> d) & 1]
+
+            def place(v):
+                det = sum(1 << j for j, d in enumerate(bits) if (v >> d) & 1)
+                c, r = _coords(basis, v & ~mine)
+                assert not r
+                return det | (c << k)
+
+            def table(vectors, law):
+                img = [place(v) for v in vectors]
+                out = {}
+                for c, pr in law.items():
+                    x, j = 0, 0
+                    while c >> j:
+                        if (c >> j) & 1:
+                            x ^= img[j]
+                        j += 1
+                    out[x] = out.get(x, 0.0) + pr
+                return out
+
+            ta, tb = table(ba, la), table(bb, lb)
+            joint = {}
+            for x, pa in ta.items():
+                for y, pb in tb.items():
+                    joint[x ^ y] = joint.get(x ^ y, 0.0) + pa * pb
+            joint = spread(joint, [[(place(v), w) for v, w in by[loc]] for loc in sorted(step_locs[i])])
+            keep = {c >> k: pr for c, pr in joint.items() if not c & ((1 << k) - 1)}
+            acc = sum(keep.values())
+            accept[i] = acc
+            res = ([b for b, _ in basis], {c: pr / acc for c, pr in keep.items()}, below | mine)
+        memo[node] = res
+        return res
+
+    for i in range(len(tr.nodes)):
+        sub(("node", i))
+    basis, law, _ = sub(tr.root)
+    out = {}
+    for c, pr in law.items():
+        v, j = 0, 0
+        while c >> j:
+            if (c >> j) & 1:
+                v ^= basis[j]
+            j += 1
+        e = v >> an.shift
+        out[e] = out.get(e, 0.0) + pr
+    mask = dict(X=sum(1 << i for i, v in enumerate(an.canon) if not v & low),
+                Z=sum(1 << i for i, v in enumerate(an.canon) if not v >> n))
+    return dict(law=out, accept=accept, classes=mask, single=dict(X=list(an.sx), Z=list(an.sz)))
+
+
+def class_weights(single, n):
+    """{class: least number of coordinates whose single errors add up to it}."""
+    best, frontier = {0: 0}, {0}
+    for w in range(1, n + 1):
+        nxt = set()
+        for e in frontier:
+            for c in range(n):
+                f = e ^ single[c]
+                if f not in best:
+                    best[f] = w
+                    nxt.add(f)
+        if not nxt:
+            break
+        frontier = nxt
+    return best

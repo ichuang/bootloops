@@ -155,7 +155,7 @@ def analyze(s, budget):
                 ),
             )
         )
-    return dict(
+    result=dict(
         status="proved",
         model="conditional Pauli-based compilation on a fixed block map",
         branch_scope="all" if requested is None else "specified transcript",
@@ -164,3 +164,8 @@ def analyze(s, budget):
         hardware=inventory,
         branches=branches,
     )
+
+    if "surgery_installation" in s:
+        from .pbc_surgery import bind
+        result["surgery_installation"]=bind(result,s,budget)
+    return result
