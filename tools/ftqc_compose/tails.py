@@ -239,14 +239,14 @@ def _compute(spec):
                 raise ValueError(f"{name}: need integers 0 <= t < n")
             levels[name] = (n, t)
     program = cones.Program.from_json(spec["program"])
-    flow = cones.Flow(program)
+    # with an outer code every block is an outer block, whether or not the program delivers
+    # outer resources: its outputs are then decoded at both levels
+    flow = cones.Flow(program, two=True if "outer" in levels else None)
     check = cones.contained(program, flow, 4, 1)
     if check["outside"]:
         raise ValueError("linear propagation leaves a cone of this program")
     if flow.two and "outer" not in levels:
         raise ValueError("a two-level program needs the outer code's n and t")
-    if not flow.two and "outer" in levels:
-        raise ValueError("an outer code was given for a single-level program")
     if flow.two and noise != "independent":
         raise ValueError("two levels are bounded under independent noise only")
     if not isinstance(spec["contracts"], dict):

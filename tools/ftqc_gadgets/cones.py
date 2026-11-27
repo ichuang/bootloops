@@ -192,11 +192,14 @@ class Flow:
         self.S, self.O, self.pend = {}, {}, {}
         self.known, self.tick = set(), 0
         self._ec2_atom = {}
+        self.counts = dict(block_ticks=0, peak_blocks=0, inner_corrections=0, outer_corrections=0, resources={})
         for b in program.inputs:
             self._blank(b)
         for layer in program.layers:
             self._layer(layer)
             self._sweep()
+            self.counts["block_ticks"] += len(self.S)
+            self.counts["peak_blocks"] = max(self.counts["peak_blocks"], len(self.S))
             self.tick += 1
         self._finish()
         self._sweep()
@@ -264,6 +267,9 @@ class Flow:
         self.S[b] = {"X": self._node((), [c1, m1, c2] + ax), "Z": self._node((), [c2, m2] + az)}
 
     def _new(self, kind, names):
+        if kind in INNER_KINDS:
+            res = self.counts["resources"]
+            res[kind] = res.get(kind, 0) + (1 if kind == "and1" else len(names))
         if kind in ("zero", "plus", "cat"):
             for b in names:
                 self._blank(b)
@@ -287,6 +293,7 @@ class Flow:
             self._new_outer(kind, names)
 
     def _new_outer(self, kind, names):
+        self.counts["resources"][kind] = self.counts["resources"].get(kind, 0) + 1
         at = {s: self._atom(kind, s, names[0], level=2, origin="outer") for s in "XZ"}
         for b in names:
             self._post_ec(b)
@@ -316,6 +323,7 @@ class Flow:
         return e
 
     def _ec_a(self, b):
+        self.counts["inner_corrections"] += 1
         c1, m1 = self._cls(("eca", "c1"), [b]), self._cls(("eca", "m1"), [b])
         ax, az = self._atom("plus", "X", b, origin="eca"), self._atom("plus", "Z", b, origin="eca")
         S = self.S[b]
@@ -336,6 +344,7 @@ class Flow:
         del self.pend[b]
 
     def _ec2_a(self, b):
+        self.counts["outer_corrections"] += 1
         A = ("~p", b)
         self._ec2_atom[b] = self._new_outer("plus2", [A])
         self._gate(b, A, "CX", 1)
@@ -935,6 +944,102 @@ class Direct:
 
 
 # ---------------------------------------------------------------------- receipts
+def correction_pattern(program):
+    """How a schedule follows its gates and idle ticks.  A step is a gate or an idle tick of a
+    live block.  Each step is classed by what happens to the block in the next layer: an inner
+    correction, a measurement or drop, the end of the program, or another gate or idle tick
+    (uncorrected).  A run is a maximal sequence of consecutive steps of one block without a
+    correction between them; `runs` counts them by length.  A schedule with no uncorrected
+    step corrects after every gate and every idle tick: all its runs have length one."""
+    live = set(program.inputs)
+    rows = []
+    for layer in program.layers:
+        what = {}
+        for op in layer:
+            k = op[0]
+            if k == "NEW":
+                live |= set(op[2:])
+                continue
+            for b in program.blocks_of(op):
+                what[b] = "ec" if k in ("ECa", "ECb") else "end" if k in ("MZ", "MX", "DROP") else "gate"
+        for b in live:
+            what.setdefault(b, "idle")
+        rows.append(what)
+        live -= {b for b, w in what.items() if w == "end"}
+    out = dict(steps=0, corrected=0, measured=0, ended=0, uncorrected=0, gates=0, idle_ticks=0,
+               gates_not_followed_by_correction=0)
+    run, runs = {}, {}
+
+    def close(b):
+        n = run.pop(b, 0)
+        if n:
+            runs[n] = runs.get(n, 0) + 1
+
+    for i, what in enumerate(rows):
+        nxt = rows[i + 1] if i + 1 < len(rows) else {}
+        for b, w in what.items():
+            if w not in ("gate", "idle"):
+                close(b)
+                continue
+            run[b] = run.get(b, 0) + 1
+            out["steps"] += 1
+            out["gates" if w == "gate" else "idle_ticks"] += 1
+            after = nxt.get(b)
+            kind = "corrected" if after == "ec" else "measured" if after == "end" else "ended" if after is None else "uncorrected"
+            out[kind] += 1
+            if w == "gate" and kind == "uncorrected":
+                out["gates_not_followed_by_correction"] += 1
+    for b in list(run):
+        close(b)
+    out["runs"] = {str(k): v for k, v in sorted(runs.items())}
+    out["longest_run"] = max(runs, default=0)
+    out["corrects_after_every_step"] = out["uncorrected"] == 0
+    return out
+
+
+def count(program):
+    """The ledger of a schedule without its cones: the same counts as `ledger`, from the
+    layers alone.  For sweeps over many schedules; it does not validate the schedule the way
+    a Flow does (a Flow refuses a block used twice or a correction interrupted)."""
+    live = set(program.inputs)
+    c = dict(layers=len(program.layers), block_ticks=0, peak_blocks=0, inner_corrections=0, outer_corrections=0)
+    res = {}
+    for layer in program.layers:
+        for op in layer:
+            k = op[0]
+            if k == "NEW":
+                kind = op[1]
+                res[kind] = res.get(kind, 0) + (len(op) - 2 if kind in ("zero", "plus", "cat", "std") else 1)
+                live |= set(op[2:])
+            elif k in ("MZ", "MX", "DROP"):
+                live.discard(op[1])
+            elif k == "ECa":
+                c["inner_corrections"] += 1
+            elif k == "EC2a":
+                c["outer_corrections"] += 1
+                res["plus2"] = res.get("plus2", 0) + 1
+                live.add(("~p", op[1]))
+            elif k == "EC2b":
+                res["zero2"] = res.get("zero2", 0) + 1
+                live.discard(("~p", op[1]))
+        c["block_ticks"] += len(live)
+        c["peak_blocks"] = max(c["peak_blocks"], len(live))
+    c["resources"] = dict(sorted(res.items()))
+    return c
+
+
+def ledger(flow):
+    """What a schedule spends, counted as the flow ran: block-ticks (live blocks at the end of
+    every layer, the ancilla block of an outer correction in progress included), the largest
+    number of live blocks, inner and outer corrections, and resources delivered by kind (inner
+    kinds and std per block; AND resources and outer resources per delivery, the two ancillas
+    of every outer correction included)."""
+    c = flow.counts
+    return dict(layers=len(flow.p.layers), block_ticks=c["block_ticks"], peak_blocks=c["peak_blocks"],
+                inner_corrections=c["inner_corrections"], outer_corrections=c["outer_corrections"],
+                resources=dict(sorted(c["resources"].items())))
+
+
 def summarize(flow):
     """Per event: what a probability bound needs.  Inner events: location weight and atoms
     by kind; outer events: the inner events and outer atoms in the cone."""

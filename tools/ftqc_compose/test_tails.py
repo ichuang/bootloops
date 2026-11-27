@@ -218,8 +218,13 @@ class TailTests(unittest.TestCase):
     def test_refusals(self):
         with self.assertRaisesRegex(ValueError, "no contract"):
             cone_bound_result(spec(contracts={}))
-        with self.assertRaisesRegex(ValueError, "single-level"):
-            cone_bound_result(spec(outer={"n": 7, "t": 1}))
+        # an outer code makes every block an outer block, also when no outer resource is delivered:
+        # the outputs are then decoded at both levels and an outer event sums inner ones
+        lifted = cone_bound_result(spec(p="1/100000", outer={"n": 7, "t": 1}))
+        flat = cone_bound_result(spec(p="1/100000"))
+        self.assertEqual(lifted["cones"]["outer_decoding_events"], 2 + 2)       # two measurements, one output block
+        self.assertEqual(flat["cones"]["outer_decoding_events"], 0)
+        self.assertLess(F(lifted["upper"]), F(flat["upper"]))
         with self.assertRaises(ValueError):
             cone_bound_result(spec(p="2"))
         with self.assertRaisesRegex(ValueError, "0 <= t < n"):

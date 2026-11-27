@@ -1552,6 +1552,41 @@ def t_cones(heavy):
                 needle, exc=GadgetError)
     refuses("cones: outputs that are not the live blocks are refused",
             lambda: cones.Flow(cones.Program([[("MZ", "A")]], ["A", "B"], ["A", "B"])), "declared outputs", exc=GadgetError)
+    # ---- what a schedule spends, and how it follows its steps by corrections
+    two = cones.Program([[("NEW", "zero2", "Q"), ("NEW", "and2", "a", "b", "t")], [("ECa", "Q"), ("MZ", "a", "m")],
+                         [("ECb", "Q"), ("DROP", "b")], [("EC2a", "Q")], [("EC2b", "Q")], [("ECa", "Q")], [("ECb", "Q")]],
+                        [], ["Q", "t"], "ledger")
+    led = cones.ledger(cones.Flow(two))
+    # live blocks at the end of each layer: Q a b t | Q b t | Q t | Q t ~p | Q t | Q t | Q t
+    check("cones: the ledger counts live blocks per layer, corrections and deliveries",
+          led == dict(layers=7, block_ticks=4 + 3 + 2 + 3 + 2 + 2 + 2, peak_blocks=4, inner_corrections=2, outer_corrections=1,
+                      resources={"and2": 1, "plus2": 1, "zero2": 2}), str(led))
+    one = cones.Program([[("NEW", "zero", "A", "B"), ("NEW", "std", "C")], [("CX", "A", "B")], [("MZ", "B"), ("ECa", "A")],
+                         [("ECb", "A")]], [], ["A", "C"], "one")
+    led1 = cones.ledger(cones.Flow(one))
+    check("cones: inner resources are counted per block",
+          led1["resources"] == {"std": 1, "zero": 2} and led1["block_ticks"] == 3 + 3 + 2 + 2 and led1["inner_corrections"] == 1,
+          str(led1))
+    rnd = random.Random(4)
+    progs = [_random_program(rnd, rnd.randint(3, 5), rnd.randint(6, 14)) for _ in range(30)] + [two, one]
+    check("cones: the count from the layers alone is the ledger of the flow",
+          all(cones.count(p) == cones.ledger(cones.Flow(p)) for p in progs))
+    strict = cones.Program([[("CX", "A", "B")], [("ECa", "A"), ("ECa", "B")], [("ECb", "A"), ("ECb", "B")], [("MZ", "B")],
+                            [("ECa", "A")], [("ECb", "A")]], ["A", "B"], ["A"], "strict")
+    pat = cones.correction_pattern(strict)
+    # steps: the gate on A and on B (corrected next), the idle tick of A while B is measured (corrected next)
+    check("cones: a schedule that corrects after every gate and idle tick has runs of length one only",
+          pat["corrects_after_every_step"] and pat["steps"] == 3 and pat["corrected"] == 3 and pat["runs"] == {"1": 3}
+          and pat["gates"] == 2 and pat["idle_ticks"] == 1 and pat["longest_run"] == 1
+          and pat["gates_not_followed_by_correction"] == 0, str(pat))
+    loose = cones.Program([[("CX", "A", "B")], [("CX", "A", "B")], [], [("MZ", "B"), ("ECa", "A")], [("ECb", "A")], []],
+                          ["A", "B"], ["A"], "loose")
+    pat = cones.correction_pattern(loose)
+    # A: gate, gate, idle, then corrected, then one idle tick at the end; B: gate, gate, idle, then measured
+    check("cones: uncorrected steps, runs and gates without a correction are counted",
+          not pat["corrects_after_every_step"] and pat["steps"] == 7 and pat["uncorrected"] == 4 and pat["corrected"] == 1
+          and pat["measured"] == 1 and pat["ended"] == 1 and pat["gates_not_followed_by_correction"] == 4
+          and pat["runs"] == {"1": 1, "3": 2} and pat["longest_run"] == 3, str(pat))
     # ---- algebra against the rule
     P = cones.Program([[("CX", "A", "C")], [("CX", "A", "B")], [("CX", "A", "B")]], ["A", "B", "C"],
                       ["A", "B", "C"], "twice")
