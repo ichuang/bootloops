@@ -117,3 +117,45 @@ class CircuitTests(unittest.TestCase):
         )
         self.assertFalse(detectors.any())
         self.assertEqual(outputs.tolist(), [[True, False, False, False]] * 2)
+
+    def test_sample_masks_and_silent_signatures(self):
+        from ftqc_audit.injection_statistics import summarize
+        from .injection_circuit import paths, run
+        from fractions import Fraction
+
+        s = dict(
+            outputs=2, shots=200, accepted=100, accepted_mask_counts=[90, 0, 0, 10]
+        )
+        r = summarize(s, 2, 10, 2)
+        self.assertEqual(r["correlated_error"]["estimate"], 0.1)
+        self.assertEqual(r["marginals"][0]["estimate"], 0.1)
+        self.assertEqual(r["batch_error_divided_by_outputs"], 0.05)
+        with self.assertRaises(ValueError):
+            summarize(dict(s, accepted=99), 2, 10, 2)
+        stim = self.stim
+        for case in ("bb-uniform", "bb-asymmetric", "hgp-release"):
+            _, path, _, p = paths(case)
+            circuit = stim.Circuit.from_file(path)
+            result = run(dict(case=case))
+            k = result["outputs"]
+            filt = stim.DetectorErrorModel()
+            for mask in range(1, 1 << k):
+                filt.append(
+                    "error",
+                    1,
+                    [
+                        stim.target_logical_observable_id(i)
+                        for i in range(k)
+                        if mask >> i & 1
+                    ],
+                )
+            for err in circuit.explain_detector_error_model_errors(dem_filter=filt):
+                mask = sum(1 << x.dem_target.val for x in err.dem_error_terms)
+                expected = Fraction()
+                for loc in err.circuit_error_locations:
+                    op = loc.instruction_targets
+                    scale = {"DEPOLARIZE1": 3, "DEPOLARIZE2": 15}.get(op.gate, 1)
+                    expected += Fraction(str(op.args[0])) / scale / p
+                self.assertEqual(
+                    Fraction(result["first_order_silent_by_mask"][str(mask)]), expected
+                )

@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 from fractions import Fraction
-from ftqc_audit.injection_records import audit
+from ftqc_audit.injection_records import audit, experiment_cost
 from .injection import analyze
 
 EXAMPLES = Path(__file__).parent / "examples"
@@ -44,7 +44,9 @@ def run(s, ledger=None):
     report = audit(
         stim.Circuit(data.decode()), spec, proof["postselect"], rounds, p, ledger
     )
+    cost = experiment_cost(stim.Circuit(data.decode()), report["postselect_width"])
     return dict(
+        cost=cost,
         status="proved",
         scope="finite single-location responses of closed logical Y probes",
         source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),

@@ -238,3 +238,31 @@ def audit(circuit, source, selected, rounds, p_ref, ledger=None):
         ),
         explicit_raw_flip_witnesses=[raw[i] for i in sorted(raw)],
     )
+
+
+def experiment_cost(circuit, mask_size):
+    """Full-attempt two-qubit layer count and the independent DEM discard proxy."""
+    product = 1.0
+    for instruction in circuit.detector_error_model().flattened():
+        if instruction.type == "error" and any(
+            t.is_relative_detector_id() and t.val < mask_size
+            for t in instruction.targets_copy()
+        ):
+            product *= 1 - instruction.args_copy()[0]
+    # Respect printed clock ticks. Account for any intratick wire reuse.
+    depth = 0
+    wire_depth = {}
+    for inst in circuit.flattened():
+        if inst.name == "TICK":
+            depth += max(wire_depth.values(), default=0)
+            wire_depth.clear()
+        elif inst.name == "CX":
+            targets = inst.targets_copy()
+            for c, t in zip(targets[::2], targets[1::2]):
+                layer = 1 + max(wire_depth.get(c.value, 0), wire_depth.get(t.value, 0))
+                wire_depth[c.value] = wire_depth[t.value] = layer
+    return dict(
+        physical_qubits=circuit.num_qubits,
+        two_qubit_layers=depth + max(wire_depth.values(), default=0),
+        dem_discard_union_proxy=round(1 - product, 10),
+    )
