@@ -55,7 +55,10 @@ The registered packages, grouped as the index groups them:
   methods, `ftqc_compose` joins distillation, residual frames, and local-stochastic
   error bounds across operations, and `ftqc_uncompute` certifies and simplifies logical
   reversible arithmetic using Hadamard-Measure-Reset (`HMR`), spooky pebbling, and
-  superposition masking. [Interfaces, proof assumptions and examples](../../tools/FTQC.md)
+  superposition masking; `ftqc_decoders` certifies operational syndrome decoding and
+  trapping-set bounds, and `ftqc_magic` verifies magic-state distillation factories,
+  check-qubit recycling, Clifford-hook cultivation, Caliper escape postselection, and
+  single-shot qLDPC `CCZ` pipelines. [Interfaces, proof assumptions and examples](../../tools/FTQC.md)
 - **Operations** — Turnstile (admission control for long jobs on a shared machine:
   priority token, RAM and CPU-width ledgers; formerly Bigram-queue) ships under
   [`../../ops/`](../../ops/README.md), not `tools/`, and has its own page outside the
