@@ -11,6 +11,7 @@ and `ftqc_codes`.
 The coordinate-locality certificate (`--local`) and `levels.py` extend the same
 questions to large codes and to the outer level of a concatenated scheme; the
 factory certificate (`--tree`, `factories.py`) does the same for the purification
-trees that make the ancillas.
+trees that make the ancillas. `cones.py` (`cones` command) gives the fault cone of
+every decoding event of a whole program with corrections placed sparsely.
 
 See `GUIDE.md`.

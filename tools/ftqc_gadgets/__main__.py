@@ -67,6 +67,11 @@ def main(argv=None):
     c.add_argument("target")
     c.add_argument("parts", nargs="+")
     c.add_argument("-o", "--out")
+    k = sub.add_parser("cones", help="fault cones of a block-level program (JSON: layers, inputs, outputs)")
+    k.add_argument("program")
+    k.add_argument("--no-events", action="store_true", help="statistics and a hash instead of the event list")
+    k.add_argument("--samples", type=int, default=8, help="random settings of the classical controls")
+    k.add_argument("-o", "--out")
     e = sub.add_parser("export")
     e.add_argument("spec")
     e.add_argument("-o", "--out")
@@ -80,9 +85,25 @@ def main(argv=None):
         return txt
 
     try:
+        if args.cmd == "cones":
+            from . import cones
+            with open(args.program) as f:
+                d = json.load(f)
+            if "layers" not in d or "inputs" not in d or "outputs" not in d:
+                raise GadgetError("a program file has layers, inputs and outputs")
+            rec = cones.build(cones.Program.from_json(d), samples=args.samples, events=not args.no_events)
+            emit(rec, args.out)
+            print(cones.summary(rec))
+            return 1 if rec["algebra"]["outside"] else 0
         if args.cmd == "verify":
             with open(args.receipt) as f:
                 rec = json.load(f)
+            if rec.get("schema") == "ftqc_gadgets-cones-1":
+                from . import cones
+                for line in cones.verify(rec):
+                    print("ok  ", line)
+                print(cones.summary(rec))
+                return 0
             for line in certify.verify(rec, full=args.full):
                 print("ok  ", line)
             print(certify.summary(rec))

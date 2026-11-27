@@ -103,6 +103,20 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   leaves consumed. It is tested against sampling and against the formulas written
   out; it credits a check with accepting only when both inputs are clean, so it is
   loose, and for wide blocks with frequent leaf failures it gives nothing.
+- **cones** (`cones` command, `cones.py`): fault cones of a whole program. A program
+  is a list of layers of transversal operations on code blocks, with error
+  correction placed wherever the schedule puts it (`ECa`, `ECb`), classically
+  controlled gates, decoded measurements and delivered resources. For every decoding
+  event the receipt gives its cone: the location classes and ancilla atoms whose
+  faults can be part of the pattern its decoder sees, with the weight per coordinate
+  that a probability bound needs. With an outer level it gives the outer cones too,
+  whose sources are the inner events. Three routes are compared. `Flow` applies the
+  propagation rules (unions along gates, a correction as a sink). `exact` re-derives
+  the cones by linear algebra over GF(2), modelling a correction as the measurement
+  and feedback it is, for several settings of the classical controls, and must stay
+  inside the rule's cones. `Direct` builds the program qubit by qubit on a code and
+  runs real lookup decoders with corrections carried through later gates: the first
+  decoding that goes wrong must have more than t dirty coordinates in its cone.
 - **independent_of_input**: which decoders' check values no input error can change.
   For repeated error correction (`steane_ec:CODE,rounds=2`) the later rounds have
   this property and the first does not: after one round, what a block does next is
@@ -158,6 +172,8 @@ With `tools/` on `PYTHONPATH` (or from `tools/`):
     python3 -m ftqc_gadgets analyze steane_ec:qr:47,anc=spec --local --code-receipt qr47.json --no-tables
     python3 -m ftqc_gadgets analyze prep:golay,zero,tree=XZXZ --tree -o tree.json
     python3 -m ftqc_gadgets analyze prep:qr:47,zero,tree=XZXZ,rounds=2 --tree --strict --light --wmin 11
+    python3 -m ftqc_gadgets cones program.json -o cones.json     # {"layers": [[["CX","A","B"]], ...], "inputs": [...], "outputs": [...]}
+    python3 -m ftqc_gadgets verify cones.json
 
 Library gadgets (`library.py`): `prep:CODE,STATE[,raw|spec|tree=SEQ][,rounds=K]`,
 `cnot:CODE[,leaky]`, `idle:CODE`, `knill:CODE[,anc=METHOD]`,
@@ -183,7 +199,7 @@ gadget.
 
 ## GATES
 
-`python3 tools/ftqc_gadgets/selftest.py` (about 24 s, 6900 checks; `--heavy` adds the
+`python3 tools/ftqc_gadgets/selftest.py` (about 35 s, 6943 checks; `--heavy` adds the
 Golay gadgets at t = 3 and larger two-level tests, about 5 minutes):
 
 - **Against a state-vector simulation**: seven small gadgets (teleportation and
@@ -245,6 +261,24 @@ Golay gadgets at t = 3 and larger two-level tests, about 5 minutes):
   than K junk leaves, leave the output within that weight, and two mirrored junk
   faults defeat it. Levels receipts with factories; refusals for a loose, foreign or
   wrong-state factory and for missing inner receipts.
+
+- Cones: known answers on small programs (what a measurement after a gate sees; a
+  full correction leaves only its own sources, which is also what a standard block
+  carries; a controlled gate has weight two). On forty random programs linear
+  propagation never leaves a cone, and two equal gates show the rule overestimating.
+  Physical tests on the Steane code (Golay with `--heavy`), controls on, off and
+  random: no decoding goes wrong while every cone has at most t dirty coordinates,
+  with sets of up to a dozen faults, and a failure is found with t + 1. A cone with
+  one gate removed is caught. Two levels: outer correction is a sink for earlier
+  inner events. Malformed programs and edited receipts are refused.
+
+Seventeen defects were planted in the cone code (a gate not carrying a sector, a
+correction that is not a sink or forgets an ancilla's errors or its measurement,
+idles dropped, sectors exchanged, the algebra without its feedback or without the
+ancilla, the physical test without carried corrections or without recognising a
+wrong decoding, outer correction not a sink, inner events not entering the outer
+level, a non-Clifford location pooling one sector, a controlled gate of weight
+one). The battery fails on each; two needed a new check first.
 
 Six more were planted in the probability recursion (sum and product exchanged,
 fresh dirt or the partner's pattern dropped, acceptance not depending on the inputs,
@@ -310,6 +344,15 @@ fails on each. The last was a real bug found this way.
   stabilizer to be heavier than the distance** (true for the quadratic-residue and
   BCH codes here, false for surface codes, where `library.radii` returns a small
   radius by design).
+- **Cones are sets of sources, not probabilities.** The receipt gives each event's
+  weight and atoms; the tail bound over coordinates is a separate step. A cone is an
+  overestimate wherever paths cancel.
+- **The cone theorem's induction is an argument.** The tool checks its hypotheses on
+  the program (rule against algebra) and tests its conclusion on physical circuits
+  of small programs. Non-Clifford locations and outer operations are not built
+  physically; they enter by rule only.
+- **A program's cones depend on its schedule.** The receipt is bound to the layers by
+  hash; moving one correction changes it.
 - **A factory contract is not a refinement order.** It says nothing about a run in
   which K leaves hold a junk-capable fault, and it counts leaves, not columns: one
   bad column crosses every leaf. In the levels receipt the columns of failed local
