@@ -62,6 +62,7 @@ def interleaved(spec):
     proofs = []
     law = {0: Fraction(1)}
     acceptance = Fraction(1)
+    underlying_attempts = set()
     for i, row in enumerate(spec["instances"]):
         fields(row, "id", "batch", "member", "factory", "receipt", "data")
         if (
@@ -78,6 +79,10 @@ def interleaved(spec):
         ids.add(row["id"])
         data.add(row["data"])
         src = read_delivery(row["factory"], row["receipt"])
+        attempts = set(src.get("source_attempts", []))
+        if underlying_attempts & attempts:
+            raise ValueError("interleaved factories share an underlying source attempt")
+        underlying_attempts.update(attempts)
         member = row["member"]
         if (
             src["state"] != "T"

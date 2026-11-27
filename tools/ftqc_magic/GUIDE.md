@@ -264,3 +264,7 @@ separately. For example, a binary CCZ can have three native output wires
 but only one deliverable three-qubit state. Strict v1 receipts bind the
 producer Python sources. To use a historical spec at a new revision,
 reissue its receipt with `python3 -m ftqc_magic check`.
+
+The [in-situ BB144 factory guide](../ftqc_extractors/BICYCLE_FACTORY.md)
+covers injection batch replay, RM15 input assignment, signed native pivot
+measurements, physical scheduling and full-attempt pricing.

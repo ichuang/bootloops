@@ -77,6 +77,21 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     try:
+        if args.cmd in ("check", "verify"):
+            spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+            if spec.get("kind") == "insitu-rm15":
+                # Native Extractors owns source replay; share the same joined
+                # receipt with Compose's logical gate and hardware consumers.
+                from ftqc_compose.__main__ import receipt as replay_inputs
+                from .certify import canonical_json_sha256
+                joined = replay_inputs(spec)
+                if args.cmd == "check":
+                    _write_or_print(joined, args.output)
+                elif canonical_json_sha256(joined) != canonical_json_sha256(json.loads(Path(args.receipt).read_text())):
+                    raise ValueError("in-situ factory receipt differs from replay")
+                else:
+                    print("verified in-situ RM15 factory")
+                return 0
         if args.cmd in ("check", "pipeline"):
             spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
             rec = build_receipt(spec, crosscheck_external=bool(args.external))
@@ -121,5 +136,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
     except MagicRefusalError as exc:
         sys.stderr.write(json.dumps(exc.to_dict(), sort_keys=True) + "\n")
+        return 2
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        sys.stderr.write(f"ftqc_magic: {exc}"+chr(10))
         return 2
     return 0

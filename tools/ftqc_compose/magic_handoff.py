@@ -67,7 +67,9 @@ def consume_t(spec):
         spec,
         dict(
             upper=delta,
-            p=spec["factory_receipt"]["contract"]["input_error_rate"],
+            p=spec["factory_receipt"]
+            .get("contract", {})
+            .get("input_error_rate", "joint carrier law"),
             noise_evidence=source["premises"],
         ),
         locations=len(transfer["operations"]),

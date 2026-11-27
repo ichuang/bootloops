@@ -16,6 +16,10 @@ def sqrt_upper(q):
 
 
 def read_delivery(spec, receipt):
+    if spec.get("kind") == "insitu-rm15":
+        from .insitu import output_delivery
+
+        return output_delivery(spec, receipt)
     identity = verify_receipt(spec, receipt)
     if spec.get("kind", "pipeline").strip().lower() == "pipeline":
         stages = spec["stages"]
