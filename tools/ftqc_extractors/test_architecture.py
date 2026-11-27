@@ -72,3 +72,19 @@ class GrossReadingTests(unittest.TestCase):
             self.assertEqual((len(r["measured"]),r["survivors"],r["added_data"]+r["added_check_meters"]),(12,12,216))
             circ,*_=probe(mem,axis,"X")
             self.assertTrue(RecordModel(circ).locations)
+
+class ExpansionTests(unittest.TestCase):
+    def test_expansion_and_soundness(self):
+        import json
+        from pathlib import Path
+        path=Path(__file__).parent/"examples"
+        e=json.loads((path/"modular-expansion.json").read_text())
+        r=receipt(e)
+        verify(e,r)
+        self.assertEqual(r["result"]["original"],"1/2")
+        self.assertTrue(r["result"]["meets_unit_bound"])
+        s=json.loads((path/"intermediate-reading.json").read_text())
+        r=receipt(s)
+        verify(s,r)
+        self.assertEqual(r["result"]["quantum_soundness"],"2")
+        self.assertEqual(receipt(dict(s,rounds=[1]))["result"]["status"],"counterexample")
