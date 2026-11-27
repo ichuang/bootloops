@@ -60,7 +60,7 @@ def _phase_mul(a: PhasePoly, b: PhasePoly) -> PhasePoly:
     return out
 
 
-def _anf_to_phase_poly(expr: ANF, angle: Fraction) -> PhasePoly:
+def _anf_to_phase_poly(expr: ANF, angle: Fraction, max_monomials: int) -> PhasePoly:
     """Exact lifting of `angle * expr(v)` into `(Q / 2Z)[v_0, ...]` (`v_i in {0, 1}`).
 
     When `angle == 1` (sign flip: Z, CZ, CCZ, NEG, HMR kickback), `1 * (A ^ B) == 1*A + 1*B (mod 2)`,
@@ -89,6 +89,8 @@ def _anf_to_phase_poly(expr: ANF, angle: Fraction) -> PhasePoly:
                 cur.pop(mk, None)
             else:
                 cur[mk] = nv
+        if len(cur) > max_monomials:
+            raise _SymbolicOverflow()
 
     out: PhasePoly = {}
     for mk, iv in cur.items():
@@ -327,23 +329,23 @@ def _symbolic_verify_ops(
             q_anf[q1] = guard(anf_xor(q_anf[q1], diff))
             q_anf[q2] = guard(anf_xor(q_anf[q2], diff))
         elif kind == "NEG":
-            _phase_add_inplace(phase_poly, _anf_to_phase_poly(active, Fraction(1, 1)))
+            _phase_add_inplace(phase_poly, _anf_to_phase_poly(active, Fraction(1, 1), max_monomials))
         elif kind == "Z":
             fired = guard(anf_and(active, q_anf[op.qubits[0]]))
-            _phase_add_inplace(phase_poly, _anf_to_phase_poly(fired, Fraction(1, 1)))
+            _phase_add_inplace(phase_poly, _anf_to_phase_poly(fired, Fraction(1, 1), max_monomials))
         elif kind == "CZ":
             c1, c2 = op.qubits
             fired = guard(anf_and(active, guard(anf_and(q_anf[c1], q_anf[c2]))))
-            _phase_add_inplace(phase_poly, _anf_to_phase_poly(fired, Fraction(1, 1)))
+            _phase_add_inplace(phase_poly, _anf_to_phase_poly(fired, Fraction(1, 1), max_monomials))
         elif kind == "CCZ":
             c1, c2, c3 = op.qubits
             fired = guard(anf_and(active, guard(anf_and(q_anf[c1], q_anf[c2]))))
             fired = guard(anf_and(fired, q_anf[c3]))
-            _phase_add_inplace(phase_poly, _anf_to_phase_poly(fired, Fraction(1, 1)))
+            _phase_add_inplace(phase_poly, _anf_to_phase_poly(fired, Fraction(1, 1), max_monomials))
         elif kind == "Z_POW":
             assert op.angle is not None
             fired = guard(anf_and(active, q_anf[op.qubits[0]]))
-            _phase_add_inplace(phase_poly, _anf_to_phase_poly(fired, op.angle))
+            _phase_add_inplace(phase_poly, _anf_to_phase_poly(fired, op.angle, max_monomials))
         elif kind == "R":
             q = op.qubits[0]
             hazard = guard(anf_and(active, q_anf[q]))
@@ -366,7 +368,7 @@ def _symbolic_verify_ops(
             r_var = anf_var(num_x + hmr_idx)
             hmr_idx += 1
             kick = guard(anf_and(active, guard(anf_and(r_var, q_anf[q]))))
-            _phase_add_inplace(phase_poly, _anf_to_phase_poly(kick, Fraction(1, 1)))
+            _phase_add_inplace(phase_poly, _anf_to_phase_poly(kick, Fraction(1, 1), max_monomials))
             not_act = anf_not(active)
             c_anf[b] = guard(anf_xor(guard(anf_and(c_anf[b], not_act)), guard(anf_and(active, r_var))))
             q_anf[q] = guard(anf_and(q_anf[q], not_act))
@@ -380,6 +382,9 @@ def _symbolic_verify_ops(
         elif kind == "BIT_INVERT":
             b = op.bits[0]
             c_anf[b] = guard(anf_xor(c_anf[b], active))
+
+        if len(phase_poly) > max_monomials:
+            raise _SymbolicOverflow()
 
     x_mask_all = (1 << num_x) - 1
     r_mask_all = ((1 << total_hmr) - 1) << num_x

@@ -86,6 +86,8 @@ def build_receipt_for_kmx(
     kraus_dict: dict[str, Any] | None = None
     kraus_ok = True
     if do_kraus:
+        if circuit.num_qubits > 12:
+            raise ValueError("Kraus receipt checks support at most 12 qubits")
         # Note: if circuit implements a non-identity map without an external oracle, we only assert
         # trace preservation & HMR symbolic validity unless identity is expected (`sim_res.passed`)!
         if sim_res.passed:

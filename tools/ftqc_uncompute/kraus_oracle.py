@@ -478,6 +478,8 @@ def verify_channel_kraus(
     computing exact mixed-state fidelity and trace distance against `oracle`.
     """
     nq = circuit.num_qubits
+    if nq > max_qubits:
+        raise ValueError(f"kraus_oracle supports up to {max_qubits} qubits, got {nq}")
     dim = 1 << nq
     q_reg_specs = [
         (r.name if r.name is not None else f"r{r.reg_id}", tuple(w.id for w in r.wires if isinstance(w, Qubit)))

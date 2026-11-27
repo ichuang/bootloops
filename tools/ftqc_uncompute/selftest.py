@@ -361,7 +361,7 @@ def _leg_mutants() -> str:
         (
             "M1_hmr_skip_kickback",
             "hmr.py",
-            "_phase_add_inplace(phase_poly, _anf_to_phase_poly(kick, Fraction(1, 1)))",
+            "_phase_add_inplace(phase_poly, _anf_to_phase_poly(kick, Fraction(1, 1), max_monomials))",
             "pass  # MUTANT M1",
         ),
         (
@@ -633,6 +633,20 @@ def _regress_mask_directives() -> str:
     return "mask declarations bind the register, parameters and target digest"
 
 
+def _regress_proof_limits() -> str:
+    parity = KickMixCircuit.from_kmx("CX q1 q0\nCX q2 q0\nCX q3 q0\nZ_POW q0 1/3")
+    result = verify_hmr_circuit(parity, max_monomials=5)
+    assert not result.valid and result.findings[0].code == "SYMBOLIC-BUDGET-EXCEEDED"
+    for ops in ("X q39", "X q39\nX q39"):
+        try:
+            build_receipt_for_kmx(KickMixCircuit.from_kmx(ops), shots=4, run_kraus=True)
+        except ValueError as exc:
+            assert "12 qubits" in str(exc)
+        else:
+            raise AssertionError("oversize dense request accepted")
+    return "phase expansion and both dense verification paths respect proof budgets"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
@@ -647,6 +661,7 @@ def run_selftest() -> int:
         ("_regress_directed_bounds", _regress_directed_bounds),
         ("_regress_mask_factors", _regress_mask_factors),
         ("_regress_mask_directives", _regress_mask_directives),
+        ("_regress_proof_limits", _regress_proof_limits),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),
