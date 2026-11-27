@@ -98,3 +98,15 @@ class ZXTests(unittest.TestCase):
         verify(s,r)
         self.assertEqual(r["result"]["split_Z_frame_columns"],[1])
         self.assertEqual(set(r["result"]["physical_open_wire_checks"]),{"homomorphic","cone surgery"})
+
+class CompactedDistanceTests(unittest.TestCase):
+    def test_low_weight_auxiliary_output(self):
+        # Four disjoint logical images, with only the product of all four trivial.
+        # The new edge qubit alone supports an undetectable logical Z.
+        op=dict(aux=SMALL["memory"],cycles=[],f0=[0],f1=[3,12,48,192],f2=[1],metachecks=[31])
+        s=dict(schema=1,kind="surgery_sequence",memory=dict(n=8,hx=[3,12,48,192],hz=[255]),
+               operations=[op],padding=[2,2],max_degree=8,target=2)
+        r=receipt(s)
+        verify(s,r)
+        self.assertEqual(r["result"]["obligation"],"compacted code distance")
+        self.assertEqual(r["result"]["witness"],dict(axis="Z",qubits=[8]))

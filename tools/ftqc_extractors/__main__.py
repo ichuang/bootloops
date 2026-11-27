@@ -20,6 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
+    "pbc": ("blocks bridges magic_supplies gates target max_degree", "outcomes"),
     "surgery_zx": ("memory operation max_degree", ""),
     "modular_expansion": ("vertices edges components layers target", ""),
     "intermediate_reading": ("memory operations padding max_degree target rounds", ""),
@@ -97,6 +98,9 @@ def evaluate(s, backend, budget, seconds, reverse=False):
             return expansion(s, budget)
         if kind == "surgery_zx":
             from .surgery_zx import analyze
+            return analyze(s, budget)
+        if kind == "pbc":
+            from .pbc import analyze
             return analyze(s, budget)
         if kind == "block_reading":
             from .block_reading import analyze
