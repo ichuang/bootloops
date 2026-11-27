@@ -318,7 +318,7 @@ def simulate_trajectories(
         for r in circuit.registers
         if r.kind == "q"
     ]
-    if not q_reg_specs and circuit.num_qubits > 0:
+    if not circuit.registers and circuit.num_qubits > 0:
         q_reg_specs = [("q_all", tuple(range(circuit.num_qubits)))]
 
     reg_widths = {name: len(qids) for name, qids in q_reg_specs}

@@ -61,6 +61,7 @@ from tools.ftqc_uncompute import (  # noqa: E402
     simulate_trajectories,
     solve_optimal_pebbling_astar,
     suggest_for_dag,
+    suggest_for_kmx,
     uniform_residue_mask_bound,
     validate_pebbling_schedule,
     verify_channel_kraus,
@@ -526,6 +527,23 @@ def _regress_abstract_dag() -> str:
     return "abstract DAGs retain estimates and identify the unproved node"
 
 
+def _regress_public_wires() -> str:
+    circuit = KickMixCircuit.from_kmx("X q0\nX q1")
+    assert circuit.public_qubits() == {0, 1} and not circuit.scratch_qubits()
+    assert not suggest_for_kmx(circuit)
+    classical = KickMixCircuit.from_kmx('REGISTER r0 "bit"\nAPPEND_TO_REGISTER b0 r0\nR q0')
+    assert classical.scratch_qubits() == (0,) and simulate_trajectories(classical, shots=64).passed
+    assert verify_channel_kraus(classical).exact_match
+    for extra in ("APPEND_TO_REGISTER q0 r0", 'REGISTER r0 "duplicate"',
+                  'REGISTER r1 "x"\nAPPEND_TO_REGISTER q1 r1'):
+        try:
+            KickMixCircuit.from_kmx('REGISTER r0 "x"\nAPPEND_TO_REGISTER q0 r0\n' + extra)
+        except ValueError:
+            continue
+        raise AssertionError("ambiguous register accepted")
+    return "implicit public wires and classical-only registers agree across engines"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
@@ -534,6 +552,7 @@ def run_selftest() -> int:
         ("_regress_audit_feedback", _regress_audit_feedback),
         ("_regress_injectivity", _regress_injectivity),
         ("_regress_abstract_dag", _regress_abstract_dag),
+        ("_regress_public_wires", _regress_public_wires),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),

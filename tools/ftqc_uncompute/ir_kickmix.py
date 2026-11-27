@@ -239,6 +239,11 @@ class KickMixCircuit:
     metadata: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        names = [r.name if r.name is not None else f"r{r.reg_id}" for r in self.registers]
+        ids = [r.reg_id for r in self.registers]
+        wires = [w for r in self.registers for w in r.wires]
+        if len(set(names)) != len(names) or len(set(ids)) != len(ids) or len(set(wires)) != len(wires):
+            raise ValueError("Register names, IDs and wire assignments must be unique")
         max_q = -1
         max_b = -1
         for r in self.registers:
@@ -271,6 +276,8 @@ class KickMixCircuit:
         return out
 
     def public_qubits(self) -> frozenset[int]:
+        if not self.registers:
+            return frozenset(range(self.num_qubits))
         return frozenset(
             w.id for r in self.registers if r.kind == "q" for w in r.wires if isinstance(w, Qubit)
         )
@@ -458,9 +465,10 @@ class KickMixCircuit:
                 rname = m_reg.group(2)
                 if rname is not None:
                     rname = rname.replace('\\"', '"').replace("\\\\", "\\")
-                if rid not in reg_names:
-                    reg_order.append(rid)
-                    reg_wires[rid] = []
+                if rid in reg_names:
+                    raise ValueError(f"Line {lineno}: duplicate REGISTER r{rid}")
+                reg_order.append(rid)
+                reg_wires[rid] = []
                 reg_names[rid] = rname
                 continue
 

@@ -484,7 +484,7 @@ def verify_channel_kraus(
         for r in circuit.registers
         if r.kind == "q"
     ]
-    if not q_reg_specs and nq > 0:
+    if not circuit.registers and nq > 0:
         q_reg_specs = [("q_all", tuple(range(nq)))]
 
     pub_qids = tuple(qid for _, qids in q_reg_specs for qid in qids)
