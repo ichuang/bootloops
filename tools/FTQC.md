@@ -7,7 +7,7 @@ The seven tools on `ftqc_integration` cover different parts of a fault-tolerance
 | [ftqc_codes](ftqc_codes/GUIDE.md) | Given CSS check matrices, which logical errors can the memory detect? | Code parameters, bounds on X and Z distance, witnesses and hierarchical decoding guarantees. |
 | [ftqc_extractors](ftqc_extractors/GUIDE.md) | Which logical measurements can a fixed apparatus perform, and what fault distance does a surgery sequence preserve? | Fixed-coupler graphs and bridges, transversal block readings, padded hypergraph surgery, physical fault witnesses, and resource-conditional logical T receipts. |
 | [ftqc_audit](ftqc_audit/GUIDE.md) | Which physical faults can evade a Clifford circuit’s detectors? | Detector and observable flips per location, replayable fault sets, circuit-distance intervals and preparation checks. |
-| [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, refinement receipts for component substitution and two-level checks on concatenated codes. |
+| [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, component refinement, two-level checks on concatenated codes, and the faults that can reach each decoding event in a scheduled program. |
 | [ftqc_zx](ftqc_zx/GUIDE.md) | Can a candidate replace a reference circuit under the specified noise model? | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic gadget contracts. |
 | [ftqc_compose](ftqc_compose/GUIDE.md) | Do the output and fault guarantees of one operation meet the next operation’s input requirements? | Typed joins, residual data and frame checks, level reduction and local-stochastic error bounds for a composed study. |
 | [ftqc_uncompute](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup preserve the logical quantum action? Is a pebbling schedule legal, and what error does a declared mask allow? | Exact symbolic HMR checks, sampled trajectory bounds, mask and schedule checks, and source-bound replay of `ftqc_uncompute-receipt-1`. |
@@ -76,6 +76,19 @@ python3 -m ftqc_gadgets verify "$out/zero.json"
 ```
 
 The report says the sixteen-copy tree acts as its specification, with wire faults only in columns holding a failed local or check location, unless four leaves each hold a failed junk-capable location. `levels.reduction(..., factories=...)` then lists no assumed ancilla and records that count. Given independent faults across leaves and checks, the separate `Tree.bounds` calculation bounds the probability of junk conditional on acceptance, each check’s acceptance probability from below, and expected leaf consumption. [Factory guide](ftqc_gadgets/GUIDE.md)
+
+## Trace a fault through a correction schedule
+
+A decoder sees faults that can reach its measured block and Pauli sector by that point in the schedule. The `cones` command in `ftqc_gadgets` follows these sources through transversal gates, idles, measurements and corrections. An inner cone counts location classes per coordinate and residual errors from delivered ancillas. At the outer level the receipt lists the contributing inner events and outer ancilla sources.
+
+Run the seven-layer example from the BootLoops root with the shell setup above.
+
+```sh
+python3 -m ftqc_gadgets cones tools/ftqc_gadgets/examples/two-level-cones.json -o "$out/cones.json"
+python3 -m ftqc_gadgets verify "$out/cones.json"
+```
+
+The receipt lists eight inner and four outer decoding events. In the X sector, the outer correction sees inner events 0 and 2. After that correction the output cone sees events 2, 4 and 6. This shows exactly where the earlier X error stops contributing, assuming successful decoding. Verification recomputes the cones and checks inner propagation over GF(2) for the tested control settings. The gadget suite also exercises physical one-level Clifford examples. Converting a cone into a failure probability requires a decoder radius and a joint noise model for its sources. [Example schedule](ftqc_gadgets/examples/two-level-cones.json) · [Gadget guide](ftqc_gadgets/GUIDE.md#fault-cone-receipts)
 
 ## Carry a distillation bound into a logical T gate
 

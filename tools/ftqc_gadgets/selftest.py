@@ -1408,6 +1408,211 @@ def t_factories(heavy):
     refuses("levels with factories: an inflated junk count is refused",
             lambda: levels.verify_reduction(bad, outer, inner, factories=fac), "factory_junk")
 
+def _random_program(rnd, nblocks=4, depth=10):
+    """A valid single-level program: gates, controlled gates, corrections, measurements."""
+    from ftqc_gadgets import cones
+    live = [f"B{i}" for i in range(nblocks)]
+    inputs, layers, bits, fresh, pend = list(live), [], [], [0], {}
+    for _ in range(depth):
+        layer, free = [], [b for b in live if b not in pend]
+        for b in list(pend):
+            layer.append(("ECb", b))
+            del pend[b]
+        rnd.shuffle(free)
+        while len(free) >= 2 and rnd.random() < 0.7:
+            a, b = free.pop(), free.pop()
+            k = rnd.choice(["CX", "CX", "CZ", "CXg", "CZg"])
+            if k.endswith("g") and not bits:
+                k = k[:2]
+            layer.append((k, a, b, rnd.choice(bits)) if k.endswith("g") else (k, a, b))
+        for b in free[:]:
+            r = rnd.random()
+            if r < 0.3:
+                layer.append(("ECa", b))
+                pend[b] = 1
+                free.remove(b)
+            elif r < 0.4 and len(live) > 2:
+                fresh[0] += 1
+                bit = f"m{fresh[0]}"
+                layer.append((rnd.choice(["MZ", "MX"]), b, bit))
+                live.remove(b)
+                free.remove(b)
+                new = f"N{fresh[0]}"
+                layer.append(("NEW", rnd.choice(["zero", "plus", "std"]), new))
+                live.append(new)
+                bits.append(bit)                # usable from the next layer on
+                bits_new = bit
+        layers.append(layer)
+        # a record becomes usable one layer after its measurement
+    if pend:
+        layers.append([("ECb", b) for b in pend])
+    # controls must refer to earlier layers only: drop controlled gates whose bit is too new
+    seen, clean = set(), []
+    for layer in layers:
+        row = []
+        for op in layer:
+            if op[0] in ("CXg", "CZg") and op[3] not in seen:
+                op = (op[0][:2], op[1], op[2])
+            row.append(op)
+        clean.append(row)
+        seen.update(op[2] for op in layer if op[0] in ("MZ", "MX"))
+    return cones.Program(clean, inputs, live, "random")
+
+
+def t_cones(heavy):
+    from ftqc_gadgets import cones
+    steane = library.code_of("steane")
+
+    def what(flow, ev):
+        return sorted((s["kind"], repr(s["what"]), s["tick"], s.get("sector")) for s in
+                      (flow.sources[i] for i in cones._bits(flow.cone(ev))))
+    # ---- known answers
+    P = cones.Program([[("CX", "A", "B")], [("MZ", "B")]], ["A", "B"], ["A"], "copy")
+    f = cones.Flow(P)
+    ev = {(e["kind"], str(e["block"]), e["sector"]): e for e in f.events}
+    check("cones: a measurement after a CX sees the gate and its own location, nothing else",
+          what(f, ev[("meas", "B", "X")]) == [("class", "('gate', 'CX')", 0, None), ("class", "('meas', 'X')", 1, None)])
+    check("cones: the control keeps the gate and its idle in both sectors",
+          f.weight(f.cone(ev[("out", "A", "X")])) == (2, {}) and f.weight(f.cone(ev[("out", "A", "Z")])) == (2, {}))
+    P = cones.Program([[("CX", "A", "B")], [("ECa", "B")], [("ECb", "B")]], ["A", "B"], ["A", "B"], "sink")
+    f = cones.Flow(P)
+    ev = {(e["kind"], str(e["block"]), e["sector"]): e for e in f.events}
+    after = f.weight(f.cone(ev[("out", "B", "X")])), f.weight(f.cone(ev[("out", "B", "Z")]))
+    check("cones: after a full correction a block carries the correction's own sources only",
+          after == ((3, {("plus", "X"): 1, ("zero", "X"): 1}), (2, {("zero", "Z"): 1})), str(after))
+    check("cones: the correction's event sees what came before",
+          f.weight(f.cone(ev[("ec", "B", "X")])) == (3, {("plus", "X"): 1})
+          and f.weight(f.cone(ev[("ec", "B", "Z")])) == (4, {("plus", "Z"): 1, ("zero", "Z"): 1}))
+    Pstd = cones.Program([[("NEW", "std", "S")]], [], ["S"], "std")
+    fs = cones.Flow(Pstd)
+    es = {(e["kind"], e["sector"]): e for e in fs.events}
+    idle = 1                                            # the fresh block idles in its first tick
+    check("cones: a standard block is what a full correction leaves",
+          fs.weight(fs.cone(es[("out", "X")])) == (3 + idle, {("plus", "X"): 1, ("zero", "X"): 1})
+          and fs.weight(fs.cone(es[("out", "Z")])) == (2 + idle, {("zero", "Z"): 1}))
+    P = cones.Program([[("CXg", "A", "B", "m")]], ["A", "B"], ["A", "B"], "g")
+    refuses("cones: a control that is not measured yet is refused", lambda: cones.Flow(P), "not measured", exc=GadgetError)
+    P = cones.Program([[("MZ", "C", "m")], [("CXg", "A", "B", "m")]], ["A", "B", "C"], ["A", "B"], "g")
+    f = cones.Flow(P)
+    check("cones: a controlled gate is one class of weight two",
+          max(s["weight"] for s in f.sources) == 2 and sum(s["weight"] == 2 for s in f.sources) == 1)
+    for name, layers, needle in (("a block used twice", [[("CX", "A", "B"), ("MZ", "A")]], "twice"),
+                                 ("an interrupted correction", [[("ECa", "A")], [("CX", "A", "B")]], "middle"),
+                                 ("a second half alone", [[("ECb", "A")]], "without its first half"),
+                                 ("a dead block", [[("MZ", "A")], [("CX", "A", "B")]], "not live"),
+                                 ("an unknown operation", [[("T", "A")]], "unknown")):
+        refuses(f"cones: {name} is refused", lambda layers=layers: cones.Flow(cones.Program(layers, ["A", "B"], ["A", "B"])),
+                needle, exc=GadgetError)
+    refuses("cones: outputs that are not the live blocks are refused",
+            lambda: cones.Flow(cones.Program([[("MZ", "A")]], ["A", "B"], ["A", "B"])), "declared outputs", exc=GadgetError)
+    # ---- algebra against the rule
+    P = cones.Program([[("CX", "A", "C")], [("CX", "A", "B")], [("CX", "A", "B")]], ["A", "B", "C"],
+                      ["A", "B", "C"], "twice")
+    f = cones.Flow(P)
+    c = cones.contained(P, f, samples=2)
+    check("cones: two equal gates cancel in the algebra and not in the rule, which only overestimates",
+          not c["outside"] and c["events_where_rule_exceeds_algebra"] >= 1, str(c))
+    rnd = random.Random(21)
+    progs = [_random_program(rnd, rnd.randint(3, 5), rnd.randint(6, 14)) for _ in range(40)]
+    bad = [p for p in progs if cones.contained(p, cones.Flow(p), samples=4)["outside"]]
+    check("cones: on forty random programs linear propagation never leaves a cone", not bad
+          and sum(len(cones.Flow(p).events) for p in progs) > 400)
+    T = cones.Program([[("TOF", 2, "A", "B")], [("ECa", "A")], [("ECb", "A")]], ["A", "B"], ["A", "B"], "tof")
+    f = cones.Flow(T)
+    ev = {(e["kind"], str(e["block"]), e["sector"]): e for e in f.events}
+    check("cones: a non-Clifford location pools both sectors of its blocks",
+          f.weight(f.cone(ev[("out", "B", "Z")]))[0] == 2 + 2 and not cones.contained(T, f, 2)["outside"])
+    T = cones.Program([[("ECa", "A")], [("ECb", "A")], [("TOF", 1, "A", "B")]], ["A", "B"], ["A", "B"], "tof2")
+    f = cones.Flow(T)
+    bx = next(e for e in f.events if e["kind"] == "out" and str(e["block"]) == "B" and e["sector"] == "X")
+    check("cones: after a non-Clifford location a Z-only source of one block is in the X cone of the other",
+          any(f.sources[i]["what"] == ("ecb", "m2") for i in cones._bits(f.cone(bx))))
+    M = cones.Program([[("CX", "A", "B")], [("ECa", "A"), ("NEW", "plus", "C")], [("ECb", "A"), ("CX", "C", "B")],
+                       [("MZ", "B", "m"), ("CZ", "A", "C")], [("CXg", "A", "C", "m")], [("ECa", "C")], [("ECb", "C")],
+                       [("MX", "C")]], ["A", "B"], ["A"], "mixed")
+    c = cones.contained(M, cones.Flow(M), samples=4)
+    check("cones: where nothing cancels, the algebra reaches every source of every cone",
+          not c["outside"] and c["events_where_rule_exceeds_algebra"] == 0 and c["events"] == 8, str(c))
+    # ---- the physical test
+    small = [("mixed", [[("CX", "A", "B")], [("ECa", "A"), ("NEW", "plus", "C")], [("ECb", "A"), ("CX", "C", "B")],
+                        [("MZ", "B", "m"), ("CZ", "A", "C")], [("CXg", "A", "C", "m")], [("ECa", "C")], [("ECb", "C")],
+                        [("MX", "C")]], ["A", "B"], ["A"]),
+             ("std", [[("NEW", "std", "D"), ("CX", "A", "B")], [("CZ", "D", "A")], [("MZ", "B", "m")],
+                      [("CZg", "A", "D", "m")], [("ECa", "D")], [("ECb", "D")]], ["A", "B"], ["A", "D"])]
+    for name, layers, ins, outs in small:
+        P = cones.Program(layers, ins, outs, name)
+        for label, acts in (("on", None), ("off", lambda t, op: False)):
+            d = cones.Direct(P, steane, acts)
+            r = d.test(exhaustive=1, samples=2500, seed=3)
+            check(f"cones, physical ({name}, controls {label}): no decoding goes wrong while every cone has at "
+                  f"most t dirty coordinates", r["violations"] == 0 and r["within_hypothesis"] > 900
+                  and r["largest_set"] >= 6, str({k: v for k, v in r.items() if k not in ("beyond",)}))
+            check(f"cones, physical ({name}, controls {label}): with t + 1 dirty coordinates a decoding fails",
+                  r["beyond"] is not None and r["beyond"]["dirty"] == r["t"] + 1)
+    # a cone made too small is caught by the physical test
+    P = cones.Program(small[0][1], small[0][2], small[0][3], "tampered")
+    f = cones.Flow(P)
+    k = next(e for e in f.events if e["kind"] == "meas")
+    gate = next(i for i in cones._bits(f.cone(k)) if f.sources[i]["what"][0] == "gate")
+    f.cone_of[k["node"]] &= ~(1 << gate)
+    r = cones.Direct(P, steane, flow=f).test(exhaustive=2, samples=0, search=0)
+    check("cones, physical: a cone with one gate removed is caught", r["violations"] > 0)
+    if heavy:
+        P = cones.Program(small[0][1], small[0][2], small[0][3], "golay")
+        r = cones.Direct(P, library.code_of("golay")).test(exhaustive=1, samples=6000, seed=4)
+        check("cones, physical (Golay, t = 3): no violation, and a failure with four dirty coordinates",
+              r["violations"] == 0 and r["within_hypothesis"] > 4000 and r["beyond"] is not None, str(r)[:300])
+    for _ in range(6 if heavy else 3):
+        P = _random_program(rnd, 3, 7)
+        if any(op[0] == "NEW" and op[1] not in ("zero", "plus", "std") for l in P.layers for op in l):
+            continue
+        acts = (lambda t, op, m={}: m.setdefault((t, op), rnd.random() < 0.5))
+        r = cones.Direct(P, steane, acts).test(exhaustive=1, samples=1200, seed=5, search=300)
+        check("cones, physical: a random program with random controls", r["violations"] == 0 and r["sets"] > 500,
+              str(r)[:300])
+    # ---- two levels
+    P2 = cones.Program([[("NEW", "zero2", "Q")], [("ECa", "Q")], [("ECb", "Q")], [("EC2a", "Q")], [("EC2b", "Q")],
+                        [("ECa", "Q")], [("ECb", "Q")]], [], ["Q"], "two")
+    f = cones.Flow(P2)
+    check("cones, two levels: recognised", f.two and len(f.outer) == 4 and len(f.terms) == 3)
+    tags = [(o["tag"], o["sector"], len([i for i in cones._bits(f.cone_of[o["node"]])
+                                         if f.sources[i]["kind"] == "event"])) for o in f.outer]
+    first_x = [i for i, e in enumerate(f.events) if e["kind"] == "ec" and e["sector"] == "X"][0]
+    out_x = next(o for o in f.outer if o["tag"] == "out" and o["sector"] == "X")
+    mem = {f.sources[i]["event"] for i in cones._bits(f.cone_of[out_x["node"]]) if f.sources[i]["kind"] == "event"}
+    check("cones, two levels: outer correction is a sink for the inner events before it",
+          first_x not in mem and len(mem) == 3, f"{tags} {sorted(mem)}")
+    ec2_x = next(o for o in f.outer if o["tag"] == "ec2" and o["sector"] == "X")
+    mem2 = {f.sources[i]["event"] for i in cones._bits(f.cone_of[ec2_x["node"]]) if f.sources[i]["kind"] == "event"}
+    check("cones, two levels: and its own event sees them", first_x in mem2)
+    refuses("cones: an outer resource in a single-level run is refused",
+            lambda: cones.Flow(cones.Program([[("NEW", "zero2", "Q")]], [], ["Q"]), two=False), "outer resource",
+            exc=GadgetError)
+    refuses("cones: the physical test refuses a two-level program",
+            lambda: cones.Direct(P2, steane), "single-level", exc=GadgetError)
+    # ---- receipts
+    P = cones.Program(small[0][1], small[0][2], small[0][3], "receipt")
+    rec = cones.build(P)
+    check("cones receipt: verifies, and lists every event", len(cones.verify(rec)) == 3
+          and len(rec["inner_events"]) == len(cones.Flow(P).events) and "largest cone" in cones.summary(rec))
+    lite = cones.build(P, events=False)
+    check("cones receipt: without the event list it still verifies and carries the same hash",
+          "inner_events" not in lite and lite["events_sha256"] == rec["events_sha256"] and cones.verify(lite))
+    for name, edit in (("an edited weight", lambda r: r["inner_events"][0].update(weight=1)),
+                       ("edited statistics", lambda r: r["stats"].update(largest_weight=1)),
+                       ("an edited theorem", lambda r: r.update(theorem="trust me")),
+                       ("a dropped term", lambda r: r.update(top_level_terms=[{"x": 1}]))):
+        bad = copy.deepcopy(rec)
+        edit(bad)
+        refuses(f"cones receipt: {name} is refused", lambda bad=bad: cones.verify(bad), "does not recompute", exc=GadgetError)
+    bad = copy.deepcopy(rec)
+    bad["program"]["layers"][1] = [["NEW", "plus", "C"]]
+    refuses("cones receipt: an edited program under the old hash is refused", lambda: cones.verify(bad), "sha256",
+            exc=GadgetError)
+    rt = cones.Program.from_json(json.loads(json.dumps(P2.to_json())))
+    check("cones: a two-level program survives a JSON round trip", rt.sha256() == P2.sha256()
+          and cones.build(rt)["stats"] == cones.build(P2)["stats"])
+
 
 def ftqc_codes_concat():
     import ftqc_codes
@@ -1452,7 +1657,7 @@ def main():
     for fn, args in ((t_structure, ()), (t_tables, ()), (t_dense, (heavy,)), (t_linear, ()),
                      (t_weights, ()), (t_props, (heavy,)), (t_refine, (heavy,)), (t_compose, ()),
                      (t_receipts, ()), (t_local, (heavy,)), (t_levels, (heavy,)), (t_factories, (heavy,)),
-                     (t_cli, ())):
+                     (t_cones, (heavy,)), (t_cli, ())):
         t1 = time.time()
         fn(*args)
         print(f"  {fn.__name__:<14} {time.time() - t1:6.2f} s   ({len(PASS)} passed so far)")
