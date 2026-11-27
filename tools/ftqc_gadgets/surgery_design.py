@@ -58,6 +58,10 @@ def geometry(s):
 
 def build(s):
     n = s["n"]
+    if s["method"] == "branch-code":
+        from .surgery_branch_code import cylinders
+
+        return cylinders(n, s["hx"], s["hz"], s["targets"], s["rounds"])
     if s["method"] == "branch":
         from .surgery_parallel import branch
 
