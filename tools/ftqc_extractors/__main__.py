@@ -235,8 +235,12 @@ def main():
     check = sub.add_parser("verify")
     check.add_argument("spec", type=Path)
     check.add_argument("receipt", type=Path)
+    from .injection_cli import add_parser, command
+    add_parser(sub)
     args = parser.parse_args()
     try:
+        if args.command == "injection":
+            return command(args)
         s = json.loads(args.spec.read_text())
         if args.command == "measurement":
             from .gross import measurement

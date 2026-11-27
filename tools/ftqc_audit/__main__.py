@@ -47,11 +47,8 @@ def main(argv=None):
     )
     r.add_argument("--fault", action="append", default=[], metavar="LOCATION:LABEL")
     r.add_argument("-o", "--out")
-    injection=sub.add_parser("injection",help="audit a published logical-Y injection experiment")
-    injection.add_argument("case")
-    injection.add_argument("--faults",help="write accepted location modes as JSON lines")
-    injection.add_argument("--decode",action="store_true",help="apply the reference BP+OSD configuration")
-    injection.add_argument("-o","--out")
+    from ftqc_extractors.injection_cli import add_parser
+    add_parser(sub)
     args = ap.parse_args(argv)
     try:
         if args.cmd=="injection":
