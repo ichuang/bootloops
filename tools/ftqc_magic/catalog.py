@@ -295,15 +295,127 @@ def build_jws_63_2_3_t2() -> BinaryFactory:
 
 
 def build_bh_49_1_5_t() -> BinaryFactory:
-    r"""Placeholder for [[49, 1, 5]] factory (completed in Milestone M2 with recycling)."""
-    raise NotImplementedError
+    """Bravyi & Haah (2012, arXiv:1209.2426 p. 10) / Jacinto et al. (2026) [[49, 1, 5]] factory:
+    `49T -> 1T` (`d = 5`, leading error `1411 p^5`, `N = 14` rows compressible to `5` active qubits!).
+    """
+    check_rows = [
+        "1111111111111110101010101010101010101010101010101",
+        "0000000000000000000111100110011000011001100110011",
+        "0000000000000001100000011001100110000000000000000",
+        "0000000000000000000000000000000001111000000001111",
+        "0000000000000000011110000000000000000111100000000",
+        "0000000000000000000001111000011110000000000000000",
+        "0000000000000000000000000111111110000000000000000",
+        "0000000000000000000000000000000001111111100000000",
+        "0000000000000000000000000000000000000000011111111",
+        "1010101010101010000000000000000000000000000000000",
+        "0110011001100110000000000000000000000000000000000",
+        "0001111000011110000000000000000000000000000000000",
+        "0000000111111110000000000000000000000000000000000",
+    ]
+    return BinaryFactory.from_row_strings(
+        output_rows=["1" * 49],
+        check_rows=check_rows,
+        name="bh_49_1_5_t",
+    )
+
+
+def build_jvbs_64_1_4_t() -> BinaryFactory:
+    """Jacinto et al. (2026, arXiv:2606.07734 Appendix D Eq. D1) compact `64T -> 1T` factory
+    on `N = 10` qubits (`d = 4`, leading error `495 p^4`).
+    """
+    rows = [
+        "1000000000111111111000000000000000000000000000111111111000000000",
+        "1001000000110111111000111000010011000010001101101110010010111001",
+        "0001010000001010000000100001011011011100011111100011111100011010",
+        "0000010010000010010000010010001111011111100011111100011111000100",
+        "0000000011000000011000001100000111111001111110001111110001111000",
+        "0100000001100000001100000001100110111111001101111001101110001001",
+        "0110000000110000000010000010110110110110111010110111010011100010",
+        "0010100000010100000001000100111100110101110101101110101000101101",
+        "0000101000000101000100100000111101100010101111010101111010010011",
+        "0000001100000001100010010000111001101111010110111010110100100110",
+    ]
+    return BinaryFactory.from_row_strings(
+        output_rows=rows[:1],
+        check_rows=rows[1:],
+        name="jvbs_64_1_4_t",
+    )
+
+
+def build_jvbs_165_1_5_t() -> BinaryFactory:
+    """Jacinto et al. (2026, arXiv:2606.07734 Theorem 1, Table I/II) canonical compact `165T -> 1T`
+    factory on `N = 11` logical qubits (`d = 5`, leading error `784245 p^5`).
+    """
+    from .search import build_canonical_t_factory
+
+    fac = build_canonical_t_factory(11)
+    return BinaryFactory(
+        k=fac.k,
+        r=fac.r,
+        n=fac.n,
+        output_rows=fac.output_rows,
+        check_rows=fac.check_rows,
+        gamma=fac.gamma,
+        name="jvbs_165_1_5_t",
+    )
+
+
+def build_jvbs_47_3_3_ccz() -> BinaryFactory:
+    """Jacinto et al. (2026, arXiv:2606.07734 Appendix D Eq. D3) compact `47T -> 1 CCZ` factory
+    on `N = 9` qubits (`d = 3`, leading error `236 p^3`).
+    """
+    rows = [
+        "01111101011011011111010011101001100001001011101",
+        "10010011110000101100111101110100111010010110000",
+        "00010011100101100000010001110111101111101010110",
+        "10011101001010011101001010011101001010011101001",
+        "01001011011001001011011001001011011001001011011",
+        "00111000111000111000111000111000111000111000111",
+        "00000111111000000111111000000111111000000111111",
+        "00000000000111111111111000000000000111111111111",
+        "00000000000000000000000111111111111111111111111",
+    ]
+    return BinaryFactory.from_row_strings(
+        output_rows=rows[:3],
+        check_rows=rows[3:],
+        name="jvbs_47_3_3_ccz",
+    )
+
+
+def build_jvbs_48_3_4_ccz() -> BinaryFactory:
+    """Jacinto et al. (2026, arXiv:2606.07734 Appendix D Eq. D4) compact `48T -> 1 CCZ` factory
+    on `N = 10` qubits (`d = 4`, leading error `2816 p^4`).
+    """
+    rows = [
+        "001111101110111011111101101101111010010001101011",
+        "011001111011010001011011000100101100111011111110",
+        "001111010010110100111101000101101110011011101110",
+        "100110011001100110011001100101100110011001101001",
+        "010101010011001101010101110001010101010101011100",
+        "001100110101010100110011010100110011001100110101",
+        "000011110011001100001111001100001111000011110011",
+        "000000001111000011111111000011111111000000001111",
+        "000000000000111111111111000000000000111111111111",
+        "000000000000000000000000111111111111111111111111",
+    ]
+    return BinaryFactory.from_row_strings(
+        output_rows=rows[:3],
+        check_rows=rows[3:],
+        name="jvbs_48_3_4_ccz",
+    )
 
 
 CATALOG_NAMES: tuple[str, ...] = (
     "bk_15_1_3_t",
     "bh_14_2_2_t",
+    "bh_49_1_5_t",
+    "jvbs_64_1_4_t",
+    "jvbs_165_1_5_t",
     "cube_8_3_2_ccz",
     "bgm_36_3_3_cs2_ccz",
+    "jvbs_47_3_3_ccz",
+    "jvbs_48_3_4_ccz",
     "bgm_48_3_4_ccz_2level",
     "jws_63_2_3_t2",
     "gprw_64_6_4_2ccz",
@@ -321,10 +433,20 @@ def get_catalog_factory(name: str) -> BinaryFactory | SignedStabilizerFactory:
         return build_bk_15_1_3_t()
     if key == "bh_14_2_2_t":
         return build_bh_3k_plus_8_t(2)
+    if key == "bh_49_1_5_t":
+        return build_bh_49_1_5_t()
+    if key == "jvbs_64_1_4_t":
+        return build_jvbs_64_1_4_t()
+    if key == "jvbs_165_1_5_t":
+        return build_jvbs_165_1_5_t()
     if key == "cube_8_3_2_ccz":
         return build_cube_8_3_2_ccz()
     if key == "bgm_36_3_3_cs2_ccz":
         return build_bgm_36_3_3_cs2_ccz()
+    if key == "jvbs_47_3_3_ccz":
+        return build_jvbs_47_3_3_ccz()
+    if key == "jvbs_48_3_4_ccz":
+        return build_jvbs_48_3_4_ccz()
     if key == "bgm_48_3_4_ccz_2level":
         return build_bgm_48_3_4_ccz_two_level()
     if key == "jws_63_2_3_t2":
