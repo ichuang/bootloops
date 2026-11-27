@@ -1,4 +1,3 @@
-import copy
 import unittest
 from importlib.util import find_spec
 
@@ -9,7 +8,7 @@ from ftqc_gadgets.test_surgery import edge
 from ftqc_extractors.__main__ import evaluate
 from ftqc_extractors.installed_surgery import analyze
 from ftqc_extractors.surgery_bench import two_block
-from ftqc_extractors.surgery_products import lifted_product,product_sequence,radial_design
+from ftqc_extractors.surgery_products import product_sequence,radial_design
 
 
 class ProductTests(unittest.TestCase):

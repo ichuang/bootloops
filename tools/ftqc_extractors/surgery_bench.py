@@ -5,7 +5,6 @@ from pathlib import Path
 from ftqc_gadgets.surgery import Instrument,receipt
 from ftqc_gadgets.surgery_design import build
 from ftqc_gadgets.surgery_merge import word
-from ftqc_gadgets.surgery_geometry import transpose
 from .algebra import hgp,seed
 from .surgery_export import export
 from .surgery_products import radial_design,product_sequence
@@ -61,6 +60,22 @@ def two_block(variant="adapter"):
 def architecture(case):
     from .surgery_layout import product_connection,translated_settings
     from .surgery_products import lifted_product
+    if case in ("shuttle-packed","shuttle-serial"):
+        from ftqc_gadgets.surgery_parallel import branch
+        from .installed_surgery import compile_schedule
+        g=branch(1,[],["+Z"],2)
+        s=installed([(g,[0,2],None),(g,[1,3],None)],2,[],2)
+        if case=="shuttle-packed":
+            s["batches"]=[s["batches"][0]+s["batches"][1]]
+        spec,_=compile_schedule(s)
+        layers=[]
+        for i,row in enumerate(spec["ticks"]):
+            moves=[[2,[1,0]],[3,[1,3]]] if i==0 else []
+            if i==len(spec["ticks"])-1:
+                moves=[[2,[3,0]],[3,[3,3]]]
+            layers.append(dict(moves=moves,move_time=2 if moves else 0,gate_time=1))
+        s["transport"]=dict(initial=[[0,0],[0,3],[3,0],[3,3]],layers=layers,gate_range=1)
+        return s
     if case=="product-connection":
         return product_connection([[5]],[[5]],[[1]],[[3]],4,2)
     if case=="pcpp":
@@ -98,7 +113,7 @@ def architecture(case):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("case",choices=["two-block","two-block-parsimonious","radial90","radial90-reference","hgp-padded","product-connection","cyclic-seed","pcpp","branched","serial","parallel-parsimonious"])
+    ap.add_argument("case",choices=["two-block","two-block-parsimonious","radial90","radial90-reference","hgp-padded","shuttle-packed","shuttle-serial","product-connection","cyclic-seed","pcpp","branched","serial","parallel-parsimonious"])
     ap.add_argument("-o",required=True,type=Path)
     args=ap.parse_args()
     if args.case.startswith("two-block"):

@@ -42,3 +42,26 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(receipt(g["spec"],1)["faults"]["lower"],2)
         self.assertEqual(receipt(build(s)["spec"],1)["faults"]["upper"],1)
 
+
+    def test_pbc_signed_selection(self):
+        import json
+        from pathlib import Path
+        from ftqc_gadgets.surgery_build import graph
+        from ftqc_extractors.__main__ import evaluate
+        path=Path(__file__).parent/"examples/bridged-pbc.json"
+        src=json.loads(path.read_text())
+        src.update(blocks=src["blocks"][:1],bridges=[],magic_supplies=[0],gates=[],target=1)
+        block=src["blocks"][0]
+        logical=block["basis"][0][1]
+        g=graph(block["n"],block["checks"],"-"+logical[1:],[(0,1)])
+        inst=Instrument(g)
+        couplers=sorted({tuple(sorted(op.qs)) for _,_,op in inst.c.locations() if op.name=="CX"})
+        src["surgery_installation"]=dict(idles=False,couplers=couplers,
+                settings=[dict(gadget=receipt(g,0),placement=list(range(inst.c.n)))])
+        out=evaluate(src,"exact",100000,60)
+        chosen=next(iter(out["surgery_installation"]["selected"].values()))
+        self.assertEqual(chosen["public_xor"],1)
+        self.assertEqual(out["branches"][0]["surgery_ticks"],len(g["ticks"]))
+        src["surgery_installation"]["couplers"]=[]
+        with self.assertRaisesRegex(ValueError,"uninstalled coupler"):
+            evaluate(src,"exact",100000,60)

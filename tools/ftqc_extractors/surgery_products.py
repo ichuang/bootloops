@@ -2,7 +2,6 @@
 from itertools import combinations
 from ftqc_codes.gf2 import Echelon,dot,nullspace,supp
 from ftqc_gadgets.surgery_geometry import transpose,check_rows,restricted_cone
-from ftqc_gadgets.surgery_build import combine
 from .algebra import hgp
 
 
@@ -10,7 +9,7 @@ def product_sequence(c,nc,d,nd,words,target,padding,degree):
     """Chang et al. Eq. (42), tensor the graph-to-classical-code map with id_D."""
     check_rows(c,nc)
     check_rows(d,nd)
-    mc,md=len(c),len(d)
+    md=len(d)
     n,hx,hz=hgp(c,nc,transpose(d,nd),md)
     ops=[]
     for word in words:

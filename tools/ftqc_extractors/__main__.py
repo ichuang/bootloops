@@ -24,7 +24,7 @@ FIELDS = {
     "injection_circuit": ("case", ""),
     "injection_search": ("memory logicals count objective", ""),
     "injection": ("method memory logicals", "preparation postselect"),
-    "pbc": ("blocks bridges magic_supplies gates target max_degree", "outcomes"),
+    "pbc": ("blocks bridges magic_supplies gates target max_degree", "outcomes surgery_installation"),
     "surgery_zx": ("memory operation max_degree", ""),
     "modular_expansion": ("vertices edges components layers target", ""),
     "intermediate_reading": ("memory operations padding max_degree target rounds", ""),

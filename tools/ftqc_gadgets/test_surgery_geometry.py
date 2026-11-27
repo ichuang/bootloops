@@ -34,3 +34,17 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(set(labels),set(range(5)))
         self.assertTrue(all(c.bit_count()<=3 for c in paths))
 
+
+    def test_surface_patch_bridges(self):
+        from .surgery_design import build
+        from .surgery import Instrument
+        from .surgery_merge import word
+        # Two distance-two rotated patches, each with one encoded qubit.
+        base=dict(n=8,hx=[15,240],hz=[3,12,48,192],axis="Z",rounds=2,
+                  sites=[0,2,4,6],targets=[word(8,85,"Z")],distance_target=2)
+        for shape in [dict(method="enhanced"),dict(method="bridge",left_size=2,
+                      left=[[0,1]],right=[[0,1]],links=[[0,0],[1,1]])]:
+            out=build(dict(base,**shape))
+            Instrument(out["spec"])
+            self.assertEqual(out["geometry"]["static"]["lower"],2)
+            self.assertEqual(out["geometry"]["cone"]["logical_qubits"],1)

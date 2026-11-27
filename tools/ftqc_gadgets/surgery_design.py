@@ -1,7 +1,5 @@
 """Source-bound finite surgery designs accepted by the Gadgets CLI."""
-from ftqc_codes.gf2 import supp
 from .parsimonious import cellulate
-from .surgery import receipt
 from .surgery_geometry import adapter,distance,expansion
 from .surgery_merge import merge
 from .surgery_build import graph
@@ -15,6 +13,14 @@ def geometry(s):
     if len(set(sites))!=len(sites) or any(type(q)!=int or not 0<=q<s["n"] for q in sites):
         raise ValueError("invalid or duplicate physical port")
     ports=[1<<q for q in sites]
+    if method in ("enhanced","bridge"):
+        from .surgery_bridges import enhanced,bridge
+        if method=="enhanced":
+            g=enhanced(sites,s["hx"] if s["axis"]=="Z" else s["hz"],s.get("budget",100000))
+        else:
+            m=s["left_size"]
+            g=bridge(m,len(sites)-m,s["left"],s["right"],s["links"])
+        return ports,[(1<<a)|(1<<b) for a,b in g["edges"]],g.get("faces"),g
     if method=="adapter":
         if len(sites)%2:
             raise ValueError("adapter needs equally many ports at each end")
