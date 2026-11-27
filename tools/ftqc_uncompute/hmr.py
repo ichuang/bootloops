@@ -164,7 +164,7 @@ class HMRVerificationResult:
 
 
 class _SymbolicOverflow(Exception):
-    """Raised when exact global ANF exceeds `max_monomials` so modular verification engages."""
+    """Raised when exact global ANF exceeds `max_monomials`."""
 
 
 def _check_injectivity_anf(
@@ -492,8 +492,7 @@ def verify_hmr_circuit(
     """Verify HMR phase cancellation, dirty-reset absence, scratch restoration, and branch injectivity.
 
     Uses exact global symbolic ANF + `(Q / 2Z)` multilinear phase polynomials up to `max_monomials`,
-    and falls back to modular `@enter:del_*` scope verification + Fiat-Shamir trajectory cross-check
-    when deeply cascaded nonlinear arithmetic exceeds `max_monomials`.
+    and reports an unproved result when the global proof exceeds that budget.
     """
     if circuit.registers:
         pub_qids = tuple(
@@ -513,59 +512,12 @@ def verify_hmr_circuit(
             max_monomials=max_monomials,
         )
     except _SymbolicOverflow:
-        # Modular verification of inner `@enter:del_*` scopes + trajectory check
-        findings: list[HMRFinding] = []
-        stack: list[tuple[str, int]] = []
-        for idx, op in enumerate(circuit.ops):
-            if op.kind == "INFO_TAG" and op.info_tag:
-                if op.info_tag.startswith("@enter:"):
-                    stack.append((op.info_tag[7:], idx))
-                elif op.info_tag.startswith("@exit:") and stack:
-                    name, start_i = stack.pop()
-                    if name.startswith("del_"):
-                        sub_ops = circuit.ops[start_i + 1 : idx]
-                        touched = sorted({q for sop in sub_ops for q in sop.qubits})
-                        sub_res = _symbolic_verify_ops(
-                            sub_ops,
-                            tuple(touched),
-                            circuit.num_qubits,
-                            circuit.num_bits,
-                            allow_branch_global_phase=allow_branch_global_phase,
-                            check_scratch_clean=False,
-                            max_monomials=max_monomials,
-                        )
-                        for f in sub_res.findings:
-                            # Note: in isolated `del_*`, target qubit was initialized externally to f(inputs)
-                            if f.code not in ("NON-INJECTIVE-KICKMIX-BRANCH", "UNCOMPENSATED-HMR-PHASE"):
-                                findings.append(f)
-
-        from .kickmix_sim import simulate_trajectories
-
-        sim = simulate_trajectories(circuit, shots=512, check_scratch_clean=check_scratch_clean)
-        dirty_free = sim.dirty_resets == 0
-        if not dirty_free and sim.first_failure_witness:
-            findings.append(
-                HMRFinding(
-                    code="DIRTY-RESET-HAZARD",
-                    message="Dirty reset detected in modular trajectory check",
-                    op_index=sim.first_failure_witness.get("dirty_reset_op_index"),
-                    qubit=sim.first_failure_witness.get("dirty_reset_qubit"),
-                    witness=sim.first_failure_witness,
-                )
-            )
-        is_valid = len(findings) == 0
         return HMRVerificationResult(
-            valid=is_valid,
-            branch_injective=is_valid,
-            dirty_reset_free=dirty_free,
-            phase_cancelled=is_valid,
-            branch_global_phase_clean=is_valid,
-            scratch_cleaned=sim.first_failure_witness is None
-            or sim.first_failure_witness.get("uncleaned_scratch_qubit") is None,
-            basis_outcome_independent=is_valid,
-            proof_method="modular_scoped_anf_plus_fiat_shamir",
-            num_public_qubits=len(pub_qids),
-            num_hmr=circuit.operation_statistics().num_hmr,
+            valid=False, branch_injective=False, dirty_reset_free=False,
+            phase_cancelled=False, branch_global_phase_clean=False, scratch_cleaned=False,
+            basis_outcome_independent=False, proof_method="symbolic_budget_exceeded",
+            num_public_qubits=len(pub_qids), num_hmr=circuit.operation_statistics().num_hmr,
             output_degree_max=-1,
-            findings=tuple(findings),
+            findings=(HMRFinding("SYMBOLIC-BUDGET-EXCEEDED",
+                                 f"Global ANF exceeded {max_monomials} monomials"),),
         )

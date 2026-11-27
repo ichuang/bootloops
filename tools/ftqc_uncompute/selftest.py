@@ -415,9 +415,28 @@ def _leg_mutants() -> str:
     return "M1-M4 scratch-copy code mutants all killed"
 
 
+def _regress_global_budget() -> str:
+    n = 14
+    header = ['REGISTER r0 "x"'] + [f"APPEND_TO_REGISTER q{i} r0" for i in range(n)]
+    invert = [f"X q{i}" for i in range(n)]
+    chain = [f"CCX q0 q1 q{n}"] + [
+        f"CCX q{n+j-2} q{j} q{n+j-1}" for j in range(2, n)
+    ]
+    bad = [f"CCX q0 q1 q{n}", f"HMR q{n} b0"]
+    bare = KickMixCircuit.from_kmx("\n".join(header + bad))
+    assert any(f.code == "UNCOMPENSATED-HMR-PHASE" for f in verify_hmr_circuit(bare).findings)
+    padded = KickMixCircuit.from_kmx("\n".join(header + invert + chain + chain[::-1] + invert + bad))
+    receipt = build_receipt_for_kmx(padded, shots=8)
+    assert receipt["verdict"] == "REFUSED"
+    assert receipt["hmr_verification"]["findings"][0]["code"] == "SYMBOLIC-BUDGET-EXCEEDED"
+    assert not receipt["fiat_shamir_trajectories"]["coherent_bound_valid"]
+    return "identity padding cannot certify a missing phase fixup"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
+        ("_regress_global_budget", _regress_global_budget),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),
