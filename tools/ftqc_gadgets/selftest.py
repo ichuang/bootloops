@@ -837,8 +837,18 @@ def t_local(heavy):
     forged = copy.deepcopy(valid)
     forged["results"][0]["decoders"][0]["proof"]["kernel_lower"] = 15
     refuses("an inflated kernel proof is recomputed", lambda: certify.verify(forged), "recompute")
+    # out of budget, the only other proof is the BCH bound, which needs a cyclic kernel:
+    # the Steane code in another qubit order has none, in its usual order it has
+    st_ = library.code_of("steane")
+    perm = [1, 0, 2, 3, 4, 5, 6]
+    moved = Code("steane_moved", 7, [sum(1 << perm[i] for i in gf2.supp(r)) for r in st_.hx],
+                 [sum(1 << perm[i] for i in gf2.supp(r)) for r in st_.hz])
     check("a kernel search that runs out of budget cannot certify the proposed radius",
-          not props.local(Analysis(meas, tables=False, cap=0), 1)["local"])
+          not props.local(Analysis(library.measure(moved, "Z"), tables=False, cap=0), 1)["local"])
+    cyc = props.local(Analysis(meas, tables=False, cap=0), 1)
+    check("out of budget on a cyclic kernel, the radius rests on the BCH bound and the proof says so",
+          cyc["local"] and "BCH" in cyc["decoders"][0]["proof"].get("bound_from", "")
+          and not props.local(Analysis(meas, tables=False, cap=0), 2)["local"], str(cyc)[:300])
     # repeated correction: later rounds do not depend on the input
     a = Analysis(library.load("steane_ec:steane,anc=spec,rounds=2"))
     ind = props.independent_of_input(a)
@@ -980,6 +990,424 @@ def t_levels(heavy):
     check("levels: a weaker inner receipt lowers the inner radius",
           levels.reduction(outer, weak)["conclusion"]["inner_faults_per_rectangle"] == 0)
 
+def _tree_variant(kind, code_name="steane"):
+    """Two raw copies and one X check, with one thing wrong."""
+    from ftqc_gadgets.gadget import state_checks
+    code = library.code_of(code_name)
+    n = code.n
+    b = Builder("variant_" + kind)
+    b.no_detectors()
+    A, B = b.par(lambda: library.frag_prep(b, code, "zero", "raw"),
+                 lambda: library.frag_prep(b, code, "plus" if kind == "states" else "zero", "raw"))
+    if kind == "inside":
+        b.tick([("CX", x, y) for x, y in zip(A, B)])
+        b.tick([("CX", A[0], A[1])])
+        b.tick([("CX", A[0], A[1])])
+    elif kind == "skew":
+        b.tick([("CX", x, y) for x, y in zip(A, B[1:] + B[:1])])
+    elif kind == "partial":
+        b.tick([("CX", x, y) for x, y in zip(A[:-1], B[:-1])])
+    else:
+        b.tick([("CX", y, x) if kind == "reversed" else ("CX", x, y) for x, y in zip(A, B)])
+    if kind == "waits":
+        b.tick([("I", y) for y in B])
+    recs = b.tick([("M", y) for y in B] + [("I", x) for x in A])
+    masks = state_checks(code, "zero", "Z")
+    if kind == "fewer":
+        masks = masks[:-1]
+    if kind == "foreign":
+        masks = masks[:-1] + [masks[-1] ^ 1]
+    b.checks(recs[:n], masks)
+    b.output(A, code)
+    return b.build()
+
+
+def _ec_with_trees(code_name, seq_plus, seq_zero, rounds=1):
+    """Steane error correction with purified ancillas, and for every fault location:
+    (coordinate or None, quiet?, leaf id or None).  Quiet: an operation of the correction
+    itself, a check operation of a tree, or the last idle of a leaf."""
+    code = library.code_of(code_name)
+    n = code.n
+    b = Builder(f"ec_with_trees({code_name})")
+    A = b.input(code, "data")
+    b.no_detectors()
+    mark = {}
+
+    def tree(state, seq):
+        before = {id(op) for t in b.ticks for op in t}
+        qs = library.frag_prep(b, code, state, "tree=" + seq, rounds)
+        for t in b.ticks:
+            for op in t:
+                if id(op) not in before:
+                    mark[id(op)] = state
+        return qs
+    P, Z = b.par(lambda: tree("plus", seq_plus), lambda: tree("zero", seq_zero))
+    b.tick([("CX", a, p) for a, p in zip(A, P)])
+    r1 = b.tick([("M", p) for p in P] + [("CX", z, a) for z, a in zip(Z, A)])[:n]
+    r2 = b.tick([("MX", z) for z in Z])
+    b.decoder("x_errors", r1, code.hz, "X", A)
+    b.decoder("z_errors", r2, code.hx, "Z", A)
+    b.output(A, code, "data")
+    ticks = [list(t) for t in b.ticks]
+    g = b.build()
+    refs = {q for blk in g.inputs for q in blk.refs}
+    wires = [q for q in range(g.circuit.n) if q not in refs]
+    pos = {q: i % n for i, q in enumerate(wires)}
+    blk = {q: i // n for i, q in enumerate(wires)}
+    last_leaf_idle = {}
+    info, i = [], 0
+    flat = [(k, op) for k, t in enumerate(ticks) for op in t if not op[0].startswith("!")]
+    first_cross = {}
+    for k, op in flat:
+        if op[0] == "CX" and blk[op[1]] != blk[op[2]]:
+            for q in op[1:]:
+                first_cross.setdefault(blk[q], k)
+    for k, op in flat:
+        qs = op[1:]
+        state = mark.get(id(op))
+        cols = {pos[q] for q in qs}
+        col = cols.pop() if len(cols) == 1 else None
+        if state is None:
+            info.append((col, True, None))
+        else:
+            in_leaf = k < first_cross[blk[qs[0]]]
+            quiet = (not in_leaf) or (op[0] == "I" and k == first_cross[blk[qs[0]]] - 1)
+            info.append((col, quiet, (state, blk[qs[0]]) if in_leaf else None))
+    return g, info
+
+
+def t_factories(heavy):
+    from ftqc_gadgets import factories, levels
+    INF = factories.INF
+    # ---- the contract against enumeration
+    for spec, seq, need in (("prep:steane,zero,raw", "", (1, 1)), ("prep:steane,zero,tree=X", "X", (2, 1)),
+                            ("prep:steane,zero,tree=Z", "Z", (1, 2)), ("prep:steane,plus,tree=Z", "Z", (1, 2)),
+                            ("prep:steane,zero,tree=XZ", "XZ", (2, 2)), ("prep:steane,plus,tree=ZX", "ZX", (2, 2)),
+                            ("prep:steane,zero,tree=XX", "XX", (4, 1)), ("prep:steane,zero,tree=ZXZ", "ZXZ", (2, 4)),
+                            ("prep:steane,zero,tree=XZ,rounds=1", "XZ", (2, 2))):
+        g = library.load(spec)
+        c = factories.certificate(g)
+        k = c.get("junk_leaves_needed", {})
+        check(f"factory {spec}: recognised, sequence and number of junk leaves needed",
+              c["tree"] and c["sequence"] == seq and (k["X"], k["Z"]) == need
+              and c["through"] == min(need) - 1 and c["leaves"] == 2 ** len(seq), str(c)[:300])
+        tr = factories.Tree(g)
+        an = Analysis(g)
+        r = factories.test(g, tr, exhaustive=2 if g.circuit.n <= 21 else 1, samples=9000, analysis=an)
+        check(f"factory {spec}: the rule agrees with propagation on every examined set",
+              r["failures"] == 0 and r["accepted"] > 800 and r["largest_accepted"] >= 8, str(r))
+        # the count K against the rule itself: fewest leaves with a junk-capable fault that raise the flag
+        junk = {}
+        for b_, leaf in tr.leaves.items():
+            cls = tr.shapes[leaf["shape"]]["classes"]
+            junk[b_] = {t: next((leaf["locs"][i] for i, row in enumerate(cls) if row[t][0] == "junk"), None)
+                        for t in "XZ"}
+        for t, want in zip("XZ", need):
+            best = INF
+            blocks = sorted(junk)
+            for w in range(1, len(blocks) + 1):
+                if best < INF:
+                    break
+                for sub in itertools.combinations(blocks, w):
+                    if all(junk[b_][t] is not None for b_ in sub) and tr.predict([junk[b_][t] for b_ in sub])[t][0]:
+                        best = w
+                        break
+            check(f"factory {spec}: junk leaves needed ({t}) is the least number that raises the flag", best == want,
+                  f"{best} vs {want}")
+        # the contract implies refinement of the specification through K - 1 (on the Steane
+        # code enumeration goes further: every Z pattern on |0_L> is equivalent to one error)
+        if len(seq) <= 2 and "rounds" not in spec:
+            state = spec.split(",")[1]
+            rr = props.refine(an, Analysis(library.prep("steane", state, "spec")), min(need) - 1, 0)
+            check(f"factory {spec}: enumeration against the specification confirms the contract's order",
+                  rr["holds_through"] == min(need) - 1, str(rr["holds_through"]))
+    # on the Golay code the order is exact: enumeration stops where the contract does
+    for seq, K in (("X", 1), ("XZ", 2)) if heavy else (("X", 1),):
+        g = library.load(f"prep:golay,zero,tree={seq}")
+        c = factories.certificate(g)
+        rr = props.refine(Analysis(g), Analysis(library.prep("golay", "zero", "spec")), K, 0)
+        check(f"factory prep:golay,zero,tree={seq}: enumeration against the specification stops where the "
+              f"contract does", c["through"] == K - 1 == rr["holds_through"] and rr["violation"] is not None,
+              f"{c['through']} {rr['holds_through']}")
+    # ---- classes against the definition, by replay on the raw circuit
+    for name in ("steane", "golay") if heavy else ("steane",):
+        for state in ("zero", "plus"):
+            g = library.prep(name, state, "raw")
+            tr = factories.Tree(g)
+            an = Analysis(g)
+            n = tr.n
+            low = (1 << n) - 1
+            mask = dict(X=sum(1 << i for i, v in enumerate(an.canon) if not v & low),
+                        Z=sum(1 << i for i, v in enumerate(an.canon) if not v >> n))
+            ok = True
+            for loc in an.model.locations:
+                for t, per in (("X", an.sx), ("Z", an.sz)):
+                    hits = set()
+                    for label in loc.faults:
+                        e = an.replay([(loc.index, label)]) >> an.shift & mask[t]
+                        if e:
+                            cs = [c for c in range(n) if per[c] == e]
+                            hits.add(cs[0] if cs else -1)
+                    want = "none" if not hits else ("local" if len(hits) == 1 and -1 not in hits else "junk")
+                    got = tr.info[loc.index][2][t]
+                    ok = ok and got[0] == want and (want != "local" or got[1] == next(iter(hits)))
+            check(f"factory classes ({name}, {state}): every location classed as the definition says", ok)
+    c = factories.certificate(library.prep("golay", "zero", "raw"))["leaf_kinds"][0]
+    check("factory classes: the library's raw Golay preparation (100 locations)",
+          (c["locations"], c["junk_capable_X"], c["junk_capable_Z"]) == (100, 66, 65)
+          and c["max_local_per_coordinate_X"] <= 3 and c["max_local_per_coordinate_Z"] <= 3, str(c))
+    c = factories.certificate(library.prep("steane", "zero", "spec"))
+    check("factory: a specification has no junk-capable location and is its own contract",
+          c["tree"] and c["junk_leaves_needed"] == dict(X=None, Z=None) and c["through"] is None and c["physical"])
+    # ---- strict classes
+    g = library.load("prep:steane,zero,tree=XZ,rounds=2")
+    cs, cn = factories.certificate(g, strict=True), factories.certificate(g)
+    check("factory, strict: only the last idle round of a leaf is local, each idle in its own column",
+          cs["tree"] and cs["physical"] and not cn["physical"]
+          and cs["leaf_kinds"][0]["junk_capable_X"] == cs["leaf_kinds"][0]["locations"] - 7
+          and cs["leaf_kinds"][0]["max_local_per_coordinate_Z"] == 1 and cs["junk_leaves_needed"] == dict(X=2, Z=2))
+    r = factories.test(g, factories.Tree(g, strict=True), exhaustive=1, samples=6000)
+    check("factory, strict: the rule with demoted classes still agrees with propagation", r["failures"] == 0, str(r))
+    c = factories.certificate(library.load("prep:steane,zero,tree=XZ"), strict=True)
+    check("factory, strict: a leaf without a final idle round is refused", not c["tree"] and "idle" in c["reason"])
+    # ---- what is not a tree
+    for kind, needle in (("fewer", "do not span"), ("foreign", "do not span"), ("reversed", "does not complete"),
+                         ("inside", "after its leaf"), ("skew", "not a transversal"), ("partial", "every coordinate"),
+                         ("waits", "idles between"), ("states", "same state")):
+        c = factories.certificate(_tree_variant(kind))
+        check(f"factory: a tree with {kind} is refused", not c["tree"] and needle in c["reason"], str(c))
+    c = factories.certificate(_tree_variant("ok"))
+    check("factory: the unmodified variant is accepted", c["tree"] and c["sequence"] == "X")
+    c = factories.certificate(library.load("steane_ec:steane,anc=spec"))
+    check("factory: a gadget with inputs is refused", not c["tree"])
+    c = factories.certificate(library.load("prep:steane,zero,tree=X"), wmin=5)
+    check("factory: a minimum weight that cannot be proved is refused", not c["tree"] and "only" in c["reason"])
+    c = factories.certificate(library.load("prep:steane,zero,tree=X"), wmin=2)
+    check("factory: a smaller requested minimum weight is used as given", c["tree"] and c["wmin"] == dict(X=2, Z=2))
+    from ftqc_codes import bch as _bch
+    b63 = _bch.cyclic_css(63, [1, 3, 5])
+    c = factories.certificate(library.prep(b63, "zero", "tree=X"), wmin=7, cap=200_000)
+    check("factory: on a cyclic code a minimum weight the search cannot reach is taken from the BCH bound",
+          c["tree"] and c["wmin"] == dict(X=7, Z=7)
+          and any("BCH" in v.get("bound_from", "") for v in c["wmin_proof"].values()), str(c)[:300])
+    # ---- probabilities: the recursion against sampling with independent location faults
+    from fractions import Fraction
+    for spec, p, shots in (("prep:steane,zero,tree=XZ", Fraction(1, 200), 60000),
+                           ("prep:steane,plus,tree=ZXZ", Fraction(1, 400), 40000),
+                           ("prep:steane,zero,tree=XZ,rounds=1", Fraction(1, 300), 40000)):
+        g = library.load(spec)
+        tr = factories.Tree(g)
+        an = Analysis(g)
+        bd = tr.bounds(*tr.iid_rates(p))
+        n = tr.n
+        low = (1 << n) - 1
+        mask = dict(X=sum(1 << i for i, v in enumerate(an.canon) if not v & low),
+                    Z=sum(1 << i for i, v in enumerate(an.canon) if not v >> n))
+        table = [[an.sig(*eff) for eff in loc.faults.values()] for loc in an.model.locations]
+        rnd = random.Random(11)
+        pf = float(p)
+        acc = 0
+        hit = dict(junkX=0, junkZ=0, dirtyX=0, dirtyZ=0)
+        for _ in range(shots):
+            sg, locs = 0, []
+            for i, labs in enumerate(table):
+                if rnd.random() < pf:
+                    sg ^= rnd.choice(labs)
+                    locs.append(i)
+            if sg & an.DET:
+                continue
+            acc += 1
+            if locs:
+                pred = tr.predict(locs)
+                e = sg >> an.shift
+                for t in "XZ":
+                    hit["junk" + t] += pred[t][0]
+                    hit["dirty" + t] += bool(e & mask[t])
+        want_acc = 1.0
+        for a_ in bd["accept_lower"]:
+            want_acc *= float(a_)
+        slack = lambda k, bound: hit[k] / acc <= float(bound) + 3 * (float(bound) / acc) ** 0.5 + 3 / acc
+        check(f"factory probabilities {spec}: acceptance is at least the product of the bounds",
+              acc / shots >= want_acc - 0.01 and acc > shots // 4, f"{acc / shots:.4f} vs {want_acc:.4f}")
+        check(f"factory probabilities {spec}: sampled junk and non-trivial rates do not exceed the bounds",
+              all(slack(k + t, bd[k][t]) for k in ("junk", "dirty") for t in "XZ")
+              and hit["dirtyX"] + hit["dirtyZ"] > 50,
+              str({k: round(v / acc, 5) for k, v in hit.items()}) + " vs "
+              + str({k: {t: round(float(v), 5) for t, v in bd[k].items()} for k in ("junk", "dirty")}))
+        check(f"factory probabilities {spec}: expected leaves at least the number of leaves",
+              bd["expected_leaves"] >= len(tr.leaves))
+    tr = factories.Tree(library.load("prep:steane,zero,tree=XZXZ"))
+    bd = tr.bounds(dict(X=Fraction(1, 100), Z=Fraction(1, 100)), dict(X=Fraction(0), Z=Fraction(0)),
+                   Fraction(0), Fraction(0))
+    check("factory probabilities: with no dirt the junk bound is the polynomial of the rule (8 x^4 and 64 z^4)",
+          bd["junk"] == dict(X=8 * Fraction(1, 100) ** 4, Z=64 * Fraction(1, 100) ** 4)
+          and bd["expected_leaves"] == 16, str(bd["junk"]))
+    # one X check, every input non-zero, against the formulas written out
+    tr1 = factories.Tree(library.load("prep:steane,zero,tree=X"))
+    F = Fraction
+    jx, jz, ux, uz, sa, sb = F(1, 7), F(1, 11), F(1, 5), F(1, 9), F(1, 13), F(1, 17)
+    b1 = tr1.bounds(dict(X=jx, Z=jz), dict(X=ux, Z=uz), sa, sb)
+    al = (1 - ux) ** 2 * (1 - sb)
+    check("factory probabilities: one check, all four formulas and the retry count",
+          b1["accept_lower"] == [al] and b1["junk"] == dict(X=jx * jx / al, Z=2 * jz / al)
+          and b1["dirty"] == dict(X=(sa + ux * (ux + sb)) / al, Z=(2 * uz + sa) / al)
+          and b1["expected_leaves"] == 2 / al, str(b1))
+    rj, rd, ra, rb = tr1.iid_rates(F(1, 100))
+    k1 = factories.certificate(library.load("prep:steane,zero,tree=X"))["leaf_kinds"][0]
+    cls = tr1.shapes[0]["classes"]
+    check("factory probabilities: rates for independent location faults count the right locations",
+          rj == {t: 1 - F(99, 100) ** k1[f"junk_capable_{t}"] for t in "XZ"}
+          and rd == {t: 1 - F(99, 100) ** sum(1 for r in cls if r[t][0] != "none") for t in "XZ"}
+          and ra == rb == 1 - F(99, 100) ** 14 and rj["X"] != rj["Z"] and rj["X"] < rd["X"])
+    check("factory probabilities: no bound when a check cannot be shown to accept",
+          tr.bounds(dict(X=Fraction(1, 2), Z=Fraction(1, 2)), dict(X=Fraction(1), Z=Fraction(1)),
+                    Fraction(0), Fraction(0)) is None)
+    # ---- receipts
+    g = library.load("prep:steane,zero,tree=XZ,rounds=2")
+    rec = certify.build(g, tree=dict(strict=True))
+    check("factory receipt: verifies", any("tree" in line for line in certify.verify(rec)))
+    check("factory receipt: summary states the contract", "unless this many leaves" in certify.summary(rec))
+    for name, edit in (("inflated count", lambda r: r["results"][0]["junk_leaves_needed"].update(X=4)),
+                       ("strict flag removed", lambda r: r["results"][0].update(strict=False)),
+                       ("physical claimed", lambda r: r["results"][0].update(physical=False)),
+                       ("lemma edited", lambda r: r["results"][0].update(lemma="trust me"))):
+        bad = copy.deepcopy(rec)
+        edit(bad)
+        refuses(f"factory receipt: {name} is refused", lambda bad=bad: certify.verify(bad), "does not recompute")
+    light = certify.build(g, tree=dict(strict=True, light=True))
+    check("factory receipt, light: same certificate without the full fault model, and it verifies",
+          light["results"] == rec["results"] and light["stats"].get("light")
+          and any("tree" in line for line in certify.verify(light)))
+    bad = copy.deepcopy(light)
+    bad["results"].append(dict(type="check", kind="prep", t=1, weight="pauli", holds_through=1, per=[],
+                               violation=None, note=None))
+    refuses("factory receipt, light: another kind of result cannot ride on it",
+            lambda: certify.verify(bad), "factory certificate only")
+    bad = copy.deepcopy(light)
+    bad["results"][0]["leaves"] = 8
+    refuses("factory receipt, light: an edited certificate is refused", lambda: certify.verify(bad),
+            "does not recompute")
+    refuses("factory receipt, light: enumeration cannot be requested with it",
+            lambda: certify.build(g, [("prep", 0)], tree=dict(light=True)), "light", exc=GadgetError)
+    bad = copy.deepcopy(certify.build(_tree_variant("ok"), tree=True))
+    bad["gadget"]["circuit"] = _tree_variant("fewer").to_json()["circuit"]
+    refuses("factory receipt: a circuit with a check removed under the old certificate is refused",
+            lambda: certify.verify(bad))
+    # ---- one level: correction with real trees, any number of faults inside few coordinates
+    for name, T, K, trials in (("steane", 1, 2, 3000),) + ((("golay", 3, 2, 8000),) if heavy else ()):
+        g, info = _ec_with_trees(name, "ZX", "XZ")
+        an = Analysis(g)
+        W = an.weigher()
+        n = len(g.outputs[0].qubits)
+        in_locs = {i for b_ in g.inputs for i in b_.in_locs}
+        pool, noisy = {}, []
+        k = 0
+        for loc in an.model.locations:
+            if loc.index in in_locs:
+                p = [b_.in_locs.index(loc.index) for b_ in g.inputs if loc.index in b_.in_locs][0]
+                for label, eff in loc.faults.items():
+                    pool.setdefault(p, []).append((loc.index, label, an.sig(*eff), True))
+                k += 1
+                continue
+            col, quiet, leaf = info[k]
+            k += 1
+            for label, eff in loc.faults.items():
+                item = (loc.index, label, an.sig(*eff), False)
+                if quiet:
+                    pool.setdefault(col, []).append(item)
+                else:
+                    noisy.append((leaf, item))
+        check(f"correction with trees ({name}): every location has a class", k == len(info))
+        rnd = random.Random(5)
+        seen = bad = big = 0
+        by_det = {}
+        for c_ in pool:
+            for it in pool[c_]:
+                by_det.setdefault((c_, it[2] & an.DET), []).append(it)
+        for trial in range(trials):
+            cols = rnd.sample(range(n), rnd.randint(1, T))
+            items = []
+            for c_ in cols:
+                items += rnd.sample(pool[c_], rnd.randint(1, min(12, len(pool[c_]))))
+            if trial % 3 == 0:                      # fewer than K leaves with a junk-capable fault
+                items.append(rnd.choice(noisy)[1])
+            if len({it[0] for it in items}) != len(items):
+                continue
+            sg = 0
+            for it in items:
+                sg ^= it[2]
+            if sg & an.DET:                          # try to make it accepted inside the same columns
+                fix = [it for c_ in cols for it in by_det.get((c_, sg & an.DET), [])
+                       if it[0] not in {x[0] for x in items}]
+                if not fix:
+                    continue
+                items.append(rnd.choice(fix))
+                sg ^= items[-1][2]
+            seen += 1
+            big = max(big, len(items))
+            if W.weight(an.effect(sg), len(cols)) is None:
+                bad += 1
+        check(f"correction with trees ({name}): faults confined to at most {T} coordinates, however many, "
+              f"with fewer than {K} junk leaves, leave the output within that weight",
+              bad == 0 and seen > trials // 20 and big > T + 3, f"{bad} of {seen}, largest {big}")
+        # and K junk leaves can break it: the same junk fault in two sibling leaves
+        leaves = sorted({leaf for leaf, _ in noisy})
+        broke = False
+        for a_, b_ in zip(leaves[::2], leaves[1::2]):
+            la = [it for leaf, it in noisy if leaf == a_]
+            lb = [it for leaf, it in noisy if leaf == b_]
+            for x, y in zip(la, lb):
+                if x[1] == y[1] and not (x[2] ^ y[2]) & an.DET and W.weight(an.effect(x[2] ^ y[2]), T) is None:
+                    broke = True
+                    break
+            if broke:
+                break
+        check(f"correction with trees ({name}): two leaves with the same junk-capable fault defeat it", broke)
+    # ---- the levels receipt without assumed ancillas
+    outer = certify.build(library.load("steane_ec:steane,anc=spec"), local=True)
+    parts = {role: certify.build(library.load(f"prep:steane,{role},tree={seq}"),
+                                 refines=[(library.prep("steane", role, "spec"), 1, 0)])
+             for role, seq in (("plus", "ZX"), ("zero", "XZ"))}
+    ec_spec = certify.build(library.load("steane_ec:steane,anc=spec"), [("ec", 1)], close=1)
+    ec = dict(composition=certify.compose(ec_spec, parts), target=ec_spec, parts=parts)
+    inner = dict(cnot=certify.build(library.load("cnot:steane"), [("gate", 1)]), ec=ec,
+                 measure_z=certify.build(library.load("measure:steane,z"), [("ec", 1)]),
+                 measure_x=certify.build(library.load("measure:steane,x"), [("ec", 1)]),
+                 prep_zero=parts["zero"], prep_plus=parts["plus"],
+                 idle=certify.build(library.idle("steane"), [("gate", 1)]))
+    fac = {role: certify.build(library.load(f"prep:steane,{role},tree={seq},rounds=2"), tree=dict(strict=True))
+           for role, seq in (("plus", "ZX"), ("zero", "XZ"))}
+    lv = levels.reduction(outer, inner, factories=fac)
+    check("levels with factories: no ancilla is assumed, and the junk event is recorded",
+          lv["outer"]["assumed"] == [] and [f["role"] for f in lv["factories"]] == ["plus", "zero"]
+          and lv["factory_junk_leaves_needed"] == 2 and "idle" in [r["role"] for r in lv["inner"]]
+          and lv["conclusion"] == dict(bad_columns_tolerated=1, inner_faults_per_rectangle=1), str(lv)[:400])
+    levels.verify_reduction(lv, outer, inner, factories=fac)
+    check("levels with factories: summary", "plus ancilla: tree ZX" in levels.summary(lv))
+    lv1 = levels.reduction(outer, inner, factories=dict(zero=fac["zero"]))
+    check("levels with factories: an ancilla without a factory stays assumed",
+          lv1["outer"]["assumed"] == ["plus ancilla as its specification"])
+    refuses("levels with factories: a receipt verified without its factories is refused",
+            lambda: levels.verify_reduction(lv, outer, inner), "differs")
+    loose = certify.build(library.load("prep:steane,zero,tree=XZ,rounds=2"), tree=True)
+    refuses("levels with factories: a factory without strict classes is refused",
+            lambda: levels.reduction(outer, inner, factories=dict(fac, zero=loose)), "strict")
+    refuses("levels with factories: a tree for the other state is refused",
+            lambda: levels.reduction(outer, inner, factories=dict(plus=fac["zero"])), "does not prepare")
+    refuses("levels with factories: the factory's operations need inner receipts too",
+            lambda: levels.reduction(outer, {k: v for k, v in inner.items() if k != "idle"}, factories=fac),
+            "no inner receipt for idle")
+    refuses("levels with factories: a factory for an ancilla the gadget does not have is refused",
+            lambda: levels.reduction(certify.build(library.load("cnot:steane"), local=True), inner,
+                                     factories=dict(zero=fac["zero"])), "no such specified ancilla")
+    other = certify.build(library.load("prep:golay,zero,tree=XZ,rounds=1"), tree=dict(strict=True))
+    refuses("levels with factories: a factory on another code is refused",
+            lambda: levels.reduction(outer, inner, factories=dict(zero=other)), "outer code")
+    bad = copy.deepcopy(lv)
+    bad["factory_junk_leaves_needed"] = 4
+    refuses("levels with factories: an inflated junk count is refused",
+            lambda: levels.verify_reduction(bad, outer, inner, factories=fac), "factory_junk")
+
 
 def ftqc_codes_concat():
     import ftqc_codes
@@ -1023,7 +1451,8 @@ def main():
     t0 = time.time()
     for fn, args in ((t_structure, ()), (t_tables, ()), (t_dense, (heavy,)), (t_linear, ()),
                      (t_weights, ()), (t_props, (heavy,)), (t_refine, (heavy,)), (t_compose, ()),
-                     (t_receipts, ()), (t_local, (heavy,)), (t_levels, (heavy,)), (t_cli, ())):
+                     (t_receipts, ()), (t_local, (heavy,)), (t_levels, (heavy,)), (t_factories, (heavy,)),
+                     (t_cli, ())):
         t1 = time.time()
         fn(*args)
         print(f"  {fn.__name__:<14} {time.time() - t1:6.2f} s   ({len(PASS)} passed so far)")

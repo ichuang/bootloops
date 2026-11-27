@@ -30,12 +30,22 @@ def _clean(d):
 
 
 def build(gadget, checks=(), close=None, refines=(), sector=False, cap=3_000_000, analysis=None,
-          local=None, tables=True):
-    """local: True, an integer radius or {decoder: radius} adds the coordinate-locality
+          local=None, tables=True, tree=None):
+    """tree: True or dict(strict=, wmin=) adds the factory certificate of a purification tree
+    (factories.certificate).
+    local: True, an integer radius or {decoder: radius} adds the coordinate-locality
     certificate (props.local).  tables=False skips decoder tables (large codes; only the
     locality certificate is then available).
     checks: [(kind, t)] or [(kind, t, sector)].  close: s or None.  refines: [(spec gadget, order, input weight)]."""
-    an = analysis or Analysis(gadget, cap, tables)
+    light = bool(tree) and isinstance(tree, dict) and tree.get("light")
+    if light:
+        # the factory certificate reads the circuit and its leaves only; a large tree need
+        # not have every fault propagated through it
+        if checks or close is not None or refines or local:
+            raise GadgetError("a light receipt carries the factory certificate only")
+        an = None
+    else:
+        an = analysis or Analysis(gadget, cap, tables)
     results = []
     for item in checks:
         kind, t = item[0], item[1]
@@ -56,8 +66,15 @@ def build(gadget, checks=(), close=None, refines=(), sector=False, cap=3_000_000
             r["radius_request"] = local
         r["lemma"] = props.LEMMA
         results.append(r)
+    if tree:
+        from . import factories
+        opt = tree if isinstance(tree, dict) else {}
+        r = factories.certificate(gadget, bool(opt.get("strict")), opt.get("wmin"), cap)
+        r["lemma"] = factories.LEMMA
+        results.append(r)
+    stats = dict(gadget.counts(), light=True) if light else an.stats()
     return _clean(dict(schema=SCHEMA, tool="ftqc_gadgets", tool_version=VERSION,
-                       gadget=gadget.to_json(), stats=an.stats(), tables=bool(tables), results=results))
+                       gadget=gadget.to_json(), stats=stats, tables=bool(tables), results=results))
 
 
 def receipt_sha(receipt):
@@ -72,15 +89,24 @@ def verify(receipt, full=False, cap=3_000_000):
     """Raises Refusal; returns the list of things that were checked."""
     if receipt.get("schema") not in (SCHEMA, "gadgetcert-receipt-1"):
         raise Refusal(f"not a {SCHEMA} receipt")
+    light = bool(receipt.get("stats", {}).get("light"))
     try:
         g = Gadget.from_json(receipt["gadget"])
-        an = Analysis(g, cap, receipt.get("tables", True))
+        if light and any(r.get("type") != "tree" for r in receipt.get("results", [])):
+            raise Refusal("a light receipt may carry the factory certificate only")
+        an = None if light else Analysis(g, cap, receipt.get("tables", True))
     except (GadgetError, ValueError) as e:
         raise Refusal(f"gadget: {e}") from None
-    done = ["gadget hash, input preamble, decoder checks, detectors"]
-    if _clean(an.stats()) != receipt.get("stats"):
-        raise Refusal("the fault-model statistics differ from the recomputed ones")
-    done.append("fault-model statistics")
+    if light:
+        done = ["gadget hash"]
+        if _clean(dict(g.counts(), light=True)) != receipt.get("stats"):
+            raise Refusal("the circuit counts differ from the recomputed ones")
+        done.append("circuit counts")
+    else:
+        done = ["gadget hash, input preamble, decoder checks, detectors"]
+        if _clean(an.stats()) != receipt.get("stats"):
+            raise Refusal("the fault-model statistics differ from the recomputed ones")
+        done.append("fault-model statistics")
     for i, r in enumerate(receipt.get("results", [])):
         tag = f"result {i} ({r.get('type')})"
         typ = r.get("type")
@@ -159,6 +185,13 @@ def verify(receipt, full=False, cap=3_000_000):
                 if again != r:
                     raise Refusal(f"{tag}: the locality certificate does not recompute")
                 done.append(f"{tag}: physical fault columns and decoder bounds recomputed")
+            elif typ == "tree":
+                from . import factories
+                again = _clean(factories.certificate(g, bool(r.get("strict")), r.get("wmin_request"), cap))
+                again["lemma"] = factories.LEMMA
+                if again != r:
+                    raise Refusal(f"{tag}: the factory certificate does not recompute")
+                done.append(f"{tag}: circuit parsed again, leaf classes, detectors and minimum weights recomputed")
             else:
                 raise Refusal(f"{tag}: unknown result type")
         except (KeyError, TypeError, ValueError, IndexError) as e:
@@ -284,9 +317,12 @@ def summary(receipt):
                        f"(with specifications: {c['target_holds_through']})")
         return "\n".join(out)
     st = receipt["stats"]
-    out = [f"{receipt['gadget']['name']}: {st['qubits']} qubits, {st['fault_locations']} fault "
-           f"locations, {st['columns']} distinct fault effects, {st['detectors']} detectors, "
-           f"{st['decoder_checks']} decoder checks"]
+    if st.get("light"):
+        out = [f"{receipt['gadget']['name']}: {st['qubits']} qubits, {st['fault_locations']} fault locations"]
+    else:
+        out = [f"{receipt['gadget']['name']}: {st['qubits']} qubits, {st['fault_locations']} fault "
+               f"locations, {st['columns']} distinct fault effects, {st['detectors']} detectors, "
+               f"{st['decoder_checks']} decoder checks"]
     for r in receipt["results"]:
         if r["type"] == "local":
             if not r["local"]:
@@ -299,6 +335,19 @@ def summary(receipt):
                 out.append(f"  coordinate-local on {r['coordinates']} coordinates: {', '.join(props_)} "
                            f"hold when faults and input errors touch {thr} coordinates"
                            + ("; also with X and Z counted separately" if r["sector"] else ""))
+            continue
+        if r["type"] == "tree":
+            if not r["tree"]:
+                out.append(f"  not a purification tree: {r['reason']}")
+            else:
+                k = r["junk_leaves_needed"]
+                need = ", ".join(f"{t}: {'never' if k[t] is None else k[t]}" for t in "XZ")
+                out.append(f"  purification tree {r['sequence'] or '(single leaf)'} of {r['leaves']} leaves on "
+                           f"{r['coordinates']} coordinates"
+                           + (", strict classes" if r["strict"] else "")
+                           + f": acts as its specification, with wire faults only on coordinates of faulty "
+                             f"local and step locations, unless this many leaves hold a junk-capable fault ({need})"
+                           + ("" if r["physical"] else "; some local locations sit on other coordinates"))
             continue
         if r["type"] == "check":
             line = (f"  {r['kind']} ({r['weight']} weight), r + s <= {r['t']}: holds through "

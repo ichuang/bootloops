@@ -109,10 +109,28 @@ class Hier:
 
 
 def kernel_radius(checks, n, requested, cap=5_000_000):
-    """Prove uniqueness through the requested weight using the actual decoder matrix."""
-    search = minweight.min_weight(gf2.nullspace(checks, n), n, target=2*requested+1, max_combos=cap)
+    """Prove uniqueness through the requested weight using the actual decoder matrix.
+
+    First by search over the kernel.  If the search budget stops short of the request and
+    the kernel is a cyclic code, the BCH bound is tried on it: its zeros are computed
+    exactly from this matrix and the theorem is cited (bch.py).  The evidence says which
+    of the two the bound rests on."""
+    kernel = gf2.nullspace(checks, n)
+    search = minweight.min_weight(kernel, n, target=2*requested+1, max_combos=cap)
     bound = n if search["empty"] else (search["lower"] - 1) // 2
-    return bound, dict(kernel_lower=search["lower"], empty_kernel=search["empty"])
+    evidence = dict(kernel_lower=search["lower"], empty_kernel=search["empty"])
+    if bound < requested and not search["empty"]:
+        from . import bch
+        try:
+            r = bch.code_bound(kernel, n)
+        except (bch.NotCyclic, ValueError):
+            r = None
+        if r is not None and (r["bound"] - 1) // 2 > bound:
+            bound = (r["bound"] - 1) // 2
+            evidence.update(kernel_lower=r["bound"], search_lower=search["lower"],
+                            bound_from="BCH bound on the check kernel: zeros computed exactly, theorem cited",
+                            bch={k: v for k, v in r.items() if k != "bound"})
+    return bound, evidence
 
 
 def radius(receipt, sector):

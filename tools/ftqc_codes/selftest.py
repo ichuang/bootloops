@@ -556,6 +556,25 @@ def t_hier():
             lambda: hier.certificate(inflated, RECEIPTS["steane"]), "proved kernel radius")
     tab, u = hier.leader_table(codes.golay().hz, 23)
     check("hier: Golay table has 2048 entries, unique through 3", len(tab) == 2048 and u == 3)
+    # radius of a decoder from its own matrix: search, then the BCH bound when the search stops short
+    from ftqc_codes import bch
+    b63 = bch.cyclic_css(63, [1, 3, 5])
+    bound, ev = hier.kernel_radius(b63.hz, 63, 3, cap=200_000)
+    check("kernel radius: a search that stops short falls back to the BCH bound on the same kernel",
+          bound == 3 and ev["kernel_lower"] == 7 and ev["search_lower"] < 7 and "BCH" in ev["bound_from"], str(ev)[:200])
+    bound2, ev2 = hier.kernel_radius(b63.hz, 63, 3, cap=60_000_000)
+    check("kernel radius: with a larger budget the search alone proves the same radius",
+          bound2 == 3 and "bound_from" not in ev2, str(ev2))
+    perm = list(range(63))
+    perm[0], perm[5] = perm[5], perm[0]
+    moved = [sum(1 << perm[i] for i in gf2.supp(r)) for r in b63.hz]
+    bound3, ev3 = hier.kernel_radius(moved, 63, 3, cap=200_000)
+    check("kernel radius: the same code in a non-cyclic order gets no such help",
+          bound3 < 3 and "bound_from" not in ev3, str(ev3))
+    bound4, ev4 = hier.kernel_radius(b63.hz, 63, 4, cap=200_000)
+    check("kernel radius: the BCH bound does not prove more than the designed distance gives", bound4 == 3)
+    bound5, ev5 = hier.kernel_radius(codes.golay().hz, 23, 3)
+    check("kernel radius: Golay by search", bound5 == 3 and "bound_from" not in ev5)
 
 # ---------------------------------------------------------------- 6. SAT leg (needs cadical)
 def t_sat(heavy):

@@ -55,6 +55,17 @@ STATEMENT = (
     "as specifications) are hypotheses as well: an outer ancilla must refine its specification "
     "with bad columns in place of faults.")
 
+FACTORIES = (
+    "An ancilla listed under factories is produced by a purification tree whose locations are "
+    "inner gadgets (an idle is an inner error correction).  Its certificate uses strict classes: "
+    "only the last idle of each leaf and the locations of the checks are local, each in its own "
+    "physical column; every other leaf location is junk-capable.  By the filter rule printed in "
+    "that certificate, in every accepted run in which fewer than K leaves hold a bad junk-capable "
+    "location, in each sector, the ancilla is its specification with wire faults only in columns "
+    "that hold a bad local or step location of the factory.  Those columns count toward T2 "
+    "together with all others.  A run with K or more such leaves in one factory is not covered: "
+    "that is the junk event, whose probability a design must bound separately.")
+
 ROLE_OF = {"I": "idle", "H": "h", "R": "prep_zero", "RX": "prep_plus", "CX": "cnot", "M": "measure_z", "MX": "measure_x"}
 KIND_OF = dict(idle="gate", h="gate", prep_zero="prep", prep_plus="prep", cnot="gate", ec="ec", measure_z="ec", measure_x="ec")
 
@@ -256,7 +267,40 @@ def _block_code(receipt):
     return codes[0] if codes else None
 
 
-def reduction(outer_receipt, inner, cap=3_000_000):
+def _factory(role, rec, code, cap):
+    """Check a tree receipt as the factory of an outer ancilla; returns (row, roles used)."""
+    from . import factories as fac
+    from .gadget import state_checks
+    certify.verify(rec, cap=cap)
+    res = [r for r in rec["results"] if r["type"] == "tree"]
+    if len(res) != 1 or not res[0]["tree"]:
+        raise certify.Refusal(f"factory {role}: the receipt carries no positive tree certificate")
+    res = res[0]
+    if not res["strict"] or not res["physical"]:
+        raise certify.Refusal(f"factory {role}: an outer factory needs strict classes with every local "
+                              f"location in its own column")
+    fg = Gadget.from_json(rec["gadget"])
+    fc = fg.outputs[0].code
+    if fc is None or (fc.n, list(fc.hx), list(fc.hz)) != (code.n, list(code.hx), list(code.hz)):
+        raise certify.Refusal(f"factory {role}: its output block is not a block of the outer code")
+    tr = fac.Tree(fg, True, res.get("wmin_request"), cap)
+    for t, G in (("X", tr.GX), ("Z", tr.GZ)):
+        want = gf2.Echelon(state_checks(code, role, t))
+        if len(want.basis) != len(G) or any(v not in want for v in G):
+            raise certify.Refusal(f"factory {role}: the tree does not prepare the {role} state")
+    used = set()
+    for tick in fg.circuit.ticks:
+        for op in tick:
+            if not op.noisy or op.name not in ROLE_OF:
+                raise certify.Refusal(f"factory {role}: unsupported or noiseless operation {op.text()}")
+            used.add(ROLE_OF[op.name])
+    row = dict(role=role, gadget=fg.name, sha256=fg.sha256(), receipt_sha256=certify.receipt_sha(rec),
+               sequence=res["sequence"], leaves=res["leaves"], junk_leaves_needed=res["junk_leaves_needed"],
+               operations=sorted(used))
+    return row, used
+
+
+def reduction(outer_receipt, inner, cap=3_000_000, factories=None):
     """outer_receipt: a receipt of the outer gadget that carries a locality certificate.
     inner: {role: receipt} with roles prep_zero, prep_plus, cnot, ec, measure_z,
     measure_x; every role the outer circuit uses is required, `ec` always.  Returns the
@@ -284,8 +328,18 @@ def reduction(outer_receipt, inner, cap=3_000_000):
             if op.name not in ROLE_OF:
                 raise certify.Refusal(f"unsupported outer operation {op.name}")
             used.add(ROLE_OF[op.name])
-    assumed = sorted({f"{p['role']} ancilla as its specification" for p in g.parts
-                      if p.get("method") == "spec"})
+    spec_roles = sorted({p["role"] for p in g.parts if p.get("method") == "spec"})
+    frows = []
+    for role in sorted(factories or {}):
+        if role not in spec_roles:
+            raise certify.Refusal(f"factory {role}: the outer gadget has no such specified ancilla")
+        ocode = next((b.code for b in g.inputs + g.outputs if b.code is not None), None)
+        if ocode is None:
+            raise certify.Refusal("the outer gadget declares no code")
+        row, more = _factory(role, factories[role], ocode, cap)
+        frows.append(row)
+        used |= more
+    assumed = [f"{role} ancilla as its specification" for role in spec_roles if role not in (factories or {})]
     rows, t1, code_sha = [], None, None
     for role in sorted(used):
         rec = inner.get(role)
@@ -322,7 +376,13 @@ def reduction(outer_receipt, inner, cap=3_000_000):
         rows.append(dict(role=role, gadget=bg.name, logical_action=action, properties=got, through=through,
                          receipt_sha256=certify.receipt_sha(evid)))
         t1 = through if t1 is None else min(t1, through)
+    extra = {}
+    if frows:
+        need = [v for r in frows for v in r["junk_leaves_needed"].values() if v is not None]
+        extra = dict(factories=frows, factory_statement=FACTORIES,
+                     factory_junk_leaves_needed=min(need) if need else None)
     return certify._clean(dict(
+        **extra,
         schema=LEVELS, tool="ftqc_gadgets", tool_version=certify.VERSION,
         outer=dict(gadget=g.name, sha256=g.sha256(), receipt_sha256=certify.receipt_sha(outer_receipt),
                    coordinates=loc["coordinates"], properties=[k for k in ("gate", "ec", "close") if loc[k]],
@@ -332,12 +392,13 @@ def reduction(outer_receipt, inner, cap=3_000_000):
         statement=STATEMENT))
 
 
-def verify_reduction(levels, outer_receipt, inner, cap=3_000_000):
+def verify_reduction(levels, outer_receipt, inner, cap=3_000_000, factories=None):
     if levels.get("schema") != LEVELS:
         raise certify.Refusal(f"not a {LEVELS} receipt")
-    again = reduction(outer_receipt, inner, cap)
-    for k in ("outer", "inner", "inner_code", "conclusion", "statement"):
-        if again[k] != levels.get(k):
+    again = reduction(outer_receipt, inner, cap, factories)
+    for k in ("outer", "inner", "inner_code", "conclusion", "statement", "factories",
+              "factory_statement", "factory_junk_leaves_needed"):
+        if again.get(k) != levels.get(k):
             raise certify.Refusal(f"levels: {k} differs from what the receipts support")
     return ["outer receipt and locality certificate", "inner receipts", "conclusion recomputed"]
 
@@ -350,6 +411,10 @@ def summary(levels):
              f"when each inner rectangle has at most {c['inner_faults_per_rectangle']} faults"]
     for a in levels["outer"].get("assumed", []):
         lines.append(f"  assumed: {a}")
+    for f in levels.get("factories", []):
+        k = f["junk_leaves_needed"]
+        lines.append(f"  {f['role']} ancilla: tree {f['sequence']} of {f['leaves']} leaves; not covered when "
+                     + ", ".join(f"{k[t]} leaves hold a bad junk-capable location ({t})" for t in "XZ" if k[t] is not None))
     for r in levels["inner"]:
         lines.append(f"  {r['role']}: {r['gadget']} ({', '.join(f'{k} through {v}' for k, v in r['properties'].items())})")
     return "\n".join(lines)
