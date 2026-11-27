@@ -20,6 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
+    "gross_block_reading": ("axis padding target", ""),
     "surgery_sequence": ("memory operations padding max_degree target", ""),
     "fixed_graph": ("n checks vertices edges ports cycles routes max_degree logical target", "couplers"),
     "block_reading": ("memory blocks pattern axis target", "expected"),
@@ -81,6 +82,9 @@ def evaluate(s, backend, budget, seconds, reverse=False):
             return analyze(s, budget)
         if kind == "surgery_sequence":
             from .surgery_sequence import analyze
+            return analyze(s, budget)
+        if kind == "gross_block_reading":
+            from .reading_audit import analyze
             return analyze(s, budget)
         if kind == "block_reading":
             from .block_reading import analyze
@@ -212,6 +216,20 @@ def main():
             from .algebra import bits
 
             validate(s)
+            if s["kind"] == "gross_block_reading":
+                from ftqc_codes.codes import CSSCode, load
+                from .reading_audit import probe
+                if args.probe is None or args.arm != "gate" or s["axis"] not in ("X","Z") or s["target"]!=12 or s["padding"]!=[12,12]:
+                    raise ValueError("select a canonical BB144 reading probe X or Z")
+                mem=load("bb144")
+                if s["axis"]=="X":
+                    mem=CSSCode("dual",mem.n,mem.hz,mem.hx)
+                text=json.dumps(probe(mem,s["axis"],args.probe)[0].to_json())+"\n"
+                if args.o:
+                    args.o.write_text(text)
+                else:
+                    print(text,end="")
+                return 0
             if s["kind"] == "gross_circuit":
                 from .gross_probes import experiment
 

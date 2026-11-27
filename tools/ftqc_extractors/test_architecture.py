@@ -58,3 +58,17 @@ class SequenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             receipt(s)
         self.assertEqual(receipt(dict(SMALL,target=3))["result"]["status"],"counterexample")
+
+class GrossReadingTests(unittest.TestCase):
+    def test_both_axes(self):
+        from ftqc_codes.codes import CSSCode, load
+        from ftqc_audit.record_model import RecordModel
+        from .reading_audit import probe
+        from .block_reading import reading
+        bb=load("bb144")
+        for axis in ("X","Z"):
+            mem=bb if axis=="Z" else CSSCode("dual",144,bb.hz,bb.hx)
+            r=reading((144,mem.hx,mem.hz),2,[3],"Z")
+            self.assertEqual((len(r["measured"]),r["survivors"],r["added_data"]+r["added_check_meters"]),(12,12,216))
+            circ,*_=probe(mem,axis,"X")
+            self.assertTrue(RecordModel(circ).locations)
