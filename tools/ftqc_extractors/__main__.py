@@ -26,7 +26,10 @@ FIELDS = {
     "intermediate_reading": ("memory operations padding max_degree target rounds", ""),
     "gross_block_reading": ("axis padding target", ""),
     "surgery_sequence": ("memory operations padding max_degree target", ""),
-    "fixed_graph": ("n checks vertices edges ports cycles routes max_degree logical target", "couplers"),
+    "fixed_graph": (
+        "n checks vertices edges ports cycles routes max_degree logical target",
+        "couplers",
+    ),
     "block_reading": ("memory blocks pattern axis target", "expected"),
     "gross_circuit": ("rounds target", "spacetime fault_witnesses"),
     "gross_z": ("target", ""),
@@ -83,27 +86,35 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     try:
         if kind == "fixed_graph":
             from .fixed_graph import analyze
+
             return analyze(s, budget)
         if kind == "surgery_sequence":
             from .surgery_sequence import analyze
+
             return analyze(s, budget)
         if kind == "gross_block_reading":
             from .reading_audit import analyze
+
             return analyze(s, budget)
         if kind == "intermediate_reading":
             from .surgery_bounds import intermediate
+
             return intermediate(s, budget)
         if kind == "modular_expansion":
             from .surgery_bounds import expansion
+
             return expansion(s, budget)
         if kind == "surgery_zx":
             from .surgery_zx import analyze
+
             return analyze(s, budget)
         if kind == "pbc":
             from .pbc import analyze
+
             return analyze(s, budget)
         if kind == "block_reading":
             from .block_reading import analyze
+
             return analyze(s, budget)
         if kind == "gross_circuit":
             from .gross_noisy import report
@@ -235,16 +246,23 @@ def main():
             if s["kind"] == "gross_block_reading":
                 from ftqc_codes.codes import CSSCode, load
                 from .reading_audit import probe
-                if args.probe is None or args.arm != "gate" or s["axis"] not in ("X","Z") or s["target"]!=12 or s["padding"]!=[12,12]:
+
+                if (
+                    args.probe is None
+                    or args.arm != "gate"
+                    or s["axis"] not in ("X", "Z")
+                    or s["target"] != 12
+                    or s["padding"] != [12, 12]
+                ):
                     raise ValueError("select a canonical BB144 reading probe X or Z")
-                mem=load("bb144")
-                if s["axis"]=="X":
-                    mem=CSSCode("dual",mem.n,mem.hz,mem.hx)
-                text=json.dumps(probe(mem,s["axis"],args.probe)[0].to_json())+"\n"
+                mem = load("bb144")
+                if s["axis"] == "X":
+                    mem = CSSCode("dual", mem.n, mem.hz, mem.hx)
+                text = json.dumps(probe(mem, s["axis"], args.probe)[0].to_json()) + "\n"
                 if args.o:
                     args.o.write_text(text)
                 else:
-                    print(text,end="")
+                    print(text, end="")
                 return 0
             if s["kind"] == "gross_circuit":
                 from .gross_probes import experiment

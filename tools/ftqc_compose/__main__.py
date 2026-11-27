@@ -43,8 +43,12 @@ def evaluate(spec):
         return logical_t_result(spec)
     if spec["kind"] == "block-reading-residual":
         from ftqc_extractors.__main__ import verify
+
         source, proof = spec["extractor"], spec["distance_receipt"]
-        if source["kind"] != "gross_block_reading" or proof["result"]["status"] != "proved":
+        if (
+            source["kind"] != "gross_block_reading"
+            or proof["result"]["status"] != "proved"
+        ):
             raise ValueError("expected verified BB144 block reading")
         verify(source, proof)
         t = spec["faults"]
@@ -52,10 +56,14 @@ def evaluate(spec):
             raise ValueError("fault count must be a nonnegative integer")
         probes = proof["result"]["circuit"]["probes"]
         spread = sum(p["residual_component_weight_per_fault"] for p in probes.values())
-        return dict(status="proved", axis=source["axis"], faults=t,
-                    residual_data_weight_upper=min(288, t*spread),
-                    assumption="ideal encoded inputs; apply split frame; open output",
-                    probe_hashes={b:p["circuit_sha256"] for b,p in probes.items()})
+        return dict(
+            status="proved",
+            axis=source["axis"],
+            faults=t,
+            residual_data_weight_upper=min(288, t * spread),
+            assumption="ideal encoded inputs; apply split frame; open output",
+            probe_hashes={b: p["circuit_sha256"] for b, p in probes.items()},
+        )
     if spec["kind"] == "gross-residual":
         from .gross_residual import gross_result
 

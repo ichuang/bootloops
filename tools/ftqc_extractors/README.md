@@ -2,7 +2,7 @@
 
 ftqc_extractors checks fault-tolerance claims about logical operations on encoded quantum memory. Give it a code and a measurement construction, a circuit schedule, or a logical T protocol. It produces a JSON receipt that can be verified against the same input. A failed distance target can be just as informative as a proof. Its witness identifies the faults that evade detection and damage the logical operation.
 
-An **extractor system** couples auxiliary qubits to a quantum memory so that a choice of checks measures a logical Pauli on the data. A full extractor can address every logical Pauli on the block. A partial extractor covers a specified set. ftqc_extractors implements extractors for two memory code families: hypergraph product (HGP) codes and the bivariate bicycle gross code. Each construction specifies its auxiliary graph, port connections and measurement procedure. [He et al., §§4.2–4.5](https://arxiv.org/abs/2503.10390v2)
+An **extractor system** couples auxiliary qubits to a quantum memory so that a choice of checks measures a logical Pauli on the data. A full extractor can address every logical Pauli on the block. A partial extractor covers a specified set. ftqc_extractors verifies finite fixed-coupler graphs for signed stabilizer codes and auxiliary-hypergraph surgeries for CSS memories. It also has specialized constructions for hypergraph product (HGP) codes and the bivariate bicycle gross code. Each construction specifies its auxiliary graph, port connections and measurement procedure. [He et al., §§4.2–4.5](https://arxiv.org/abs/2503.10390v2)
 
 ## Try a circuit proof
 
@@ -23,6 +23,10 @@ The example measures a weight-two logical Z on an eight-qubit HGP block. Two rou
 
 | Input kind | What the receipt establishes |
 |---|---|
+| `block_reading`, `gross_block_reading` | Full transversal reading of a CSS pattern, the measured subgroup, spectators and split frame. The BB144 benchmark separately audits a physical schedule. |
+| `fixed_graph`, `pbc` | Routing, relative expansion and couplers of a fixed full or partial extractor, plus signed measurement settings for a bridged Clifford+T program. |
+| `surgery_sequence`, `intermediate_reading` | Sequence-level phenomenological bounds with checked auxiliary complexes, distances and temporal boundaries. Intermediate time uses a separate soundness test. |
+| `modular_expansion`, `surgery_zx` | Finite hypergraph expansion and thickening, or a ZX comparison of a homomorphic measurement with a surgery instrument. |
 | `gross_circuit` | Circuit-level fault distance of the explicit noisy BB144 logical Z measurement, including the split frame and surviving logicals. |
 | `gross_z` | Ideal unprimed logical Z measurement and exact static distances for the BB144 memory and its merged code. |
 | `hgp` | Block length, logical dimension and base Pauli distance from the two classical seed matrices. |

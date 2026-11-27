@@ -5,7 +5,7 @@ The seven tools on `ftqc_integration` cover different parts of a fault-tolerance
 | Tool | Input and question | Evidence |
 |---|---|---|
 | [ftqc_codes](ftqc_codes/GUIDE.md) | Given CSS check matrices, which logical errors can the memory detect? | Code parameters, bounds on X and Z distance, witnesses and hierarchical decoding guarantees. |
-| [ftqc_extractors](ftqc_extractors/GUIDE.md) | Does an HGP or gross-code extractor measure the intended logical observable and preserve the spectators? | Static and scheduled distance bounds, logical readout and frame checks, and logical T gate receipts with a specified resource input. |
+| [ftqc_extractors](ftqc_extractors/GUIDE.md) | Which logical measurements can a fixed apparatus perform, and what fault distance does a surgery sequence preserve? | Fixed-coupler graphs and bridges, transversal block readings, padded hypergraph surgery, physical fault witnesses, and resource-conditional logical T receipts. |
 | [ftqc_audit](ftqc_audit/GUIDE.md) | Which physical faults can evade a Clifford circuit’s detectors? | Detector and observable flips per location, replayable fault sets, circuit-distance intervals and preparation checks. |
 | [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, refinement receipts for component substitution and two-level checks on concatenated codes. |
 | [ftqc_zx](ftqc_zx/GUIDE.md) | Can a candidate replace a reference circuit under the specified noise model? | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic gadget contracts. |
@@ -37,6 +37,12 @@ python3 -m ftqc_extractors verify "$spec" "$out/distance.json"
 ```
 
 The audit report counts 25,048 noisy locations in this probe and checks faults through weight two. The extractor receipt combines both CSS probes, the time history of the logical readout, and a physical witness. It proves exact distance **7** for the seven-round measurement. Flipping one fixed port measurement in every round changes the reported logical Z and passes all detectors.
+
+## Cross-block measurements
+
+For two BB144 memories the full reading measures twelve independent corresponding logical parities. The new apparatus uses 72 data qubits and 144 check meters. With twelve syndrome rounds before and after the reading, Proposition 3.9 gives phenomenological distance at least twelve. A separate one-merge-round circuit with ideal encoded inputs and terminal measurements has circuit distance between 3 and 12 in the two complementary audit probes. Compose replays that evidence before using the split-frame residual bound. [BB144 benchmark](ftqc_extractors/GUIDE.md#two-block-bb144-benchmark)
+
+A general fast-surgery study supplies chain maps, auxiliary cycle checks, metachecks and the ordered temporal boundaries. A block-map study instead supplies hardware ports, matching bridges and logical Clifford+T gates. Its output lists the signed measurements available on the installed couplers for each adaptive branch. [Sequence example](ftqc_extractors/examples/three-block-sequence.json) · [Compiler example](ftqc_extractors/examples/bridged-pbc.json) · [ZX comparison](ftqc_extractors/examples/homomorphic-surgery.json)
 
 ## Three questions about Steane-code operations
 

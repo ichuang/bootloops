@@ -1,4 +1,5 @@
 """Full CSS block reading, Cowtan et al. Definition 3.6. Rows are bit masks."""
+
 from functools import reduce
 from operator import xor
 
@@ -11,7 +12,9 @@ def combine(rows, coefficients):
 
 
 def rows(values, width):
-    if not isinstance(values, list) or any(type(v) is not int or v < 0 or v.bit_length() > width for v in values):
+    if not isinstance(values, list) or any(
+        type(v) is not int or v < 0 or v.bit_length() > width for v in values
+    ):
         raise ValueError("invalid matrix rows or column width")
     return values
 
@@ -44,24 +47,26 @@ def split_section(hx, n):
 
 def row_solver(matrix):
     """Carry coefficients while eliminating rows to lift arbitrary row-space elements."""
-    basis={}
-    for i,row in enumerate(matrix):
-        coeff=1<<i
-        for pivot,(v,c) in sorted(basis.items(),reverse=True):
-            if row>>pivot&1:
-                row^=v
-                coeff^=c
+    basis = {}
+    for i, row in enumerate(matrix):
+        coeff = 1 << i
+        for pivot, (v, c) in sorted(basis.items(), reverse=True):
+            if row >> pivot & 1:
+                row ^= v
+                coeff ^= c
         if row:
-            basis[row.bit_length()-1]=(row,coeff)
+            basis[row.bit_length() - 1] = (row, coeff)
+
     def solve(word):
-        result=0
-        for pivot,(v,c) in sorted(basis.items(),reverse=True):
-            if word>>pivot&1:
-                word^=v
-                result^=c
+        result = 0
+        for pivot, (v, c) in sorted(basis.items(), reverse=True):
+            if word >> pivot & 1:
+                word ^= v
+                result ^= c
         if word:
             raise ValueError("surviving logical has no lift")
         return result
+
     return solve
 
 
@@ -72,67 +77,102 @@ def reading(code, blocks, pattern, axis):
     if axis == "X":
         hx, hz = hz, hx
     rows(pattern, blocks)
-    if not pattern or any(p.bit_count() < 2 for p in pattern) or Echelon(pattern).rank != len(pattern):
-        raise ValueError("pattern rows must be independent with at least two participating blocks")
+    if (
+        not pattern
+        or any(p.bit_count() < 2 for p in pattern)
+        or Echelon(pattern).rank != len(pattern)
+    ):
+        raise ValueError(
+            "pattern rows must be independent with at least two participating blocks"
+        )
     data = blocks * n
     mx = len(hx)
     columns = transpose(hx, n)
     extend = [copies(1, p, mx) if mx else 0 for p in transpose(pattern, blocks)]
-    x = [(h << (b*n)) | (extend[b] << (data+i))
-         for b in range(blocks) for i, h in enumerate(hx)]
-    old_z = [h << (b*n) for b in range(blocks) for h in hz]
-    ports = [copies(1 << q, p, n) | (columns[q] << (data+r*mx))
-             for r, p in enumerate(pattern) for q in range(n)]
+    x = [
+        (h << (b * n)) | (extend[b] << (data + i))
+        for b in range(blocks)
+        for i, h in enumerate(hx)
+    ]
+    old_z = [h << (b * n) for b in range(blocks) for h in hz]
+    ports = [
+        copies(1 << q, p, n) | (columns[q] << (data + r * mx))
+        for r, p in enumerate(pattern)
+        for q in range(n)
+    ]
     z = old_z + ports
-    width = data + len(pattern)*mx
+    width = data + len(pattern) * mx
     logicals = quotient(hx, hz, n)
     measured = [copies(v, p, n) for p in pattern for v in logicals]
-    readouts = [v << (r*n) for r in range(len(pattern)) for v in logicals]
+    readouts = [v << (r * n) for r in range(len(pattern)) for v in logicals]
     if [combine(ports, v) for v in readouts] != measured:
         raise ValueError("port readout does not equal requested physical logical")
     # Shorten to data to detect ANY additional projection, including spectator loss.
     expected = Echelon(old_z + measured)
     from .algebra import echelon
+
     short = [v for v in echelon(z).values() if v.bit_length() <= data]
     if len(short) != expected.rank or any(v not in expected for v in short):
         raise ValueError("unexpected data projection")
     k = css_dimension((width, x, z))
-    if k != len(logicals)*(blocks-len(pattern)):
+    if k != len(logicals) * (blocks - len(pattern)):
         raise ValueError("unexpected surviving logical dimension")
-    metas = [copies(1 << i, p, len(hz)) | (h << (len(old_z)+r*n))
-             for r,p in enumerate(pattern) for i,h in enumerate(hz)]
-    if any(combine(z,m) for m in metas):
+    metas = [
+        copies(1 << i, p, len(hz)) | (h << (len(old_z) + r * n))
+        for r, p in enumerate(pattern)
+        for i, h in enumerate(hz)
+    ]
+    if any(combine(z, m) for m in metas):
         raise ValueError("invalid port metacheck")
-    old_x=[h<<(b*n) for b in range(blocks) for h in hx]
-    z_survivors=quotient(old_x,old_z+measured,data)
-    x_survivors=quotient(old_z+measured,old_x,data)
-    solver=row_solver(hx)
-    lifts=[]
+    old_x = [h << (b * n) for b in range(blocks) for h in hx]
+    z_survivors = quotient(old_x, old_z + measured, data)
+    x_survivors = quotient(old_z + measured, old_x, data)
+    solver = row_solver(hx)
+    lifts = []
     for v in x_survivors:
-        lifted=v
-        for r,p in enumerate(pattern):
-            overlap=reduce(xor,((v>>(b*n))&((1<<n)-1) for b in bits(p)),0)
-            lifted |= solver(overlap)<<(data+r*mx)
-        if any(parity(lifted,h) for h in z):
+        lifted = v
+        for r, p in enumerate(pattern):
+            overlap = reduce(xor, ((v >> (b * n)) & ((1 << n) - 1) for b in bits(p)), 0)
+            lifted |= solver(overlap) << (data + r * mx)
+        if any(parity(lifted, h) for h in z):
             raise ValueError("spectator lift anticommutes with a merged check")
         lifts.append(lifted)
-    pairing=[sum(parity(a,b)<<i for i,b in enumerate(z_survivors)) for a in lifts]
-    if len(lifts)!=k or len(z_survivors)!=k or Echelon(pairing).rank!=k:
+    pairing = [sum(parity(a, b) << i for i, b in enumerate(z_survivors)) for a in lifts]
+    if len(lifts) != k or len(z_survivors) != k or Echelon(pairing).rank != k:
         raise ValueError("incomplete spectator logical algebra")
-    return dict(width=width, hx=x if axis=="Z" else z, hz=z if axis=="Z" else x,
-                axis=axis, measured=measured, port_readouts=readouts, metachecks=metas,
-                survivors=k,spectator_basis=dict(same_axis=z_survivors,dual_axis_lifts=lifts,pairing=pairing), split_basis=split_section(hx,n), split_blocks=pattern,
-                added_data=width-data, added_check_meters=len(ports))
+    return dict(
+        width=width,
+        hx=x if axis == "Z" else z,
+        hz=z if axis == "Z" else x,
+        axis=axis,
+        measured=measured,
+        port_readouts=readouts,
+        metachecks=metas,
+        survivors=k,
+        spectator_basis=dict(
+            same_axis=z_survivors, dual_axis_lifts=lifts, pairing=pairing
+        ),
+        split_basis=split_section(hx, n),
+        split_blocks=pattern,
+        added_data=width - data,
+        added_check_meters=len(ports),
+    )
 
 
 def analyze(spec, budget):
     code = memory(spec["memory"])
     result = reading(code, spec["blocks"], spec["pattern"], spec["axis"])
     if "expected" in spec and spec["expected"] != result["measured"]:
-        raise ValueError("measured logicals differ from expected ordered representatives")
+        raise ValueError(
+            "measured logicals differ from expected ordered representatives"
+        )
     witness = distance_below(code, spec["target"], budget)
     if witness:
         return dict(status="counterexample", model="memory-distance", witness=witness)
-    return dict(status="proved", model="ideal full block reading, static merged CSS distance",
-                distance_lower=spec["target"], theorem="2510.14895 Lemma 3.8", **result)
-
+    return dict(
+        status="proved",
+        model="ideal full block reading, static merged CSS distance",
+        distance_lower=spec["target"],
+        theorem="2510.14895 Lemma 3.8",
+        **result,
+    )
