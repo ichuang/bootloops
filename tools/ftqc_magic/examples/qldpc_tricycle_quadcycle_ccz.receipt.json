@@ -1,0 +1,198 @@
+{
+  "contract": {
+    "acceptance_lower": "1",
+    "acceptance_lower_dec": "1",
+    "active_qubits": 1134,
+    "conditional_infidelity_upper": "567/1000000",
+    "conditional_infidelity_upper_dec": "0.000567",
+    "correlation_mode": "BATCH_CORRELATED",
+    "distance": 3,
+    "expected_wire_ticks_per_output_upper": "5670",
+    "expected_wire_ticks_per_output_upper_dec": "5670",
+    "input_error_rate": "1/1000",
+    "k_outputs": 2,
+    "leading_order_coeff": 567,
+    "n_inputs": 0,
+    "name": "qldpc_tricycle_3x3x3_fanout_depth1",
+    "optimality_gap_inputs": null,
+    "optimality_lower_bound_n": null,
+    "premises": [
+      "3D tricycle transversal CCZ + depth-1 homomorphic CNOT into 4D quadcycle with single-shot metacheck repair",
+      "two output CCZ states share a common |det> minor-collapse block (BATCH_CORRELATED)"
+    ],
+    "target_label": "CCZ^2",
+    "total_wires": 1134,
+    "unnormalized_failure_upper": "567/1000000",
+    "unnormalized_failure_upper_dec": "0.000567"
+  },
+  "details": {
+    "quadcycle_jump": {
+      "L": 2,
+      "css_commutes": true,
+      "homomorphic_cnot_depth": 1,
+      "meta_x_valid": true,
+      "meta_z_valid": true,
+      "quadcycle_4d_qubits": 96,
+      "singleshot_decode": {
+        "converged": true,
+        "decoder": "ftqc_decoders.ssf_metacheck",
+        "meta_defect_nonzero_before": true,
+        "meta_defect_zero_after_repair": true,
+        "residual_syndrome_zero": true
+      },
+      "tricycle_3d_qubits": 24
+    },
+    "stages": [
+      {
+        "contract": {
+          "acceptance_lower": "1",
+          "acceptance_lower_dec": "1",
+          "active_qubits": 1134,
+          "conditional_infidelity_upper": "567/1000000",
+          "conditional_infidelity_upper_dec": "0.000567",
+          "correlation_mode": "BATCH_CORRELATED",
+          "distance": 3,
+          "expected_wire_ticks_per_output_upper": "5670",
+          "expected_wire_ticks_per_output_upper_dec": "5670",
+          "input_error_rate": "1/1000",
+          "k_outputs": 2,
+          "leading_order_coeff": 567,
+          "n_inputs": 0,
+          "name": "qldpc_tricycle_3x3x3_fanout_depth1",
+          "optimality_gap_inputs": null,
+          "optimality_lower_bound_n": null,
+          "premises": [
+            "3D tricycle transversal CCZ + depth-1 homomorphic CNOT into 4D quadcycle with single-shot metacheck repair",
+            "two output CCZ states share a common |det> minor-collapse block (BATCH_CORRELATED)"
+          ],
+          "target_label": "CCZ^2",
+          "total_wires": 1134,
+          "unnormalized_failure_upper": "567/1000000",
+          "unnormalized_failure_upper_dec": "0.000567"
+        },
+        "details": {
+          "aod_shuttle": {
+            "breakdown": [
+              {
+                "aod_monotone_submoves": 2,
+                "shift": [
+                  0,
+                  0,
+                  1
+                ]
+              },
+              {
+                "aod_monotone_submoves": 2,
+                "shift": [
+                  0,
+                  1,
+                  0
+                ]
+              },
+              {
+                "aod_monotone_submoves": 2,
+                "shift": [
+                  1,
+                  0,
+                  0
+                ]
+              }
+            ],
+            "dimension": 3,
+            "theta_aod_shuttle_moves": 6,
+            "unique_torus_shifts": 3
+          },
+          "ccz_schedule": {
+            "ccz_schedule": "fanout_depth1",
+            "effective_circuit_distance": 3,
+            "nominal_distance": 3,
+            "physical_ccz_depth": 1,
+            "qubits_per_block": 162
+          },
+          "determinant_collapse": {
+            "clifford_fixup_on_g1": [
+              "CZ(0,1)",
+              "CZ(3,4)"
+            ],
+            "correlation_mode": "BATCH_CORRELATED",
+            "k_ccz_outputs": 2,
+            "output_target": "CCZ^2",
+            "verified_all_64_basis_states_both_branches": true
+          },
+          "tricycle": {
+            "Lx": 3,
+            "Ly": 3,
+            "Lz": 3,
+            "css_commutes": true,
+            "n_qubits": 81,
+            "nominal_distance": 3,
+            "num_hx": 81,
+            "num_hz": 27,
+            "num_mx": 27,
+            "x_metacheck_valid": true
+          }
+        },
+        "kind": "qldpc",
+        "stage": 0
+      }
+    ]
+  },
+  "exports": {
+    "ftqc_compose_ancilla_contract_interleaved": {
+      "atom_tag": "magic_batch1",
+      "correlation_mode": "BATCH_CORRELATED",
+      "independent_contract": {
+        "fail": "0.000567",
+        "modes": [
+          [
+            1,
+            "0.000567"
+          ]
+        ],
+        "pi": "0.999433"
+      },
+      "interleaving": "distinct-instances",
+      "local_stochastic_contract": {
+        "equivalents": {
+          "magic_batch1": "0.000567"
+        }
+      },
+      "source_name": "qldpc_tricycle_3x3x3_fanout_depth1",
+      "target": "CCZ^2"
+    },
+    "ftqc_compose_summary": {
+      "acceptance_prob_lo": "1",
+      "conditional_failure_hi": "0.000567",
+      "distance": 3,
+      "expected_wire_ticks_per_output_hi": "5670",
+      "factory_name": "qldpc_tricycle_3x3x3_fanout_depth1",
+      "target": "CCZ^2",
+      "unnormalized_accepted_failure_hi": "0.000567"
+    },
+    "ftqc_extractors_record": {
+      "conditional_infidelity_hi": "0.000567",
+      "correlation_mode": "BATCH_CORRELATED",
+      "expected_wire_ticks_per_output_hi": "5670",
+      "fault_distance": 3,
+      "k_outputs": 2,
+      "kind": "ftqc_magic_source",
+      "name": "qldpc_tricycle_3x3x3_fanout_depth1",
+      "peak_active_qubits": 1134,
+      "target_state": "CCZ^2"
+    },
+    "ftqc_uncompute_pricing": {
+      "magic_metadata": {
+        "t_correlation_mode": "BATCH_CORRELATED",
+        "t_peak_active_qubits": 1134,
+        "t_source": "qldpc_tricycle_3x3x3_fanout_depth1"
+      },
+      "t_factory_escape_hi": "0.000567",
+      "t_factory_wire_ticks": 5670
+    }
+  },
+  "kind": "qldpc",
+  "optimality_gap": null,
+  "schema": "ftqc_magic-receipt-1",
+  "source_sha256": "8b75c2a6664f09fe9df6ef296dd0a5e2026be2adf470c00775f09ac556d23955",
+  "spec_sha256": "86ab2314824591378e2f75f4e867372efba340ec6ec926675ddcdafd9675cf05"
+}

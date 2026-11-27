@@ -1,0 +1,229 @@
+{
+  "contract": {
+    "acceptance_lower": "952157785983014364347799144621547728869454674027880245485275909514785353066535853214759022248071725216013156864495468741820602090672142422824048999/1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "acceptance_lower_dec": "0.95215778598301436434779914462154772886945467402788",
+    "active_qubits": 5,
+    "conditional_infidelity_upper": "14828001322754513585343481364862348279920168012304717752297894929806940713601157147930543717218036188983571905905317766347042935201216107/952157785983014364347799144621547728869454674027880245485275909514785353066535853214759022248071725216013156864495468741820602090672142422824048999",
+    "conditional_infidelity_upper_dec": "1.5573050539565751918140440609914923026967579486945e-11",
+    "correlation_mode": "INDEPENDENT_SINGLE",
+    "distance": 5,
+    "expected_wire_ticks_per_output_upper": "245000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000/952157785983014364347799144621547728869454674027880245485275909514785353066535853214759022248071725216013156864495468741820602090672142422824048999",
+    "expected_wire_ticks_per_output_upper_dec": "257.31029416207554795565956759417464424493330786250",
+    "input_error_rate": "1/1000",
+    "k_outputs": 1,
+    "leading_order_coeff": 1411,
+    "n_inputs": 49,
+    "name": "bh_49_1_5_t",
+    "optimality_gap_inputs": 37,
+    "optimality_lower_bound_n": 12,
+    "premises": [
+      "independent Z-equivalent input errors of rate p on each T rotation",
+      "ideal Clifford checks and postselection on all +1 X-check outcomes"
+    ],
+    "target_label": "0",
+    "total_wires": 14,
+    "unnormalized_failure_upper": "14828001322754513585343481364862348279920168012304717752297894929806940713601157147930543717218036188983571905905317766347042935201216107/1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "unnormalized_failure_upper_dec": "1.4828001322754513585343481364862348279920168012305e-11"
+  },
+  "details": {
+    "factory": {
+      "algebraic": {
+        "check_cz_corrections": [],
+        "check_s_corrections": {},
+        "full_rank": true,
+        "jws_polynomial": "0",
+        "output_cz_corrections": [],
+        "output_s_corrections": {},
+        "reduced": true
+      },
+      "distance_method": "exact_mitm",
+      "exact_probability_dp": false,
+      "lrat_info": null,
+      "witness_columns": [
+        0,
+        1,
+        2,
+        15,
+        16
+      ]
+    },
+    "faults_frame_audit": null,
+    "recycling": {
+      "active_qubits": 5,
+      "active_trace": [
+        2,
+        3,
+        3,
+        4,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        4,
+        2,
+        3,
+        4,
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        4,
+        4,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        4
+      ],
+      "bnb_exhaustive": false,
+      "column_order": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        10,
+        12,
+        14,
+        13,
+        16,
+        24,
+        28,
+        32,
+        15,
+        23,
+        27,
+        31,
+        21,
+        25,
+        29,
+        22,
+        30,
+        26,
+        17,
+        18,
+        19,
+        20,
+        37,
+        38,
+        39,
+        40,
+        33,
+        34,
+        35,
+        36,
+        41,
+        42,
+        43,
+        45,
+        44,
+        46,
+        48,
+        47
+      ],
+      "event_count": 76,
+      "lrat_lower_bound_info": null,
+      "original_wires": 14,
+      "output_physical_qubits": [
+        4
+      ],
+      "qubits_saved": 9
+    }
+  },
+  "exports": {
+    "ftqc_compose_ancilla_contract": {
+      "atom_tag": "t1",
+      "correlation_mode": "INDEPENDENT_SINGLE",
+      "independent_contract": {
+        "fail": "1.5573050539565751918140440609914923026967579486945e-11",
+        "modes": [
+          [
+            1,
+            "1.5573050539565751918140440609914923026967579486945e-11"
+          ]
+        ],
+        "pi": "0.99999999998442694946043424808185955939008507697303"
+      },
+      "interleaving": null,
+      "local_stochastic_contract": {
+        "equivalents": {
+          "t1": "1.5573050539565751918140440609914923026967579486945e-11"
+        }
+      },
+      "source_name": "bh_49_1_5_t",
+      "target": "0"
+    },
+    "ftqc_compose_summary": {
+      "acceptance_prob_lo": "0.95215778598301436434779914462154772886945467402788",
+      "conditional_failure_hi": "1.5573050539565751918140440609914923026967579486945e-11",
+      "distance": 5,
+      "expected_wire_ticks_per_output_hi": "257.31029416207554795565956759417464424493330786250",
+      "factory_name": "bh_49_1_5_t",
+      "target": "0",
+      "unnormalized_accepted_failure_hi": "1.4828001322754513585343481364862348279920168012305e-11"
+    },
+    "ftqc_extractors_record": {
+      "conditional_infidelity_hi": "1.5573050539565751918140440609914923026967579486945e-11",
+      "correlation_mode": "INDEPENDENT_SINGLE",
+      "expected_wire_ticks_per_output_hi": "257.31029416207554795565956759417464424493330786250",
+      "fault_distance": 5,
+      "k_outputs": 1,
+      "kind": "ftqc_magic_source",
+      "name": "bh_49_1_5_t",
+      "peak_active_qubits": 5,
+      "target_state": "0"
+    },
+    "ftqc_uncompute_pricing": {
+      "magic_metadata": {
+        "t_correlation_mode": "INDEPENDENT_SINGLE",
+        "t_peak_active_qubits": 5,
+        "t_source": "bh_49_1_5_t"
+      },
+      "t_factory_escape_hi": "1.5573050539565751918140440609914923026967579486945e-11",
+      "t_factory_wire_ticks": 258
+    }
+  },
+  "kind": "factory",
+  "optimality_gap": {
+    "actual_n": 49,
+    "gap_inputs": 37,
+    "lower_bound_n": 12,
+    "source": "BGM26_Thm4_Lemma13",
+    "tight_known": false
+  },
+  "schema": "ftqc_magic-receipt-1",
+  "source_sha256": "8b75c2a6664f09fe9df6ef296dd0a5e2026be2adf470c00775f09ac556d23955",
+  "spec_sha256": "db41b66bafddd7d97e0ede61ecad63df496d6e41046fc37a25e3f7bbd8e2ab6e"
+}

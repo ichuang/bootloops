@@ -1,0 +1,11 @@
+{
+  "Lx": 3,
+  "Ly": 3,
+  "Lz": 3,
+  "ccz_schedule": "fanout_depth1",
+  "claimed_distance": 3,
+  "kind": "qldpc",
+  "p_phys": "1/1000",
+  "quadcycle_L": 2,
+  "verify_quadcycle_jump": true
+}

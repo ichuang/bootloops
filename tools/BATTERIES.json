@@ -112,6 +112,10 @@
   "cmd": "python3 tools/ftqc_gadgets/selftest.py",
   "cwd": "root"
  },
+ "ftqc_magic": {
+  "cmd": "python3 tools/ftqc_magic/selftest.py",
+  "cwd": "root"
+ },
  "ftqc_uncompute": {
   "cmd": "python3 tools/ftqc_uncompute/selftest.py",
   "cwd": "root"
