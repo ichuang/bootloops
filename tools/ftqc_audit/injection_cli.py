@@ -8,11 +8,19 @@ from functools import lru_cache
 def command(args):
     from ftqc_extractors.injection_circuit import paths, run
 
+    try:
+        import stim
+
+        if args.decode:
+            import stimbposd
+    except ImportError as exc:
+        raise ValueError(
+            "injection audit requires Stim; --decode also requires stimbposd"
+        ) from exc
     if args.decode and not args.faults:
         raise ValueError("--decode requires --faults")
     predict = None
     if args.decode:
-        import stim
         import numpy as np
         from .injection_sampling import build_decoder
 

@@ -43,7 +43,10 @@ def coordinates(locations):
 
 
 def result(s):
-    import stim
+    try:
+        import stim
+    except ImportError as exc:
+        raise ValueError("injection-batch requires Stim") from exc
 
     if set(s) != {"kind", "case", "locations", "frame", "slots", "state_budget"}:
         raise ValueError("unsupported batch contract fields")
