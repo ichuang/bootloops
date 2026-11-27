@@ -110,3 +110,12 @@ class CompactedDistanceTests(unittest.TestCase):
         verify(s,r)
         self.assertEqual(r["result"]["obligation"],"compacted code distance")
         self.assertEqual(r["result"]["witness"],dict(axis="Z",qubits=[8]))
+
+class SpectatorTests(unittest.TestCase):
+    def test_one_sector_and_spectators(self):
+        from .surgery_sequence import cosystole_witness
+        self.assertIsNone(cosystole_witness((3,[],[3,6]),3,100))
+        self.assertIsNotNone(distance_below((3,[],[3,6]),3))
+        s=receipt(SMALL)["result"]["spectator_basis"]
+        self.assertEqual(len(s["same_axis"]),2)
+        self.assertTrue(all(s["pairing"]))

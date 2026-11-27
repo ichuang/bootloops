@@ -42,6 +42,29 @@ def split_section(hx, n):
     return [[columns[j], 1 << j] for j in pivots]
 
 
+def row_solver(matrix):
+    """Carry coefficients while eliminating rows to lift arbitrary row-space elements."""
+    basis={}
+    for i,row in enumerate(matrix):
+        coeff=1<<i
+        for pivot,(v,c) in sorted(basis.items(),reverse=True):
+            if row>>pivot&1:
+                row^=v
+                coeff^=c
+        if row:
+            basis[row.bit_length()-1]=(row,coeff)
+    def solve(word):
+        result=0
+        for pivot,(v,c) in sorted(basis.items(),reverse=True):
+            if word>>pivot&1:
+                word^=v
+                result^=c
+        if word:
+            raise ValueError("surviving logical has no lift")
+        return result
+    return solve
+
+
 def reading(code, blocks, pattern, axis):
     if axis not in ("X", "Z") or type(blocks) is not int or blocks < 2:
         raise ValueError("invalid reading axis or block count")
@@ -80,9 +103,25 @@ def reading(code, blocks, pattern, axis):
              for r,p in enumerate(pattern) for i,h in enumerate(hz)]
     if any(combine(z,m) for m in metas):
         raise ValueError("invalid port metacheck")
+    old_x=[h<<(b*n) for b in range(blocks) for h in hx]
+    z_survivors=quotient(old_x,old_z+measured,data)
+    x_survivors=quotient(old_z+measured,old_x,data)
+    solver=row_solver(hx)
+    lifts=[]
+    for v in x_survivors:
+        lifted=v
+        for r,p in enumerate(pattern):
+            overlap=reduce(xor,((v>>(b*n))&((1<<n)-1) for b in bits(p)),0)
+            lifted |= solver(overlap)<<(data+r*mx)
+        if any(parity(lifted,h) for h in z):
+            raise ValueError("spectator lift anticommutes with a merged check")
+        lifts.append(lifted)
+    pairing=[sum(parity(a,b)<<i for i,b in enumerate(z_survivors)) for a in lifts]
+    if len(lifts)!=k or len(z_survivors)!=k or Echelon(pairing).rank!=k:
+        raise ValueError("incomplete spectator logical algebra")
     return dict(width=width, hx=x if axis=="Z" else z, hz=z if axis=="Z" else x,
                 axis=axis, measured=measured, port_readouts=readouts, metachecks=metas,
-                survivors=k, split_basis=split_section(hx,n), split_blocks=pattern,
+                survivors=k,spectator_basis=dict(same_axis=z_survivors,dual_axis_lifts=lifts,pairing=pairing), split_basis=split_section(hx,n), split_blocks=pattern,
                 added_data=width-data, added_check_meters=len(ports))
 
 

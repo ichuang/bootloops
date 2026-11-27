@@ -53,6 +53,24 @@ def append_cone(code, op, offset, x, z, locality):
     return offset+len(ax),logicals
 
 
+def cosystole_witness(aux,d,budget):
+    """Search X cocycles modulo X stabilizers; the opposite distance is unrestricted."""
+    from itertools import combinations
+    from math import comb
+    from .algebra import parity, Limit
+    v,ax,az=aux
+    stabs=Echelon(ax)
+    for w in range(1,min(d,v+1)):
+        budget-=comb(v,w)
+        if budget<0:
+            raise Limit("auxiliary 1-cosystole search")
+        for subset in combinations(range(v),w):
+            mask=sum(1<<i for i in subset)
+            if mask not in stabs and not any(parity(mask,h) for h in az):
+                return dict(axis="X",qubits=list(subset))
+    return None
+
+
 def padding(s):
     p=s["padding"]
     if not isinstance(p,list) or len(p)!=2 or any(type(x) is not int or x<s["target"] for x in p):
@@ -78,10 +96,9 @@ def analyze(s,budget):
     for i,op in enumerate(ops):
         av,ax,az=memory(op["aux"])
         width,images=append_cone(code,op,width,x,z,s["max_degree"])
-        # Check the full auxiliary CSS distance (sufficient for the required X cosystole).
-        bad=distance_below((av,ax,az),d,budget)
+        bad=cosystole_witness((av,ax,az),d,budget)
         if bad:
-            return dict(status="counterexample",obligation="auxiliary CSS distance",index=i,witness=bad)
+            return dict(status="counterexample",obligation="auxiliary 1-cosystolic distance",index=i,witness=bad)
         for v in images:
             if not logical_basis.add(v):
                 raise ValueError("dependent or trivial induced logical measurement")

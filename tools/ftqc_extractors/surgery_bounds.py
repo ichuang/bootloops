@@ -6,7 +6,7 @@ from operator import or_
 
 from .algebra import css_dimension, distance_below, parity, span, transpose, Limit
 from .block_reading import memory, rows
-from .surgery_sequence import append_cone, padding, sparse
+from .surgery_sequence import append_cone, padding, sparse, cosystole_witness
 
 
 def expansion(s,budget):
@@ -88,7 +88,7 @@ def intermediate(s,budget):
         if type(r) is not int or r<1:
             raise ValueError("invalid round count")
         ax=memory(op["aux"])
-        bad=distance_below(ax,(d+r-1)//r,budget)
+        bad=cosystole_witness(ax,(d+r-1)//r,budget)
         if bad:
             return dict(status="counterexample",obligation="auxiliary distance times rounds",witness=bad)
         x,z=list(hx),list(hz)

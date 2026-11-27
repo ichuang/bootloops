@@ -74,7 +74,7 @@ Run `check` and `verify` on [the two-block fixture](examples/block-reading.json)
 
 ## Padded hypergraph surgery
 
-[Three-block sequence](examples/three-block-sequence.json) measures two independent patterns in order. Each auxiliary CSS code has a fourth term supplied by its complete sparse cycle basis. The three chain maps are **column** masks into the original memory. Metacheck masks refer to original Z checks followed by the operation’s vertex checks. The verifier builds the simultaneous mapping cone for the distance proof; the physical protocol performs the listed operations sequentially with one merge round apiece and the stated boundary rounds. It checks both chain squares, vertex non-overlap, sparsity, injectivity and independence of measured logical classes. This implementation uses the stronger sufficient condition of full auxiliary CSS distance. A failed sufficient condition leaves the theorem unavailable; it is not a physical fault witness. The distance model is phenomenological.
+[Three-block sequence](examples/three-block-sequence.json) measures two independent patterns in order. Each auxiliary CSS code has a fourth term supplied by its complete sparse cycle basis. The three chain maps are **column** masks into the original memory. Metacheck masks refer to original Z checks followed by the operation’s vertex checks. The verifier builds the simultaneous mapping cone for the distance proof; the physical protocol performs the listed operations sequentially with one merge round apiece and the stated boundary rounds. It checks both chain squares, vertex non-overlap, sparsity, injectivity and independence of measured logical classes. The auxiliary 1-cosystole search checks X cocycles modulo X checks. A failed sufficient condition leaves the theorem unavailable; it is not a physical fault witness. The distance model is phenomenological.
 
 ## Two-block BB144 benchmark
 
@@ -84,7 +84,7 @@ The circuit benchmark uses ideal encoded inputs, one noisy merge, noisy split an
 
 ## Expansion and intermediate time
 
-[Modular expansion](examples/modular-expansion.json) checks the exact minimum in Definition 7.2 before and after Cartesian path thickening, with ports on the first layer. It returns both minimizing cuts. [Intermediate reading](examples/intermediate-reading.json) applies Theorem 6.5. Breadth-first search on attainable Pauli syndromes computes quantum soundness from minimum physical Pauli weights, including Y. Each individual cone must preserve the memory target and its auxiliary distance times its declared merge rounds must reach that target. Both temporal boundaries are checked. These enumerations are intended for finite studies and return an open obligation at their budget.
+[Modular expansion](examples/modular-expansion.json) checks the exact minimum in Definition 7.2 before and after Cartesian path thickening, with ports on the first layer. It returns both minimizing cuts. [Intermediate reading](examples/intermediate-reading.json) applies Theorem 6.5. Breadth-first search on attainable Pauli syndromes computes quantum soundness from minimum physical Pauli weights, including Y. Each individual cone must preserve the memory target and its auxiliary 1-cosystolic distance times its declared merge rounds must reach that target. Both temporal boundaries are checked. These enumerations are intended for finite studies and return an open obligation at their budget.
 
 ## Homomorphic measurement and surgery
 
