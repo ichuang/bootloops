@@ -1,6 +1,6 @@
 """ftqc_uncompute — Measurement-based uncomputation, spooky pebbling, and superposition masking."""
 
-from . import adapters
+from . import adapters, blocks, cuts
 from .certify import (
     RECEIPT_SCHEMA,
     ReceiptRefusalError,
@@ -10,6 +10,7 @@ from .certify import (
     verify_receipt_file,
 )
 from .cli import main
+from .cuts import prove_relation, verify_with_cuts
 from .gf2 import GF2Field, anf_and, anf_const, anf_degree, anf_eval, anf_not, anf_var, anf_xor
 from .hmr import HMRFinding, HMRVerificationResult, verify_hmr_circuit
 from .ir_dag import ArithDAG, DAGNode, RegDecl, lift_scoped_kmx_to_dag
