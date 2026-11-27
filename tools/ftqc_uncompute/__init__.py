@@ -1,6 +1,7 @@
 """ftqc_uncompute — Measurement-based uncomputation, spooky pebbling, and superposition masking."""
 
 from . import adapters, blocks, cuts
+from .adapters.ftqc_bridge import estimate_reaction_decoder_latency
 from .certify import (
     RECEIPT_SCHEMA,
     ReceiptRefusalError,

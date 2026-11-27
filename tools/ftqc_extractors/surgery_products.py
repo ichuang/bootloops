@@ -1,6 +1,9 @@
 """Finite tensor and cyclic lifts for fast surgery protocols."""
 
 from itertools import combinations
+import random
+
+from ftqc_codes import certify as _fc_certify, constructions as _fc_constructions
 from ftqc_codes.gf2 import Echelon, dot, nullspace, supp
 from ftqc_gadgets.surgery_geometry import transpose, check_rows, restricted_cone
 from .algebra import hgp
@@ -68,46 +71,36 @@ def product_sequence(c, nc, d, nd, words, target, padding, degree):
 
 
 def lifted_product(a, b, lift):
-    """C1 tensor D0 + C0 tensor D1, each ring entry is a cyclic-polynomial mask."""
+    """C1 tensor D0 + C0 tensor D1, routed through `ftqc_codes.constructions.lifted_product`."""
     if type(lift) != int or lift < 1 or not a or not b or not a[0] or not b[0]:
         raise ValueError("empty lifted product")
-    m, n, r, k = len(a), len(a[0]), len(b), len(b[0])
-    for matrix, cols in ((a, n), (b, k)):
+    n_cols, k_cols = len(a[0]), len(b[0])
+    for matrix, cols in ((a, n_cols), (b, k_cols)):
         if any(len(row) != cols for row in matrix):
             raise ValueError("ragged protograph")
         for row in matrix:
             check_rows(row, lift)
-    width = (n * r + m * k) * lift
-
-    def orbit(cell, shift, coeff, reverse=False):
-        return sum(
-            1 << (cell * lift + (shift + (-e if reverse else e)) % lift)
-            for e in supp(coeff)
+    try:
+        code = _fc_constructions.lifted_product(
+            a,
+            b,
+            lift,
+            shift_convention="hx_neg_hz_pos",
+            coordinate_order="cell_major",
+            coeff_encoding="bitmask",
+            max_n=10_000_000,
+            max_rows=10_000_000,
+            max_nnz=100_000_000,
         )
-
-    hx = [
-        sum(orbit(u * r + j, t, a[i][u], True) for u in range(n))
-        | sum(orbit(n * r + i * k + v, t, b[j][v], True) for v in range(k))
-        for i in range(m)
-        for j in range(r)
-        for t in range(lift)
-    ]
-    hz = [
-        sum(orbit(u * r + j, t, b[j][v]) for j in range(r))
-        | sum(orbit(n * r + i * k + v, t, a[i][u]) for i in range(m))
-        for u in range(n)
-        for v in range(k)
-        for t in range(lift)
-    ]
-    if any(dot(x, z) for x in hx for z in hz):
-        raise ValueError("lifted square fails")
-    return width, hx, hz
+    except _fc_certify.Refusal as exc:
+        raise ValueError("lifted square fails") from exc
+    return code.n, code.hx, code.hz
 
 
 def radial90():
-    return lifted_product(
-        [[4, 8, 16], [2, 16, 2], [16, 8, 4]], [[4, 4, 1], [16, 1, 16], [2, 8, 1]], 5
-    )
+    """[[90, 8, 10]] radial lifted-product code routed through `ftqc_codes.constructions.radial90`."""
+    code = _fc_constructions.radial90()
+    return code.n, code.hx, code.hz
 
 
 def shift_word(word, n, lift, amount=1):
@@ -155,6 +148,116 @@ def radial_design():
         aux=hx,
         axis="Z",
         targets=[word(n, v, "Z")],
+        rounds=1,
+        distance_target=2,
+    )
+
+
+def radial_homotopy_design(steps=240, seed=20260910):
+    """Z_5-equivariant chain-homotopy sparsification in the homotopy class of `radial_design()`.
+
+    Follows Berent, Cohen & Quintavalle (`arXiv:2609.11723` Section IV.E): searches the
+    affine space of Z_5-equivariant chain maps homotopic to `f1 = v w^T` (`aux = hx`,
+    `rounds = 1`, `merged_qubits = 135`, `merged_logicals = 7`), reducing maximum check
+    weight, qubit degree, and physical CNOT count while measuring an equivalent Z logical.
+    """
+    dense = radial_design()
+    n, hx, hz = dense["n"], dense["hx"], dense["hz"]
+    z_ech = Echelon(hz)
+    x_ech = Echelon(hx)
+    dense_cone = restricted_cone(n, hx, hz, dense["ports"], hx)
+    want_coset = z_ech.reduce(dense_cone["measured"][0])
+
+    # Z_5-invariant stabilizer subspaces for reducing invariant v and w
+    inv_hz = []
+    for r in hz:
+        orb = 0
+        for s in range(5):
+            orb ^= shift_word(r, n, 5, s)
+        if orb:
+            inv_hz.append(orb)
+    inv_hx = []
+    for r in hx:
+        orb = 0
+        for s in range(5):
+            orb ^= shift_word(r, n, 5, s)
+        if orb:
+            inv_hx.append(orb)
+
+    zs = invariant_logicals(hz, hx, n, 5)
+    xs = invariant_logicals(hx, hz, n, 5)
+    v0 = min(zs, key=int.bit_count)
+    w0 = min((u for u in xs if dot(v0, u)), key=int.bit_count)
+
+    # Greedy coset weight reduction within Z_5-invariant stabilizers
+    for stabs_inv, name_tag in ((inv_hz, "v"), (inv_hx, "w")):
+        cur = v0 if name_tag == "v" else w0
+        improved = True
+        while improved:
+            improved = False
+            for g in stabs_inv:
+                if (cur ^ g).bit_count() < cur.bit_count():
+                    cur ^= g
+                    improved = True
+        if name_tag == "v":
+            v0 = cur
+        else:
+            w0 = cur
+
+    best_ports = [v0 if (w0 >> q) & 1 else 0 for q in range(n)]
+    best_cone = restricted_cone(n, hx, hz, best_ports, hx)
+    if best_cone["logical_qubits"] != 7 or z_ech.reduce(best_cone["measured"][0]) != want_coset:
+        best_ports = list(dense["ports"])
+        best_cone = dense_cone
+
+    def score(c_obj, p_list):
+        return (
+            max(c_obj["max_check"], c_obj["max_qubit_degree"]),
+            c_obj["max_check"] + c_obj["max_qubit_degree"],
+            sum(p.bit_count() for p in p_list),
+        )
+
+    best_sc = score(best_cone, best_ports)
+    z_cycles = list(hz) + nullspace(hx, n)
+    rng = random.Random(seed)
+
+    for _ in range(steps):
+        cand = list(best_ports)
+        x_cell = rng.randrange(9)
+        u = rng.choice(z_cycles)
+        for s in range(5):
+            xr = hx[x_cell * 5 + s]
+            us = shift_word(u, n, 5, s)
+            for q in supp(xr):
+                cand[q] ^= us
+        for cell in range(18):
+            bw = cand[cell * 5]
+            for zr in hz:
+                if (bw ^ zr).bit_count() < bw.bit_count():
+                    bw ^= zr
+            for s in range(5):
+                cand[cell * 5 + s] = shift_word(bw, n, 5, s)
+        cc = restricted_cone(n, hx, hz, cand, hx)
+        if (
+            cc["logical_qubits"] == 7
+            and len(cc["measured"]) == 1
+            and z_ech.reduce(cc["measured"][0]) == want_coset
+        ):
+            sc = score(cc, cand)
+            if sc < best_sc:
+                best_ports, best_cone, best_sc = cand, cc, sc
+
+    from ftqc_gadgets.surgery_merge import word
+
+    return dict(
+        n=n,
+        hx=hx,
+        hz=hz,
+        method="linear",
+        ports=best_ports,
+        aux=hx,
+        axis="Z",
+        targets=[word(n, best_cone["measured"][0], "Z")],
         rounds=1,
         distance_target=2,
     )

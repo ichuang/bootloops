@@ -571,6 +571,19 @@ def _regress_pricing() -> str:
         price = adapters.price_circuit_with_zx_contract(KickMixCircuit.from_kmx("X q0"), contract)
         assert price["total_wire_ticks_upper"] == "1.2345"
         assert Decimal(price["total_logical_escape_upper"]) == Decimal("0.012345")
+    lat = adapters.estimate_reaction_decoder_latency(
+        KickMixCircuit.from_kmx("HMR q0 b0\nZ q1 if b0"),
+        {"num_data_qubits": 6, "peak_ancilla_qubits": 5, "rounds_per_reaction": 2, "ticks_per_round": 8, "installed_couplers": 9},
+        decoder_stall_ticks_per_reaction="7/2",
+        shuttle_ticks_per_reaction=3,
+        surviving_logicals=1,
+        bare_code_k=2,
+        layout_name="reconfigurable_shuttle",
+    )
+    assert lat["reaction_depth"] >= 1
+    assert lat["physical_qubits_per_surviving_logical"] == "11/1"
+    assert lat["bare_code_rate"] == "2/6"
+    assert lat["total_qubit_ticks_ceil"] == lat["active_qubit_ticks"] + lat["stall_idle_qubit_ticks_ceil"]
     for rate in ("-1", "NaN", "1.5"):
         try:
             adapters.price_circuit_with_zx_contract(KickMixCircuit.from_kmx("X q0"), contract,

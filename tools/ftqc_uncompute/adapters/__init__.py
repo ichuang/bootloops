@@ -3,6 +3,7 @@
 from .cirq_bridge import cirq_available, from_cirq_circuit, to_cirq_circuit
 from .ftqc_bridge import (
     audit_clifford_hmr_with_ftqc_audit,
+    estimate_reaction_decoder_latency,
     ftqc_audit_available,
     ftqc_compose_available,
     ftqc_zx_available,
@@ -17,6 +18,7 @@ __all__ = [
     "audit_clifford_hmr_with_ftqc_audit",
     "cirq_available",
     "dag_to_qualtran_descriptor",
+    "estimate_reaction_decoder_latency",
     "external_kickmix_available",
     "from_cirq_circuit",
     "ftqc_audit_available",
