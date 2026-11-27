@@ -1,19 +1,21 @@
 """Command line:  python3 -m ftqc_codes <command> ...   (with tools/ on PYTHONPATH)
 
-  certify SPEC [-o receipt.json] [--legs A,B,C,D,E] [--target q=v ...] [--max-combos N]
-  verify  RECEIPT.json [--full]
-  spec    SPEC [-o code.json]          write the code's matrices as JSON
-  families                             list family constructors
-SPEC is a code JSON file or family[:args], e.g. golay, qr:47, toric:5, bb72.
+  certify   SPEC [-o receipt.json] [--legs A,B,C,D,E|none] [--target q=v ...] [--max-combos N]
+  construct SPEC [-o construction.receipt.json] [--static-receipt receipt.json]
+  verify    RECEIPT.json [--full] [--static-receipt receipt.json]
+  spec      SPEC [-o code.json]          write the code's matrices as JSON
+  families                               list family constructors
+SPEC is a code/import/construction JSON file or family[:args], e.g. golay, qr:47, toric:5, bb72, radial90.
 
 Exit codes: 0 ok, 1 refusal (not a CSS code, receipt fails, legs disagree),
 2 usage or malformed spec.
 """
 import argparse
 import json
+import os
 import sys
 
-from . import certify, codes
+from . import certify, codes, constructions
 
 
 def _targets(items):
@@ -42,9 +44,14 @@ def main(argv=None):
     c.add_argument("--workdir", help="directory for CNF, LRAT and Lean files (legs B, C)")
     c.add_argument("--sat-timeout", type=int, default=600)
     c.add_argument("--lean-timeout", type=int, default=3600)
+    cs = sub.add_parser("construct")
+    cs.add_argument("spec")
+    cs.add_argument("-o", "--out")
+    cs.add_argument("--static-receipt")
     v = sub.add_parser("verify")
     v.add_argument("receipt")
     v.add_argument("--full", action="store_true")
+    v.add_argument("--static-receipt")
     s = sub.add_parser("spec")
     s.add_argument("spec")
     s.add_argument("-o", "--out")
@@ -64,16 +71,46 @@ def main(argv=None):
             else:
                 print(txt)
             return 0
+        if a.cmd == "construct":
+            code = codes.load(a.spec)
+            srec = None
+            if a.static_receipt:
+                with open(a.static_receipt) as f:
+                    srec = json.load(f)
+            base_dir = os.path.dirname(os.path.abspath(a.spec)) if a.spec.endswith(".json") else None
+            crec = constructions.build_construction_receipt(code, static_receipt=srec, base_dir=base_dir)
+            constructions.verify_construction_receipt(crec, static_receipt=srec, base_dir=base_dir)
+            m = crec["metrics"]
+            print(f"{crec['payload']['name']}: n={m['n']} k={m['k']} rate={m['rate'][0]}/{m['rate'][1]} "
+                  f"ancestry={crec['payload']['ancestry']} sha256={crec['code_sha256'][:12]}")
+            if a.out:
+                with open(a.out, "w") as f:
+                    json.dump(crec, f, indent=1)
+                    f.write("\n")
+            return 0
         if a.cmd == "verify":
             with open(a.receipt) as f:
                 rec = json.load(f)
+            if rec.get("schema") == constructions.RECEIPT_SCHEMA:
+                srec = None
+                if a.static_receipt:
+                    with open(a.static_receipt) as sf:
+                        srec = json.load(sf)
+                base_dir = os.path.dirname(os.path.abspath(a.receipt))
+                for line in constructions.verify_construction_receipt(rec, static_receipt=srec, base_dir=base_dir):
+                    print("ok  ", line)
+                m = rec["metrics"]
+                print(f"{rec['payload']['name']}: n={m['n']} k={m['k']} rate={m['rate'][0]}/{m['rate'][1]} "
+                      f"ancestry={rec['payload']['ancestry']}")
+                return 0
             for line in certify.verify(rec, full=a.full):
                 print("ok  ", line)
             print(certify.summary(rec))
             return 0
-        legs = [x.strip().upper() for x in a.legs.split(",") if x.strip()]
+        raw_legs = [x.strip().upper() for x in a.legs.split(",") if x.strip()]
+        legs = [] if raw_legs == ["NONE"] else raw_legs
         if set(legs) - {"A", "B", "C", "D", "E"}:
-            raise codes.SpecError("--legs takes a subset of A,B,C,D,E")
+            raise codes.SpecError("--legs takes a subset of A,B,C,D,E or none")
         code = codes.load(a.spec)
         targets = _targets(a.target)
         rec = certify.build(code, targets, a.max_combos, legs)

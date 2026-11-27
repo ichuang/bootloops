@@ -21,7 +21,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-from ftqc_codes import certify, cnf, codes, gf2, lrat, minweight, sat  # noqa: E402
+from ftqc_codes import certify, cnf, codes, constructions, gf2, interchange, lrat, minweight, sat  # noqa: E402
 
 PASS, FAIL, SKIP = [], [], []
 
@@ -37,6 +37,15 @@ def refuses(name, fn, needle=""):
         fn()
     except certify.Refusal as e:
         check(name, needle in str(e), f"refused for another reason: {e}")
+        return
+    check(name, False, "was accepted")
+
+
+def spec_err_or_refuses(name, fn):
+    try:
+        fn()
+    except (codes.SpecError, certify.Refusal):
+        check(name, True)
         return
     check(name, False, "was accepted")
 
@@ -393,7 +402,6 @@ def t_cuts():
     code = codes.load("rotated_surface:5")
     rec = certify.build(code, legs=())
     cuts.run_leg(rec, code)
-    ev = next(x for x in rec["evidence"] if x["leg"] == "E" and x["quantity"] == "d_x")
 
     def tamper(fn):
         r = copy.deepcopy(rec)
@@ -489,7 +497,6 @@ def t_concat():
 # ---------------------------------------------------------------- 5e. hierarchical decoding
 def t_hier():
     import itertools
-    import random
     from ftqc_codes import hier
     st = codes.steane()
     big = codes.concatenate(st, st)
@@ -575,6 +582,232 @@ def t_hier():
     check("kernel radius: the BCH bound does not prove more than the designed distance gives", bound4 == 3)
     bound5, ev5 = hier.kernel_radius(codes.golay().hz, 23, 3)
     check("kernel radius: Golay by search", bound5 == 3 and "bound_from" not in ev5)
+
+
+# ---------------------------------------------------------------- 5f. interchange & replayable constructions
+def t_interchange_and_constructions():
+    # 1. Three baseline controls + read-only cross-check against ftqc_extractors
+    lp6 = constructions.lifted_product([[3]], [[3]], 3, name="LP(6,2)")
+    lp6_ref = constructions.lifted_product_circulant_ref([[3]], [[3]], 3)
+    s_lp6 = certify.structure(lp6)
+    check("baseline LP(6,2): n=6, k=2, digest c6860dd462fe, max wt 4",
+          (s_lp6["n"], s_lp6["k"]) == (6, 2)
+          and lp6.sha256().startswith("c6860dd462fe")
+          and max(gf2.wt(r) for r in lp6.hx + lp6.hz) == 4)
+    check("baseline LP(6,2): matches independent circulant block expander row-for-row",
+          lp6.hx == lp6_ref.hx and lp6.hz == lp6_ref.hz and lp6.sha256() == lp6_ref.sha256())
+
+    rad90 = constructions.radial90()
+    s_rad = certify.structure(rad90)
+    check("baseline radial90: n=90, k=8, digest b656926c5959, max wt 6",
+          (s_rad["n"], s_rad["k"]) == (90, 8)
+          and rad90.sha256().startswith("b656926c5959")
+          and max(gf2.wt(r) for r in rad90.hx + rad90.hz) == 6)
+
+    bb144 = codes.load("bb144")
+    s_bb144 = certify.structure(bb144)
+    check("baseline bb144: n=144, k=12, digest 0ae98ac8a6e5, max wt 6",
+          (s_bb144["n"], s_bb144["k"]) == (144, 12)
+          and bb144.sha256().startswith("0ae98ac8a6e5")
+          and max(gf2.wt(r) for r in bb144.hx + bb144.hz) == 6)
+
+    try:
+        from ftqc_extractors import algebra as ext_alg
+        from ftqc_extractors import surgery_products as ext_sp
+        check("cross-check LP(6,2) with ftqc_extractors.surgery_products",
+              (lp6.n, lp6.hx, lp6.hz) == ext_sp.lifted_product([[3]], [[3]], 3))
+        check("cross-check radial90 with ftqc_extractors.surgery_products",
+              (rad90.n, rad90.hx, rad90.hz) == ext_sp.radial90())
+        a_seed, b_seed = [0b011, 0b110], [0b0011, 0b0110, 0b1100]
+        hgp_c = constructions.hgp(a_seed, 3, b_seed, 4)
+        check("cross-check rectangular HGP with codes.hgp and ftqc_extractors.algebra.hgp",
+              (hgp_c.n, hgp_c.hx, hgp_c.hz) == ext_alg.hgp(a_seed, 3, b_seed, 4)
+              and hgp_c.sha256() == codes.hgp(a_seed, 3, b_seed, 4).sha256())
+    except ImportError:
+        skip("ftqc_extractors read-only cross-check", "ftqc_extractors not present")
+
+    # 2. Exact small X/Z distances vs direct normalizer-mod-stabilizer brute force
+    for nm, c_small in [
+        ("LP(6,2)", lp6),
+        ("LP_rect(1x2,2x2,L=3)", constructions.lifted_product([[3, 5]], [[3, 6], [5, 3]], 3)),
+    ]:
+        r_sm = certify.build(c_small)
+        want_dx, _ = minweight.brute_min_weight(gf2.nullspace(c_small.hz, c_small.n), c_small.n, c_small.hx)
+        want_dz, _ = minweight.brute_min_weight(gf2.nullspace(c_small.hx, c_small.n), c_small.n, c_small.hz)
+        check(f"{nm}: certified X/Z distances equal direct normalizer-mod-stabilizer brute force",
+              r_sm["facts"]["d_x"]["lower"] == want_dx
+              and r_sm["facts"]["d_z"]["lower"] == want_dz
+              and r_sm["facts"]["d_x"]["exact"] and r_sm["facts"]["d_z"]["exact"])
+
+    # 3. Rectangular seeds, cancelling coefficients, and shift-reversal detection
+    rect_lp = constructions.lifted_product([[3, 5]], [[3, 6, 1], [5, 3, 2]], 5)
+    rect_ref = constructions.lifted_product_circulant_ref([[3, 5]], [[3, 6, 1], [5, 3, 2]], 5)
+    check("rectangular cyclic LP (1x2 by 2x3, L=5) matches circulant reference",
+          rect_lp.n == (2 * 2 + 1 * 3) * 5 and rect_lp.sha256() == rect_ref.sha256())
+
+    canc_lp = constructions.lifted_product(
+        [[[0, 1, 2, 1]]], [[[0, 2, 2, 1]]], 4, coeff_encoding="exponents"
+    )
+    clean_lp = constructions.lifted_product([[0b0101]], [[0b0011]], 4, coeff_encoding="bitmask")
+    check("mod-2 repeated exponents cancel and match reduced bitmask",
+          canc_lp.sha256() == clean_lp.sha256()
+          and canc_lp.meta["construction"]["seed_inputs"]["cancelled_terms"] == 4)
+
+    asym_fwd = constructions.lifted_product([[0b0111]], [[0b1011]], 7, shift_convention="hx_neg_hz_pos")
+    asym_rev = constructions.lifted_product([[0b0111]], [[0b1011]], 7, shift_convention="hx_pos_hz_neg")
+    asym_rev_ref = constructions.lifted_product_circulant_ref(
+        [[0b0111]], [[0b1011]], 7, shift_convention="hx_pos_hz_neg"
+    )
+    check("asymmetric seed detects reversing cyclic shift while matching circulant reference",
+          asym_fwd.sha256() != asym_rev.sha256() and asym_rev.sha256() == asym_rev_ref.sha256())
+
+    # 4. General group lifted product: C_3 agreement + nonabelian S_3 + action validation
+    c3_perms = [[(g + h) % 3 for h in range(3)] for g in range(3)]
+    glp_c3 = constructions.group_lifted_product(3, c3_perms, c3_perms, [[[0, 1]]], [[[0, 1]]])
+    check("group_lifted_product on C_3 matches cyclic LP(6,2) row-for-row",
+          glp_c3.sha256() == lp6.sha256())
+
+    # S_3 on 6 elements (permutations of (0,1,2))
+    import itertools
+    s3_elems = list(itertools.permutations(range(3)))
+    s3_idx = {p: i for i, p in enumerate(s3_elems)}
+
+    def comp(p, q):
+        return tuple(p[q[i]] for i in range(3))
+
+    s3_left = [[s3_idx[comp(g, h)] for h in s3_elems] for g in s3_elems]
+    s3_right = [[s3_idx[comp(h, g)] for h in s3_elems] for g in s3_elems]
+    glp_s3 = constructions.group_lifted_product(
+        6, s3_left, s3_right, [[[0, 1, 2]]], [[[0, 3, 4]]], name="S3_LP"
+    )
+    check("nonabelian S_3 group_lifted_product commutes and records abelian=False",
+          glp_s3.commutes()
+          and glp_s3.n == 12
+          and glp_s3.meta["construction"]["seed_inputs"]["abelian"] is False
+          and s3_left != s3_right)
+
+    bad_right = copy.deepcopy(s3_left)  # S_3 left != right; claiming both equal violates L(g1,g2)==R(g2,g1)
+    refuses("control: inconsistent nonabelian left/right group action refused",
+            lambda: constructions.group_lifted_product(6, s3_left, bad_right, [[[0, 1]]], [[[0, 1]]]),
+            "inconsistent left/right")
+    spec_err_or_refuses("control: ragged protograph rejected",
+                        lambda: constructions.lifted_product([[1, 2], [1]], [[1]], 3))
+    refuses("control: pre-allocation estimator refuses oversized lift before expansion",
+            lambda: constructions.lifted_product([[3]], [[3]], 500, max_n=200),
+            "exceeds budget")
+
+    # 5. Budget-exhausted Leg A interval + work count
+    capped_rad = certify.build(rad90, max_combos=25)
+    ev_dx = next(e for e in capped_rad["evidence"] if e["quantity"] == "d_x")
+    check("budget-exhausted Leg A returns interval and work count",
+          capped_rad["facts"]["d_x"]["lower"] >= 1
+          and "budget" in ev_dx
+          and isinstance(ev_dx["combos"], int))
+
+    # 6. Three library-survey exchange gates (banked offline in examples/)
+    ex_dir = os.path.join(HERE, "examples")
+    bb_imp_path = os.path.join(ex_dir, "qldpc_bb144.import.json")
+    lp_imp_path = os.path.join(ex_dir, "qldpc_lp6_2.import.json")
+    pp_imp_path = os.path.join(ex_dir, "pp256_q4_j3_l8_p16.import.json")
+
+    bb_imp = codes.load(bb_imp_path)
+    check("exchange 1 (qLDPC BB144): byte-for-byte digest match + 12 dual pairs",
+          bb_imp.sha256() == bb144.sha256()
+          and len(bb_imp.meta["candidate_logicals"]["slot_names"]) == 12)
+
+    lp_imp = codes.load(lp_imp_path)
+    check("exchange 2 (qLDPC LP(6,2)): raw 6b6ef87d3693 -> native c6860dd462fe via coordinate map",
+          lp_imp.meta["import"]["raw_sha256"].startswith("6b6ef87d3693")
+          and lp_imp.sha256() == lp6.sha256()
+          and len(lp_imp.meta["candidate_logicals"]["slot_names"]) == 2)
+
+    lp_manifest = json.load(open(lp_imp_path))
+    bad_map = copy.deepcopy(lp_manifest)
+    bad_map["coordinate_map"]["perm_q"] = [1, 0, 2, 5, 3, 4]
+    refuses("exchange 2 control: altered physical coordinate map refused",
+            lambda: interchange.load_import_manifest(bad_map, base_dir=ex_dir),
+            "sha256")
+
+    bad_pair = copy.deepcopy(lp_manifest)
+    bad_pair["candidate_logicals"]["lz"]["supports"].reverse()
+    del bad_pair["candidate_logicals"]["lz"]["sha256"]
+    refuses("exchange 2 control: swapped logical partner refused",
+            lambda: interchange.load_import_manifest(bad_pair, base_dir=ex_dir),
+            "pairing")
+
+    # Check-order sensitivity: permuting two rows preserves stabilizer group yet changes sha256
+    reordered = codes.CSSCode("LP_reordered", lp6.n, [lp6.hx[1], lp6.hx[0], lp6.hx[2]], lp6.hz)
+    check("check-order sensitivity: same stabilizer group, distinct ordered sha256",
+          sorted(gf2.Echelon(reordered.hx).basis) == sorted(gf2.Echelon(lp6.hx).basis)
+          and reordered.sha256() != lp6.sha256())
+
+    pp_imp = codes.load(pp_imp_path)
+    pp_srec = certify.build(pp_imp, legs=())
+    certify.verify(pp_srec)
+    check("exchange 3 (Okada-Kasai PP256): n=256, k=64, ae0e0d3f792d, wt 12/21 witnesses -> d<=12",
+          pp_imp.n == 256
+          and pp_srec["facts"]["k"] == 64
+          and pp_imp.sha256().startswith("ae0e0d3f792d")
+          and max(gf2.wt(r) for r in pp_imp.hx + pp_imp.hz) == 9
+          and pp_srec["facts"]["d_x"]["upper"] == 12
+          and pp_srec["facts"]["d_z"]["upper"] == 21
+          and pp_srec["facts"]["d"]["upper"] == 12
+          and pp_srec["facts"]["d"]["lower"] is None)
+
+    # Non-CSS & duplicate coordinate controls on interchange
+    non_css = copy.deepcopy(lp_manifest)
+    non_css["code_type"] = "non_css"
+    refuses("interchange control: non-CSS code refused with symplectic message",
+            lambda: interchange.load_import_manifest(non_css, base_dir=ex_dir),
+            "symplectic")
+    refuses("interchange control: duplicate Matrix Market coordinate refused",
+            lambda: interchange.parse_matrix_market(
+                "%%MatrixMarket matrix coordinate integer general\n2 2 2\n1 1 1\n1 1 1\n"
+            ),
+            "duplicate")
+
+    # 7. Construction receipts (ftqc_codes-construction-1)
+    lp6_srec = certify.build(lp6)
+    lp6_crec = constructions.build_construction_receipt(
+        lp6,
+        static_receipt=lp6_srec,
+        provenance={"paper": "PLANS/high-rate-qec.md", "version": "baseline", "locator": "table 1"},
+    )
+    check("LP(6,2) construction receipt verifies (reproduced, rate=[2,6])",
+          bool(constructions.verify_construction_receipt(lp6_crec, static_receipt=lp6_srec))
+          and lp6_crec["payload"]["ancestry"] == "reproduced"
+          and lp6_crec["metrics"]["rate"] == [2, 6]
+          and lp6_crec["claims"]["proved_lower"]["d"] == 2)
+
+    pp_crec = constructions.build_construction_receipt(pp_imp, static_receipt=pp_srec)
+    check("PP256 construction receipt verifies (supplied, paper_claims vs witness_upper vs proved_lower)",
+          bool(constructions.verify_construction_receipt(pp_crec, static_receipt=pp_srec))
+          and pp_crec["payload"]["ancestry"] == "supplied"
+          and pp_crec["metrics"]["rate"] == [64, 256]
+          and pp_crec["claims"]["paper_claims"]["d"] == 12
+          and pp_crec["claims"]["witness_upper"]["d"] == 12
+          and pp_crec["claims"]["proved_lower"]["d"] is None)
+
+    bb_repro = constructions.build_construction_receipt(
+        bb_imp,
+        reproduction_spec={
+            "schema": constructions.SPEC_SCHEMA,
+            "kind": "named_family",
+            "name": "BB144",
+            "family_spec": "bb:12,6,x3+y1+y2,y3+x1+x2",
+        },
+    )
+    check("imported BB144 upgrades ancestry to reproduced when generator matches sha256",
+          bool(constructions.verify_construction_receipt(bb_repro))
+          and bb_repro["payload"]["ancestry"] == "reproduced")
+
+    bad_crec = copy.deepcopy(pp_crec)
+    bad_crec["claims"]["proved_lower"]["d"] = 12
+    bad_crec["static_receipt_ref"] = None
+    refuses("construction receipt control: proved_lower without static_receipt_ref refused",
+            lambda: constructions.verify_construction_receipt(bad_crec),
+            "static_receipt_ref")
+
 
 # ---------------------------------------------------------------- 6. SAT leg (needs cadical)
 def t_sat(heavy):
@@ -666,6 +899,24 @@ def t_cli():
         p = run("spec", "steane", "-o", os.path.join(wd, "s.json"))
         p2 = run("certify", os.path.join(wd, "s.json"))
         check("cli spec file round trip", p.returncode == 0 and p2.returncode == 0 and "d=3" in p2.stdout)
+        # Tagged construction JSON + CLI construct & verify
+        cspec = os.path.join(wd, "lp6.spec.json")
+        json.dump({
+            "schema": constructions.SPEC_SCHEMA,
+            "kind": "lifted_product",
+            "name": "LP(6,2)",
+            "lift": 3,
+            "a": [[3]],
+            "b": [[3]],
+        }, open(cspec, "w"))
+        srec_out = os.path.join(wd, "lp6.static.json")
+        crec_out = os.path.join(wd, "lp6.construct.json")
+        p_s = run("certify", cspec, "-o", srec_out)
+        p_c = run("construct", cspec, "--static-receipt", srec_out, "-o", crec_out)
+        p_v = run("verify", crec_out, "--static-receipt", srec_out)
+        check("cli tagged construction spec + construct + verify exits 0",
+              p_s.returncode == 0 and p_c.returncode == 0 and p_v.returncode == 0
+              and "c6860dd462fe" in p_c.stdout, p_c.stderr[-200:] + p_v.stderr[-200:])
         for ex in ("steane.receipt.json", "golay.receipt.json"):
             ex_rec = json.load(open(os.path.join(HERE, "examples", ex)))
             check(f"banked example {ex} verifies", bool(certify.verify(ex_rec, full=True)))
@@ -715,11 +966,25 @@ def t_lean(enabled):
 def main():
     heavy, lean = "--heavy" in sys.argv, "--lean" in sys.argv
     t0 = time.monotonic()
-    for fn, args in ((t_gf2, ()), (t_minweight, ()), (t_families, ()), (t_controls, ()),
-                     (t_cnf, ()), (t_lrat, ()), (t_bch, ()), (t_cuts, ()), (t_concat, ()), (t_hier, ()), (t_sat, (heavy,)), (t_cli, ()), (t_lean, (lean,))):
+    for fn, args in (
+        (t_gf2, ()),
+        (t_minweight, ()),
+        (t_families, ()),
+        (t_controls, ()),
+        (t_cnf, ()),
+        (t_lrat, ()),
+        (t_bch, ()),
+        (t_cuts, ()),
+        (t_concat, ()),
+        (t_hier, ()),
+        (t_interchange_and_constructions, ()),
+        (t_sat, (heavy,)),
+        (t_cli, ()),
+        (t_lean, (lean,)),
+    ):
         t = time.monotonic()
         fn(*args)
-        print(f"      {fn.__name__:12s} {time.monotonic() - t:6.2f} s")
+        print(f"      {fn.__name__:32s} {time.monotonic() - t:6.2f} s")
     print(f"ftqc_codes selftest: {len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped "
           f"in {time.monotonic() - t0:.1f} s")
     if FAIL:

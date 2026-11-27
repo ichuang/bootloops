@@ -44,7 +44,7 @@ def _unbits(s):
 
 
 def _partner(word, dual_basis):
-    """A vector of dual_basis (or a sum of two) with odd overlap with word."""
+    """A vector of dual_basis with odd overlap with word."""
     for z in dual_basis:
         if gf2.dot(z, word):
             return z
@@ -121,6 +121,51 @@ def _combine(facts):
     return facts
 
 
+def add_witness(receipt, code, quantity, word, partner=None):
+    """Attach a verified finite upper-bound witness for `quantity`."""
+    if quantity not in ("d_x", "d_z", "wmin_x", "wmin_z"):
+        raise Refusal(f"unknown quantity {quantity!r}")
+    n = code.n
+    if isinstance(word, str):
+        if len(word) != n or set(word) - {"0", "1"}:
+            raise Refusal(f"{quantity}: witness string must be 0/1 of length {n}")
+        w = _unbits(word)
+    else:
+        w = int(word)
+    if w <= 0 or w >> n:
+        raise Refusal(f"{quantity}: witness support outside 0..{n - 1}")
+    wt = gf2.wt(w)
+    if quantity in ("d_x", "d_z"):
+        checks = code.hz if quantity == "d_x" else code.hx
+        other = code.hx if quantity == "d_x" else code.hz
+        if any(gf2.dot(w, h) for h in checks):
+            raise Refusal(f"{quantity}: witness fails a parity check")
+        if partner is None:
+            p = _partner(w, gf2.nullspace(other, n))
+        elif isinstance(partner, str):
+            p = _unbits(partner)
+        else:
+            p = int(partner)
+        if p is None or p <= 0 or (p >> n) or any(gf2.dot(p, h) for h in other) or gf2.dot(p, w) != 1:
+            raise Refusal(f"{quantity}: partner does not certify a nontrivial logical")
+    else:
+        rows = code.hx if quantity == "wmin_x" else code.hz
+        if w not in gf2.Echelon(rows):
+            raise Refusal(f"{quantity}: witness is not a stabilizer")
+        p = None
+
+    e = receipt["facts"][quantity]
+    if e["lower"] is not None and wt < e["lower"]:
+        raise Refusal(f"{quantity}: witness of weight {wt} contradicts lower bound {e['lower']}")
+    if e["upper"] is None or wt < e["upper"]:
+        e["upper"] = wt
+        e["witness"] = _bits(w, n)
+        e["partner"] = _bits(p, n) if p is not None else None
+    e["exact"] = e["upper"] is not None and e["lower"] == e["upper"]
+    _combine(receipt["facts"])
+    return receipt
+
+
 def build(code, targets=None, max_combos=5_000_000, legs=("A",)):
     facts = structure(code)
     evidence = []
@@ -131,9 +176,15 @@ def build(code, targets=None, max_combos=5_000_000, legs=("A",)):
               for q in _quantities(code)}
     facts.update(mw)
     _combine(facts)
-    return dict(schema=SCHEMA, code=code.to_json(), facts=facts, evidence=evidence,
-                tool=dict(name="ftqc_codes", version=VERSION,
-                          python=platform.python_version(), argv=sys.argv[1:]))
+    rec = dict(schema=SCHEMA, code=code.to_json(), facts=facts, evidence=evidence,
+               tool=dict(name="ftqc_codes", version=VERSION,
+                         python=platform.python_version(), argv=sys.argv[1:]))
+    for q, winfo in (code.meta.get("witnesses") or {}).items():
+        if q in ("d_x", "d_z") and isinstance(winfo, dict) and "support" in winfo:
+            w = gf2.from_supp(winfo["support"])
+            p = gf2.from_supp(winfo["partner_support"]) if winfo.get("partner_support") else None
+            add_witness(rec, code, q, w, p)
+    return rec
 
 
 def add_lower_bound(receipt, quantity, bound, evidence):
