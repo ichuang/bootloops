@@ -9,6 +9,28 @@ from .gross_residual import check_kernel, gross_result
 
 
 class GrossResidualTests(unittest.TestCase):
+    def test_two_block_residual_requires_genuine_distance_evidence(self):
+        from copy import deepcopy
+        from .__main__ import evaluate
+
+        source = dict(
+            schema=1, kind="gross_block_reading", axis="Z", target=12, padding=[12, 12]
+        )
+        proof = receipt(source)
+        spec = dict(
+            kind="block-reading-residual",
+            extractor=source,
+            distance_receipt=proof,
+            faults=1,
+        )
+        self.assertEqual(evaluate(spec)["residual_data_weight_upper"], 90)
+        forged = deepcopy(proof)
+        forged["result"]["circuit"]["probes"]["X"][
+            "residual_component_weight_per_fault"
+        ] = 0
+        with self.assertRaisesRegex(ValueError, "replay mismatch"):
+            evaluate(dict(spec, distance_receipt=forged))
+
     def test_random_response_is_only_a_displacement(self):
         c = Circuit([[("RX", 0)], [("M", 0)]], detectors=[], outputs=[])
         model = RecordModel(c, response_records=[0])

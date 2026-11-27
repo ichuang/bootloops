@@ -90,4 +90,4 @@ For a native consumer case with L locations and verified lower distance d, a joi
 
 ## Two-block reading residuals
 
-A `block-reading-residual` input embeds the `gross_block_reading` specification as `extractor`, its replayable `distance_receipt`, and a nonnegative integer `faults`. The result sums the two component spread bounds after the split frame and caps the resulting physical support by the 288 output data qubits. It applies to the open output under the declared clean-input and gate-location model.
+A `block-reading-residual` input embeds the `gross_block_reading` specification as `extractor`, its replayable `distance_receipt`, and a nonnegative integer `faults`. The result sums the two component spread bounds after the split frame and caps the resulting physical support by the 288 output data qubits. It applies to the open output under the declared clean-input and gate-location model. For one fault the X-reading fixture gives an upper bound of 74 and the Z-reading fixture gives 90. Both count residual support on the 288 data outputs after the frame update.
