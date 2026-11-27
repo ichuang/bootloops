@@ -1074,8 +1074,9 @@ def _strict(program, outer_after=None):
         layers.append([["EC2a", b] for b in need] + [["ECa", b] for b in rest])
         layers.append([["EC2b", b] for b in need] + [["ECb", b] for b in rest])
         inner_round(rest)
-        for b in need:
-            cone[b] = [0, 0]
+        for b in need:                                         # what stays: the measurement of each outer ancilla
+            cone[b] = [1 << fresh, 1 << (fresh + 1)]
+            fresh += 2
         outer += len(need)
         layers.append([["ECa", b] for b in live])
         layers.append([["ECb", b] for b in live])

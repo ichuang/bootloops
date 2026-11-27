@@ -1617,6 +1617,13 @@ def t_cones(heavy):
           and raw3["uncorrected"] == n3 and not cones.contained(sched3, f3, samples=2)["outside"]
           and [l for l in [[op for op in l if op[0] not in ("ECa", "ECb", "EC2a", "EC2b")] for l in sched3.layers] if l]
           == [l for l in bare.layers], f"{n3} {pat3} {raw3}")
+    _, _, tracked3 = cones._strict(bare, 3)
+    ev3 = {i for i, s_ in enumerate(f3.sources) if s_["level"] == 2 and s_["kind"] == "event"}
+    sizes3 = {(str(o["block"]), o["sector"]): len([i for i in cones._bits(f3.cone_of[o["node"]]) if i in ev3]) - 1
+              for o in f3.outer if o["tag"] == "out"}
+    check("cones: with outer corrections the tracked cones are still the flow's",
+          sizes3 == {(b, s_): tracked3[b][j].bit_count() for b in ("A", "B", "Q") for j, s_ in enumerate("XZ")},
+          f"{sizes3} vs {tracked3}")
     lazy = cones.strict_schedule(bare, outer_after=10 ** 6)
     check("cones: a threshold no cone reaches gives the schedule without outer corrections",
           lazy[1] == 0 and lazy[0].layers == sched.layers)
