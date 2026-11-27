@@ -2,7 +2,7 @@
 from collections import deque
 from itertools import combinations
 from fractions import Fraction
-from ftqc_codes.gf2 import Echelon, dot, nullspace, supp
+from ftqc_codes.gf2 import Echelon, dot, nullspace
 from .surgery_build import combine, independent_section
 
 

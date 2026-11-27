@@ -66,9 +66,31 @@ def record_mask(ids, count):
     return sum(1 << i for i in ids)
 
 
+def validate_basis(basis,checks,targets,n):
+    """Check the named logical interface before and after the projective read."""
+    if set(basis)!={"input","surviving"}:
+        raise ValueError("expected input and surviving logical names")
+    pairs={}
+    previous=[]
+    for item in basis["input"]:
+        if set(item)!={"name","x","z"} or not isinstance(item["name"],str) or not item["name"] or item["name"] in pairs:
+            raise ValueError("invalid logical pair name")
+        a,b=(pauli(item[key],n) for key in ("x","z"))
+        if commute(a,b) or any(not commute(v,g) for v in (a,b) for g in checks+previous):
+            raise ValueError("invalid signed symplectic logical basis")
+        pairs[item["name"]]=(a,b)
+        previous.extend([a,b])
+    survivors=basis["surviving"]
+    k=n-len(Group(n,checks).rows)
+    if len(pairs)!=k or not isinstance(survivors,list) or len(set(survivors))!=len(survivors) or len(survivors)!=k-len(targets):
+        raise ValueError("logical interface has incorrect rank")
+    if any(name not in pairs or any(not commute(v,t) for v in pairs[name] for t in targets) for name in survivors):
+        raise ValueError("named survivor is disturbed by measurement")
+
+
 class Instrument:
     def __init__(self, spec):
-        if set(spec) != {"n","checks","targets","ticks","readouts","detectors","terminal_syndrome"}:
+        if set(spec)-{"basis"} != {"n","checks","targets","ticks","readouts","detectors","terminal_syndrome"}:
             raise ValueError("invalid instrument fields")
         self.n = n = spec["n"]
         if type(n) != int or n < 1 or type(spec["terminal_syndrome"]) != bool:
@@ -81,8 +103,15 @@ class Instrument:
         group = Group(n, checks)
         if not all(group.add(t) for t in targets):
             raise ValueError("dependent or trivial logical targets")
+        if "basis" in spec:
+            validate_basis(spec["basis"],checks,targets,n)
         self.boundary = spec["terminal_syndrome"]
         self.residual = Echelon([g.x | g.z << n for g in generators])
+        canonical={"I","CX","Z_IF","S","SDG","H","RX","R","MX","M","MZ"}
+        for row in spec["ticks"]:
+            for op in row:
+                if not isinstance(op,(list,tuple)) or not op or not isinstance(op[0],str) or op[0].removeprefix("!") not in canonical or any(type(q)!=int or q<0 for q in op[1:]):
+                    raise ValueError("invalid physical operation or wire")
         self.c = c = Circuit([[("!R", q) for q in range(n)], *spec["ticks"]], detectors=[])
         live = set(range(n))
         for tick in c.ticks[1:]:
@@ -124,7 +153,7 @@ class Instrument:
             self.readouts.append(record_mask(read["records"],len(c.meas)))
         if width >= 64:
             try:
-                import stim
+                import stim  # noqa: F401 - optional accelerated tableau
             except ImportError:
                 pass
             else:
@@ -213,7 +242,8 @@ def receipt(spec, order=1, cap=1000000):
 
 def verify(rec):
     rebuilt = receipt(rec["spec"],rec["order"],rec["cap"])
-    if rebuilt != rec:
+    import json
+    if json.dumps(rebuilt,sort_keys=True) != json.dumps(rec,sort_keys=True):
         raise ValueError("surgery receipt differs from replay")
     return rebuilt
 

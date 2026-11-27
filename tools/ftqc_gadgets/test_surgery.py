@@ -41,3 +41,12 @@ class SurgeryTests(unittest.TestCase):
     def test_open_budget(self):
         self.assertEqual(receipt(edge(),2,1)["faults"]["status"],"inconclusive")
 
+
+    def test_named_survivor(self):
+        from .surgery_parallel import branch
+        s=branch(2,[],["+ZI"])
+        s["basis"]=dict(input=[dict(name="first",x="+XI",z="+ZI"),dict(name="second",x="+IX",z="+IZ")],surviving=["second"])
+        Instrument(s)
+        s["basis"]["surviving"]=["first"]
+        with self.assertRaisesRegex(ValueError,"survivor"):
+            Instrument(s)

@@ -2,7 +2,6 @@
 from itertools import combinations,product
 from functools import reduce
 from operator import xor
-from math import comb
 
 
 def columns(inst):
@@ -95,3 +94,23 @@ def residual_profile(inst,r,s,cap):
                                 wrong_public=wrong,residual_weight_upper=max_weight,witness=worst))
     return dict(status="proved",tested=tested,completed=profile)
 
+
+
+def pair_search(inst):
+    """Exact two-location test by matching detector masks across different sites."""
+    signatures,_=columns(inst)
+    earlier={}
+    tested=0
+    for site,group in enumerate(signatures):
+        for label,(det,bit,residual) in group:
+            tested+=1
+            for (other_bit,other_res),fault in earlier.get(det,{}).items():
+                if (bit,residual)!=(other_bit,other_res):
+                    return dict(status="witness",weight=2,faults=[fault,[site,label]],
+                                readout_flip=bit^other_bit,residual=residual^other_res,tested_modes=tested)
+        # Two distinct outputs suffice to oppose any later output for this syndrome.
+        for label,(det,bit,residual) in group:
+            keep=earlier.setdefault(det,{})
+            if len(keep)<2:
+                keep.setdefault((bit,residual),[site,label])
+    return dict(status="excluded",weight=2,tested_modes=tested)

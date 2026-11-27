@@ -4,7 +4,7 @@ from .surgery import centralizer,paired,pauli,record_mask
 from ftqc_faults.audit.stab import Gen
 
 
-def compile_probe(c,spec,initial,noise=0.0):
+def compile_probe(c,spec,initial,noise=0.0,injected=None):
     import stim
     if not 0<=noise<1:
         raise ValueError("invalid physical error probability")
@@ -17,17 +17,25 @@ def compile_probe(c,spec,initial,noise=0.0):
         p.sign=-1 if g.s else 1
         return p
     out=stim.Tableau.from_stabilizers([ps(g) for g in initial]).to_circuit()
+    location=-1
     for tick in c.ticks[1:]:
         for op in tick:
             name=op.name
             qs=list(op.qs)
+            if op.noisy:
+                location+=1
+            mode=injected[1] if op.noisy and injected and injected[0]==location else None
             if name=="Z_IF":
                 out.append("CZ",[stim.target_rec(op.record-out.num_measurements),qs[0]])
             elif name in ("MX","M"):
-                out.append(name,qs,noise if op.noisy else 0)
+                out.append(name,qs,1 if mode=="flip" else noise if op.noisy else 0)
                 continue
             else:
                 out.append({"SDG":"S_DAG"}.get(name,name),qs)
+            if mode:
+                for q,p in zip(qs,mode,strict=True):
+                    if p!="I":
+                        out.append(p+"_ERROR",[q],1)
             if noise and op.noisy:
                 out.append("DEPOLARIZE2" if name=="CX" else "DEPOLARIZE1",qs,noise)
         out.append("TICK")

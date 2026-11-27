@@ -1,7 +1,6 @@
 """Install checked measurement instruments on one explicit coupler inventory."""
 
 from ftqc_gadgets.surgery import receipt, verify, pauli
-from ftqc_codes.gf2 import supp
 
 
 def compile_schedule(s):
