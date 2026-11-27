@@ -63,3 +63,7 @@ Compare the two fault propagators on an extractor or fixed T arm, replay a logic
 Use input kind `gross_z` for the published BB144 unprimed Z setting. The exact backend computes and certifies both CSS distances. The measurement command exports the merged matrices, ideal readout and split frame. See the [gross-code guide](GROSS.md) for the input, coordinate conventions, proof format and scope.
 
 Input kind `gross_circuit` compiles the noisy BB144 operation. Use `schedule --probe X` or `schedule --probe Z` to export a native ftqc_audit circuit, and `check` or `verify` for its distance. [Noise model, optional input fields and proof search](GROSS_CIRCUIT.md)
+
+## Full block reading
+
+Run `check` and `verify` on [the two-block fixture](examples/block-reading.json). Matrices are arrays of nonnegative integer row masks, least significant bit first. Each independent pattern row selects blocks. Its port parities measure one logical per member of the memory logical basis. The receipt gives the data-only projections, surviving dimension, deformed matrices and metachecks. In each pattern row, decompose the measured auxiliary split syndrome in the recorded syndrome basis and apply the corresponding correction on every selected block (Z for Z reading, X for its dual). The static bound applies Lemma 3.8 after checking the input distance.

@@ -20,6 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
+    "block_reading": ("memory blocks pattern axis target", "expected"),
     "gross_circuit": ("rounds target", "spacetime fault_witnesses"),
     "gross_z": ("target", ""),
     "t_bounds": (
@@ -73,6 +74,9 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     if backend == "sat" and kind not in ("circuit", "t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "block_reading":
+            from .block_reading import analyze
+            return analyze(s, budget)
         if kind == "gross_circuit":
             from .gross_noisy import report
 
