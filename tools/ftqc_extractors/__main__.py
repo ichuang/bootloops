@@ -221,6 +221,9 @@ def main():
     run.add_argument("--backend", choices=["exact", "sat"], default="exact")
     run.add_argument("--budget", type=int, default=2000000)
     run.add_argument("--seconds", type=int, default=60)
+    standalone=sub.add_parser("export-surgery",help="export an HGP circuit as a standalone signed instrument")
+    standalone.add_argument("spec",type=Path)
+    standalone.add_argument("-o",type=Path)
     export = sub.add_parser(
         "schedule", help="expand a conditional T gadget to physical fault locations"
     )
@@ -246,6 +249,14 @@ def main():
         if args.command == "injection":
             return command(args)
         s = json.loads(args.spec.read_text())
+        if args.command == "export-surgery":
+            from .surgery_export import export as export_instrument
+            text=json.dumps(export_instrument(s),indent=2)+"\n"
+            if args.o:
+                args.o.write_text(text)
+            else:
+                print(text,end="")
+            return 0
         if args.command == "measurement":
             from .gross import measurement
 

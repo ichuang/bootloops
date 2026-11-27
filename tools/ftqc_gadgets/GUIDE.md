@@ -412,3 +412,7 @@ Pauli-frame parities as raw record indices. Idles, Hadamards, preparations and
 destructive X/Z measurements have distinct roles. Unimplemented operations are
 refused even if marked ideal in the outer body. Input-error placeholders and
 matched fresh ancilla specifications have their own boundary contracts.
+
+## Signed surgery instruments
+
+See [the surgery interface and replay examples](../ftqc_gadgets/SURGERY.md) for physical measurement receipts, installed feed-forward schedules and conditional residual laws.
