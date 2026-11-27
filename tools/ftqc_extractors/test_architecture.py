@@ -180,3 +180,22 @@ class SpectatorTests(unittest.TestCase):
         s = receipt(SMALL)["result"]["spectator_basis"]
         self.assertEqual(len(s["same_axis"]), 2)
         self.assertTrue(all(s["pairing"]))
+
+
+class PartialReadingTests(unittest.TestCase):
+    def test_spectator_factors(self):
+        import json
+        from pathlib import Path
+        from .algebra import css_dimension
+
+        s = json.loads(
+            (Path(__file__).parent / "examples/partial-block-sequence.json").read_text()
+        )
+        r = receipt(s)
+        verify(s, r)
+        result = r["result"]
+        self.assertEqual(result["distance_lower"], 2)
+        self.assertEqual(len(result["measured"][0]), 2)
+        self.assertTrue(all(v & 0xF0F0 == 0 for v in result["measured"][0]))
+        code = result["compacted"]
+        self.assertEqual(css_dimension((code["n"], code["hx"], code["hz"])), 6)
