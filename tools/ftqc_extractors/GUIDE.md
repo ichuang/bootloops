@@ -85,3 +85,7 @@ The circuit benchmark uses ideal encoded inputs, one noisy merge, noisy split an
 ## Expansion and intermediate time
 
 [Modular expansion](examples/modular-expansion.json) checks the exact minimum in Definition 7.2 before and after Cartesian path thickening, with ports on the first layer. It returns both minimizing cuts. [Intermediate reading](examples/intermediate-reading.json) applies Theorem 6.5. Breadth-first search on attainable Pauli syndromes computes quantum soundness from minimum physical Pauli weights, including Y. Each individual cone must preserve the memory target and its auxiliary distance times its declared merge rounds must reach that target. Both temporal boundaries are checked. These enumerations are intended for finite studies and return an open obligation at their budget.
+
+## Homomorphic measurement and surgery
+
+[ZX comparison](examples/homomorphic-surgery.json) compiles two physical circuits from the same chain map: an encoded ancilla with data-to-ancilla CNOTs and destructive readout, and a vertex-check measurement with X split on the auxiliary edges. The ideal ZX boundary and outcome map are compared. Vertex strings label cosets modulo the auxiliary X checks; the extra split outcomes drive the returned Z-frame columns. Each unencoded open-wire implementation has its own ZX circuit-noise search through weight one. These circuit bounds have different boundaries from the padded phenomenological theorem.

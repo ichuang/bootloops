@@ -88,3 +88,13 @@ class ExpansionTests(unittest.TestCase):
         verify(s,r)
         self.assertEqual(r["result"]["quantum_soundness"],"2")
         self.assertEqual(receipt(dict(s,rounds=[1]))["result"]["status"],"counterexample")
+
+class ZXTests(unittest.TestCase):
+    def test_homomorphic(self):
+        import json
+        from pathlib import Path
+        s=json.loads((Path(__file__).parent/"examples/homomorphic-surgery.json").read_text())
+        r=receipt(s)
+        verify(s,r)
+        self.assertEqual(r["result"]["split_Z_frame_columns"],[1])
+        self.assertEqual(set(r["result"]["physical_open_wire_checks"]),{"homomorphic","cone surgery"})
