@@ -58,15 +58,55 @@ def two_block(variant="adapter"):
                      2*n,bridge["checks"],2)
 
 
+def architecture(case):
+    from .surgery_layout import product_connection,translated_settings
+    from .surgery_products import lifted_product
+    if case=="product-connection":
+        return product_connection([[5]],[[5]],[[1]],[[3]],4,2)
+    if case=="pcpp":
+        return dict(method="linear",n=8,hx=[15,240],hz=[15,240],axis="Z",ports=[1,2,4,0],
+                    aux=[11,12],rounds=2,distance_target=2,targets=[word(8,i,"Z") for i in (5,6)])
+    if case=="cyclic-seed":
+        n,x,z=lifted_product([[5]],[[5]],4)
+        from ftqc_codes.gf2 import nullspace
+        for seed_word in nullspace(x,n):
+            try:
+                designs=translated_settings(n,x,z,4,seed_word,[0,1],2)
+            except ValueError:
+                continue
+            parts=[build(d)["spec"] for d in designs]
+            return installed([(p,list(range(Instrument(p).c.n)),None) for p in parts],n,parts[0]["checks"],2)
+        raise ValueError("no independent translated seeds")
+    # Two inequivalent small CSS blocks. Both joint measurements touch data 0 and 3.
+    from ftqc_gadgets.surgery_parallel import branch
+    from ftqc_gadgets.surgery_build import graph
+    checks=[word(7,r,"Z") for r in (7,24)]
+    targets=[word(7,r,"Z") for r in (9,43)]
+    if case=="branched":
+        parts=[branch(7,checks,targets,2)]
+    elif case=="parallel-parsimonious":
+        parts=[]
+        for m in (9,43):
+            sites=[j for j in range(7) if m>>j&1]
+            parts.append(build(dict(n=7,hx=[],hz=[7,24],targets=[word(7,m,"Z")],axis="Z",rounds=2,
+                         method="parsimonious",sites=sites,edges=[[i,i+1] for i in range(len(sites)-1)]))["spec"])
+    else:
+        parts=[graph(7,checks,t,[(j,j+1) for j in range(t.count("Z")-1)],"homomorphic",2) for t in targets]
+    parts.append(graph(7,checks,word(7,59,"X"),[(j,j+1) for j in range(4)],"homomorphic",2))
+    return installed([(p,list(range(Instrument(p).c.n)),None) for p in parts],7,checks,2)
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("case",choices=["two-block","two-block-parsimonious","radial90","radial90-reference","hgp-padded"])
+    ap.add_argument("case",choices=["two-block","two-block-parsimonious","radial90","radial90-reference","hgp-padded","product-connection","cyclic-seed","pcpp","branched","serial","parallel-parsimonious"])
     ap.add_argument("-o",required=True,type=Path)
     args=ap.parse_args()
     if args.case.startswith("two-block"):
         result=two_block("adapter" if args.case=="two-block" else "parsimonious")
     elif args.case=="hgp-padded":
         result=product_sequence([7],3,[3,3],2,[3,5],2,[2,2],12)
+    elif not args.case.startswith("radial"):
+        result=architecture(args.case)
     else:
         result=radial_design()
         if args.case.endswith("reference"):

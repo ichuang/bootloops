@@ -8,7 +8,7 @@ def word(n,mask,axis):
     return "+" + "".join(axis if mask>>i & 1 else "I" for i in range(n))
 
 
-def merge(n,hx,hz,ports,aux,rounds,axis="Z",faces=None):
+def merge(n,hx,hz,ports,aux,rounds,axis="Z",faces=None,phenomenological=False):
     if type(rounds)!=int or rounds<1 or axis not in ("X","Z"):
         raise ValueError("invalid merged syndrome rounds or axis")
     dual=axis=="X"
@@ -16,7 +16,8 @@ def merge(n,hx,hz,ports,aux,rounds,axis="Z",faces=None):
     cone=restricted_cone(n,a,b,ports,aux,faces)
     ticks=[]
     def gate(op,*args):
-        ticks.append([[op,*args]])
+        name="!"+op if phenomenological and op not in ("M","MX") else op
+        ticks.append([[name,*args]])
     def basis(ordinary,conjugate):
         return conjugate if dual else ordinary
     def cx(c,t):
@@ -29,6 +30,8 @@ def merge(n,hx,hz,ports,aux,rounds,axis="Z",faces=None):
     detectors=[]
     prior=None
     for _ in range(rounds):
+        if phenomenological:
+            ticks.append([["I",q] for q in range(n+e)])
         currents=[]
         for j,(is_x,row) in enumerate([(False,r) for r in cone["hz"]]+[(True,r) for r in cone["hx"]]):
             meter=meters+j

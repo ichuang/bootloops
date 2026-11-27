@@ -112,7 +112,12 @@ def compile_schedule(s):
 def analyze(s,budget):
     spec,peak=compile_schedule(s)
     proof=receipt(spec,s["target"]-1,max(1,budget))
-    return dict(status=proof["faults"]["status"],gadget=proof,peak_live=peak,
+    timing={}
+    if "transport" in s:
+        from .surgery_layout import transport
+        layout=s["transport"]
+        timing["transport"]=transport(layout["initial"],layout["layers"],spec["ticks"],layout["gate_range"])
+    return dict(**timing,status=proof["faults"]["status"],gadget=proof,peak_live=peak,
                 installed_couplers=len({tuple(sorted(p)) for p in s["couplers"]}),
                 ticks=len(spec["ticks"]))
 

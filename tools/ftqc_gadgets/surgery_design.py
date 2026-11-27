@@ -40,11 +40,17 @@ def geometry(s):
 
 def build(s):
     n=s["n"]
+    if s["method"]=="branch":
+        from .surgery_parallel import branch
+        return dict(spec=branch(n,s["checks"],s["targets"],s["rounds"]),geometry=dict(method="branch"))
     if s["method"]=="homomorphic":
         g=graph(n,s["checks"],s["target"],s["edges"],"homomorphic",s.get("rounds",1))
         return dict(spec=g,geometry=dict(method="homomorphic"))
     p,a,faces,details=geometry(s)
-    cone,g=merge(n,s["hx"],s["hz"],p,a,s["rounds"],s["axis"],faces)
+    model=s.get("noise_locations","physical")
+    if model not in ("physical","phenomenological"):
+        raise ValueError("unknown surgery noise locations")
+    cone,g=merge(n,s["hx"],s["hz"],p,a,s["rounds"],s["axis"],faces,model=="phenomenological")
     if g["targets"]!=s["targets"]:
         raise ValueError("induced subgroup basis differs from requested signed outputs")
     target=s.get("distance_target",1)
