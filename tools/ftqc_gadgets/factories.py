@@ -27,7 +27,7 @@ itself is tested.
 import random
 from itertools import combinations
 
-from ftqc_audit.circuit import Circuit
+from ftqc_faults.audit.circuit import Circuit
 from ftqc_codes import gf2, minweight
 
 from .effects import Analysis

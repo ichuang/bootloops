@@ -87,7 +87,7 @@ class CircuitTests(unittest.TestCase):
 
     def test_reference_and_random_syndrome(self):
         from .injection_circuit import paths, run
-        from ftqc_audit.injection_records import parse
+        from ftqc_faults.audit.injection_records import parse
 
         stim = self.stim
         for case, coefficient, raw in [
@@ -119,7 +119,7 @@ class CircuitTests(unittest.TestCase):
         self.assertEqual(outputs.tolist(), [[True, False, False, False]] * 2)
 
     def test_sample_masks_and_silent_signatures(self):
-        from ftqc_audit.injection_statistics import summarize
+        from ftqc_faults.audit.injection_statistics import summarize
         from .injection_circuit import paths, run
         from fractions import Fraction
 

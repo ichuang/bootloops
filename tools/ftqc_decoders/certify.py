@@ -110,7 +110,7 @@ def load_problem_from_spec(prob_spec: dict[str, Any], *, base_dir: Path | None =
         )
     if kind == "extractor_gross_probe":
         _ensure_tools_on_path()
-        from ftqc_audit.record_model import RecordModel
+        from ftqc_faults.audit.record_model import RecordModel
         from ftqc_extractors.gross_probes import experiment
 
         rounds = int(prob_spec.get("rounds", 2))

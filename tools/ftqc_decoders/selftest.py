@@ -360,7 +360,7 @@ def leg_m1_m4_mutant_kills() -> str:
         scratch_tools.mkdir(parents=True)
         shutil.copytree(_PKG_DIR, scratch_pkg, ignore=shutil.ignore_patterns("__pycache__", "._*"))
         # Symlink sibling packages (`ftqc_codes`, `ftqc_audit`, `ftqc_extractors`, `ftqc_gadgets`) into scratch_tools
-        for sib in ("ftqc_codes", "ftqc_audit", "ftqc_extractors", "ftqc_gadgets"):
+        for sib in ("ftqc_codes", "ftqc_faults", "ftqc_audit", "ftqc_extractors", "ftqc_gadgets"):
             sib_src = _TOOLS_DIR / sib
             if sib_src.exists():
                 os.symlink(sib_src, scratch_tools / sib)

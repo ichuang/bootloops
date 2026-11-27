@@ -1,5 +1,7 @@
 # ftqc_zx
 
+This engine is part of [ftqc_faults](../ftqc_faults/GUIDE.md). Its canonical CLI is `python3 -m ftqc_faults zx`. The legacy entry point and receipt formats remain supported.
+
 Exact $\mathbb{F}_2$ Pauli-web verifier, constructive fault-equivalent ZX-calculus
 compiler, flag-conditioned syndrome decoder synthesizer, and zero-float outward-rounded
 stochastic gadget-contract emitter (`ftqc_zx-contract-v1`) for fault-tolerant

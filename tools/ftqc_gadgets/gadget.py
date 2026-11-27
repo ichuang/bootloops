@@ -27,7 +27,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-from ftqc_audit.circuit import Circuit, CircuitError  # noqa: E402
+from ftqc_faults.audit.circuit import Circuit, CircuitError  # noqa: E402
 from ftqc_codes import gf2  # noqa: E402
 
 

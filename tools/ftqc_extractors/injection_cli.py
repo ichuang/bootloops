@@ -5,8 +5,7 @@ from contextlib import ExitStack
 from functools import lru_cache
 
 
-def add_parser(sub):
-    parser = sub.add_parser("injection", help="audit a published logical-Y injection experiment")
+def configure_parser(parser):
     parser.add_argument("case")
     parser.add_argument("--faults", help="write accepted location modes as JSON lines")
     parser.add_argument("--decode", action="store_true", help="apply the reference BP+OSD configuration")

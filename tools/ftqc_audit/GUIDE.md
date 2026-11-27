@@ -1,5 +1,7 @@
 # ftqc_audit — GUIDE
 
+This engine is part of [ftqc_faults](../ftqc_faults/GUIDE.md). Its canonical CLI is `python3 -m ftqc_faults audit`. The legacy entry point and receipt formats remain supported.
+
 KIND: package (Python, stdlib only; imports `ftqc_codes` from this repository for
 the SAT leg and for code constructions; `circuit.py`, `stab.py`, `model.py`,
 `analysis.py`, `certify.py`, `library.py`, `stimleg.py`, `selftest.py`).

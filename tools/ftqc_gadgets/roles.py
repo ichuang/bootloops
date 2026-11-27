@@ -1,7 +1,7 @@
 """Bind an inner gadget's signed logical instrument to an outer operation."""
 
-from ftqc_audit.circuit import Circuit
-from ftqc_audit.stab import Sim
+from ftqc_faults.audit.circuit import Circuit
+from ftqc_faults.audit.stab import Sim
 from ftqc_codes import gf2
 
 from .certify import Refusal

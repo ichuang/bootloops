@@ -5,9 +5,9 @@ import json
 import sys
 from pathlib import Path
 
-from ftqc_audit.analysis import min_undetected
-from ftqc_audit.circuit import Circuit
-from ftqc_audit.model import propagate
+from ftqc_faults.audit.analysis import min_undetected
+from ftqc_faults.audit.circuit import Circuit
+from ftqc_faults.audit.model import propagate
 
 from .__main__ import digest, validate
 from .algebra import bits

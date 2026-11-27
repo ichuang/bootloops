@@ -23,8 +23,8 @@ from bisect import bisect_left
 from itertools import combinations
 from math import comb
 
-from ftqc_audit import stab
-from ftqc_audit.model import Model, propagate
+from ftqc_faults.audit import stab
+from ftqc_faults.audit.model import Model, propagate
 from ftqc_codes import gf2
 
 from .gadget import GadgetError
@@ -209,7 +209,7 @@ class Analysis:
         if not g.inputs:
             return
         sim = stab.Sim(c.n)
-        from ftqc_audit.circuit import Circuit
+        from ftqc_faults.audit.circuit import Circuit
         pre = Circuit([[("!" + op.name,) + op.qs for op in t] for t in c.ticks[:g.body_start]], c.n)
         if any(op.noisy for t in c.ticks[:g.body_start] for op in t):
             raise GadgetError("the input preamble contains a noisy operation")

@@ -3,9 +3,9 @@
 from collections import defaultdict
 from contextlib import nullcontext
 
-from ftqc_audit.spacetime import lift_bound, support_enumerator
-from ftqc_audit.record_model import RecordModel
-from ftqc_audit.projected import exclude
+from ftqc_faults.audit.spacetime import lift_bound, support_enumerator
+from ftqc_faults.audit.record_model import RecordModel
+from ftqc_faults.audit.projected import exclude
 
 from .algebra import bits
 from .gross import shifted_z

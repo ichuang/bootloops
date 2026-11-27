@@ -87,7 +87,7 @@ class SequenceTests(unittest.TestCase):
 class GrossReadingTests(unittest.TestCase):
     def test_both_axes(self):
         from ftqc_codes.codes import CSSCode, load
-        from ftqc_audit.record_model import RecordModel
+        from ftqc_faults.audit.record_model import RecordModel
         from .reading_audit import probe
         from .block_reading import reading
 

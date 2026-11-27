@@ -7,7 +7,7 @@ from itertools import combinations
 from pathlib import Path
 
 import ftqc_extractors
-from ftqc_audit.model import propagate
+from ftqc_faults.audit.model import propagate
 from ftqc_extractors.__main__ import digest
 from ftqc_extractors.algebra import (
     css_dimension,

@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 from fractions import Fraction
-from ftqc_audit.injection_records import audit, experiment_cost
+from ftqc_faults.audit.injection_records import audit, experiment_cost
 from .injection import analyze
 
 EXAMPLES = Path(__file__).parent / "examples"

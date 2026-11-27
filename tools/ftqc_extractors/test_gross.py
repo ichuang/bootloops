@@ -136,9 +136,9 @@ class NoisyCycleTests(unittest.TestCase):
             validate_cycle(body, hx, hz)
 
     def test_record_columns_against_forward_ftqc_audit(self):
-        from ftqc_audit.circuit import Circuit
-        from ftqc_audit.model import Model
-        from ftqc_audit.record_model import RecordModel
+        from ftqc_faults.audit.circuit import Circuit
+        from ftqc_faults.audit.model import Model
+        from ftqc_faults.audit.record_model import RecordModel
 
         circ = Circuit(
             [[("RX", 0), ("R", 1)], [("CX", 0, 1)], [("M", 0), ("M", 1)]],
@@ -161,7 +161,7 @@ class CircuitDistanceTests(unittest.TestCase):
         from random import Random
         from operator import xor
         from functools import reduce
-        from ftqc_audit.projected import exclude
+        from ftqc_faults.audit.projected import exclude
 
         rng = Random(2026)
         for _ in range(50):
@@ -195,7 +195,7 @@ class CircuitDistanceTests(unittest.TestCase):
 
 class SpacetimeTests(unittest.TestCase):
     def test_domains(self):
-        from ftqc_audit.spacetime import xor_feasible
+        from ftqc_faults.audit.spacetime import xor_feasible
         from itertools import product
         from random import Random
 
@@ -212,7 +212,7 @@ class SpacetimeTests(unittest.TestCase):
             )
 
     def test_native_cover_and_zero_projection_fault(self):
-        from ftqc_audit.spacetime import (
+        from ftqc_faults.audit.spacetime import (
             support_enumerator,
             lift_bound,
             enumerate_supports,

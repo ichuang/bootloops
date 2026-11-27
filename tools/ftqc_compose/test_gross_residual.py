@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import patch
 
-from ftqc_audit.circuit import Circuit
-from ftqc_audit.record_model import RecordModel
+from ftqc_faults.audit.circuit import Circuit
+from ftqc_faults.audit.record_model import RecordModel
 from ftqc_extractors.__main__ import receipt
 
 from .gross_residual import check_kernel, gross_result

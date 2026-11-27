@@ -46,8 +46,8 @@ import json
 import random
 from itertools import combinations
 
-from ftqc_audit.circuit import Circuit
-from ftqc_audit.model import Model, propagate
+from ftqc_faults.audit.circuit import Circuit
+from ftqc_faults.audit.model import Model, propagate
 from ftqc_codes import gf2, hier
 
 from .gadget import GadgetError, prep_layers

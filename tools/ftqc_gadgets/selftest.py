@@ -19,9 +19,9 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
-from ftqc_audit import analysis as fca  # noqa: E402
-from ftqc_audit import library as fclib  # noqa: E402
-from ftqc_audit.selftest import Dense, dense_run  # noqa: E402
+from ftqc_faults.audit import analysis as fca  # noqa: E402
+from ftqc_faults.audit import library as fclib  # noqa: E402
+from ftqc_faults.audit.selftest import Dense, dense_run  # noqa: E402
 from ftqc_gadgets import certify, effects, library, props  # noqa: E402
 from ftqc_gadgets.effects import Analysis  # noqa: E402
 from ftqc_gadgets.gadget import Builder, Code, Gadget, GadgetError  # noqa: E402

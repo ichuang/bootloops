@@ -24,12 +24,12 @@ def _ensure_tools_on_syspath() -> None:
 
 def ftqc_audit_available() -> bool:
     _ensure_tools_on_syspath()
-    return importlib.util.find_spec("ftqc_audit") is not None
+    return importlib.util.find_spec("ftqc_faults") is not None
 
 
 def ftqc_zx_available() -> bool:
     _ensure_tools_on_syspath()
-    return importlib.util.find_spec("ftqc_zx") is not None
+    return importlib.util.find_spec("ftqc_faults") is not None
 
 
 def ftqc_compose_available() -> bool:
@@ -151,7 +151,7 @@ def audit_clifford_hmr_with_ftqc_audit(
 ) -> dict[str, Any]:
     """Build and verify a live `ftqc_audit` certificate for a Clifford+HMR `KickMixCircuit`."""
     _ensure_tools_on_syspath()
-    import ftqc_audit  # type: ignore[import-not-found]
+    from ftqc_faults import audit as ftqc_audit  # type: ignore[import-not-found]
 
     ticks = kmx_clifford_to_ftqc_audit_ticks(circuit, prep_public_plus=True)
     pub = sorted(circuit.public_qubits()) if circuit.registers else list(range(circuit.num_qubits))

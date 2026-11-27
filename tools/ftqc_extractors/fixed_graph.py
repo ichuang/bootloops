@@ -3,7 +3,7 @@
 from itertools import combinations, product
 from math import comb
 
-from ftqc_audit.stab import Gen
+from ftqc_faults.audit.stab import Gen
 from ftqc_codes.gf2 import Echelon
 from .algebra import bits, kernel, parity, transpose, Limit
 from .block_reading import combine, rows

@@ -1,7 +1,7 @@
 """CSS record probes of a one-round full block reading with explicit gates and idles."""
 
-from ftqc_audit.circuit import Circuit
-from ftqc_audit.record_model import RecordModel
+from ftqc_faults.audit.circuit import Circuit
+from ftqc_faults.audit.record_model import RecordModel
 from ftqc_codes.codes import CSSCode, load
 from .algebra import bits, kernel, parity, transpose
 from .block_reading import combine, quotient, reading

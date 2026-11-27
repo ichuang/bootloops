@@ -283,7 +283,7 @@ def _leg_l6_receipts_and_bridges() -> str:
         bridge_notes.append("ftqc_audit live")
     if adapters.ftqc_zx_available():
         try:
-            import ftqc_zx  # type: ignore[import-not-found]
+            from ftqc_faults import zx as ftqc_zx  # type: ignore[import-not-found]
 
             cat4, _ = ftqc_zx.synth_cat_state(4)
             zxc = ftqc_zx.build_gadget_contract(cat4, p_phys="1/1000")

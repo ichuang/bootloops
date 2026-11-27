@@ -1,7 +1,7 @@
 """Compile Clifford+T to signed measurements on a fixed extractor block map."""
 
 from itertools import product
-from ftqc_zx.frame_oracle import _apply_1q_to_stab_list, _apply_2q_to_stab_list
+from ftqc_faults.zx.frame_oracle import _apply_1q_to_stab_list, _apply_2q_to_stab_list
 from .algebra import Limit
 from .block_map import Hardware, physical
 

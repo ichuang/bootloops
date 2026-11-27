@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from ftqc_audit.record_model import RecordModel
+from ftqc_faults.audit.record_model import RecordModel
 from ftqc_codes.gf2 import Echelon, dot, rank
 from ftqc_extractors.__main__ import verify
 from ftqc_extractors.algebra import bits, kernel

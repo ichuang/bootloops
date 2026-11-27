@@ -1,5 +1,7 @@
 # ftqc_zx — GUIDE
 
+This engine is part of [ftqc_faults](../ftqc_faults/GUIDE.md). Its canonical CLI is `python3 -m ftqc_faults zx`. The legacy entry point and receipt formats remain supported.
+
 Tool page: https://bootloops.ai/tools/index.html (registry index)
 
 KIND: package (`gf2.py`, `diagram.py`, `pauliweb.py`, `frame_oracle.py`,

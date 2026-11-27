@@ -2,8 +2,8 @@ import json
 import unittest
 from pathlib import Path
 
-from ftqc_audit.circuit import Circuit
-from ftqc_audit.model import Model
+from ftqc_faults.audit.circuit import Circuit
+from ftqc_faults.audit.model import Model
 
 from .audit_bridge import Bridge, cat_prefix
 

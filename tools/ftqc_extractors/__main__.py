@@ -235,8 +235,8 @@ def main():
     check = sub.add_parser("verify")
     check.add_argument("spec", type=Path)
     check.add_argument("receipt", type=Path)
-    from .injection_cli import add_parser, command
-    add_parser(sub)
+    from .injection_cli import configure_parser, command
+    configure_parser(sub.add_parser("injection", help="audit a published logical-Y injection experiment"))
     args = parser.parse_args()
     try:
         if args.command == "injection":

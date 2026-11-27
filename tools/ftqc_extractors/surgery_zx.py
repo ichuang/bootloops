@@ -1,9 +1,9 @@
 """Compile both ideal instruments of Theorem 9.1 and compare them with ftqc_zx."""
 
 from types import SimpleNamespace
-from ftqc_zx.diagram import CircuitOp, CliffordCircuit
-from ftqc_zx.pauliweb import match_measurement_branches
-from ftqc_zx.equivalence import circuit_distance
+from ftqc_faults.zx.diagram import CircuitOp, CliffordCircuit
+from ftqc_faults.zx.pauliweb import match_measurement_branches
+from ftqc_faults.zx.equivalence import circuit_distance
 from .algebra import bits, Limit
 from .block_reading import memory, split_section, combine
 from .surgery_sequence import append_cone

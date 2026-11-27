@@ -5,7 +5,7 @@ from fractions import Fraction
 import json
 
 from ftqc_extractors.injection_circuit import paths, run
-from ftqc_audit.injection_records import parse, responses
+from ftqc_faults.audit.injection_records import parse, responses
 
 
 def s_injection():

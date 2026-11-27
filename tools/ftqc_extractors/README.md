@@ -47,3 +47,5 @@ The 12 port checks of the unprimed Z setting select one logical observable of th
 With noisy syndrome extraction, the seven-round schedule has exact circuit distance 7 and the twelve-round schedule has exact distance 10. ftqc_extractors exports both CSS probes to ftqc_audit and verifies the lower bounds and matching physical faults. [Noisy schedule and replay instructions](GROSS_CIRCUIT.md)
 
 The [simultaneous injection study](INJECTION.md) constructs general CSS carrier Cliffords, checks selected Bell-pair preparations, and audits logical-Y source batches in the BB144 and HGP225 memories. [Injection example](examples/bb144-injection-4.json)
+
+Run `python3 -m ftqc_extractors injection bb-uniform` to audit a published closed Y probe. [Injection cases, decoder settings and seeded sampling](INJECTION.md)

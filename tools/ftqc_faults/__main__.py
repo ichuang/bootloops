@@ -1,4 +1,5 @@
 """Circuit fault analysis, ZX equivalence, and the Steane cross-check."""
+
 import argparse
 import json
 import sys
@@ -9,10 +10,22 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(prog="ftqc_faults", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    bridge = commands.add_parser("steane", help="check both five-ancilla Steane extractors")
+    bridge = commands.add_parser(
+        "steane", help="check both five-ancilla Steane extractors"
+    )
     output = bridge.add_mutually_exclusive_group()
     output.add_argument("-o", type=Path, help="save the cross-check receipt")
     output.add_argument("--verify", type=Path, help="replay a saved receipt")
+    commands.add_parser("audit", help="analyze a physical Clifford schedule")
+    commands.add_parser("zx", help="synthesize or verify ZX fault equivalence")
+    if argv[:1] == ["audit"]:
+        from .audit.__main__ import main as audit_main
+
+        return audit_main(argv[1:], prog="ftqc_faults audit")
+    if argv[:1] == ["zx"]:
+        from .zx.cli import main as zx_main
+
+        return zx_main(argv[1:], prog="ftqc_faults zx")
     args = parser.parse_args(argv)
     from .steane import receipt
 

@@ -1,15 +1,14 @@
 # Fault-tolerant quantum computing in BootLoops
 
-The eight tools on `ftqc_integration` cover different parts of a fault-tolerance and logical-compilation argument. Start with the object you want to certify and identify what the next step needs from its receipt.
+The seven tools on `ftqc_integration` cover different parts of a fault-tolerance and logical-compilation argument. Start with the object you want to certify and identify what the next step needs from its receipt.
 
 | Tool | Input and question | Evidence |
 |---|---|---|
 | [ftqc_codes](ftqc_codes/GUIDE.md) | Given CSS check matrices, which logical errors can the memory detect? | Code parameters, bounds on X and Z distance, witnesses and hierarchical decoding guarantees. |
 | [ftqc_extractors](ftqc_extractors/GUIDE.md) | Which logical measurements can a fixed apparatus perform, and what fault distance does a surgery sequence preserve? | Fixed-coupler graphs and bridges, transversal block readings, padded hypergraph surgery, physical fault witnesses, and resource-conditional logical T receipts. |
-| [ftqc_audit](ftqc_audit/GUIDE.md) | Which physical faults can evade a Clifford circuit’s detectors? | Detector and observable flips per location, replayable fault sets, circuit-distance intervals and preparation checks. |
+| [ftqc_faults](ftqc_faults/GUIDE.md) | How do faults propagate in this circuit, and can an implementation replace a reference under a specified fault model? | Physical fault signatures, distance intervals and witnesses from the audit engine. ZX equivalence, synthesis, flag decoder tables, and stochastic contracts from the ZX engine. |
 | [ftqc_decoders](ftqc_decoders/GUIDE.md) | Does a polynomial-time decoder achieve the code or circuit distance without trapping sets, and what operational error rate does it certify? | Operational radius proofs, split-stabilizer trapping-set witnesses, two-stage metacheck repair, Peierls cluster LER bounds, Stim `.dem` export and audited external (`Tesseract`, `PyMatching`, `ldpc`) runs. |
 | [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, component refinement, two-level checks on concatenated codes, and the faults that can reach each decoding event in a scheduled program. |
-| [ftqc_zx](ftqc_zx/GUIDE.md) | Can a candidate replace a reference circuit under the specified noise model? | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic gadget contracts. |
 | [ftqc_compose](ftqc_compose/GUIDE.md) | Do the output and fault guarantees of one operation meet the next operation’s input requirements? | Typed joins, residual data and frame checks, level reduction and local-stochastic error bounds for a composed study. |
 | [ftqc_uncompute](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup preserve the logical quantum action? Is a pebbling schedule legal, and what error does a declared mask allow? | Exact symbolic HMR checks, sampled trajectory bounds, mask and schedule checks, and source-bound replay of `ftqc_uncompute-receipt-1`. |
 
@@ -33,7 +32,7 @@ export PYTHONPATH="$PWD/tools"
 out=$(mktemp -d)
 spec=tools/ftqc_extractors/examples/gross-circuit.json
 python3 -m ftqc_extractors schedule "$spec" --probe Z -o "$out/z-probe.json"
-python3 -m ftqc_audit records "$out/z-probe.json" -o "$out/records.json"
+python3 -m ftqc_faults audit records "$out/z-probe.json" -o "$out/records.json"
 python3 -m ftqc_extractors check "$spec" -o "$out/distance.json"
 python3 -m ftqc_extractors verify "$spec" "$out/distance.json"
 ```
@@ -55,7 +54,14 @@ python3 -m ftqc_codes certify steane -o "$out/steane.json"
 python3 -m ftqc_codes verify "$out/steane.json" --full
 python3 -m ftqc_gadgets analyze knill:steane,anc=spec --check ec:1 --close 1 -o "$out/gadget.json"
 python3 -m ftqc_gadgets verify "$out/gadget.json" --full
-python3 -m ftqc_zx equiv steane_5anc steane_spec --w 3 --noise-model circuit_css --code steane_7_1_3
+python3 -m ftqc_faults zx equiv steane_5anc steane_spec --w 3 --noise-model circuit_css --code steane_7_1_3
+```
+
+The five-ancilla bridge verifies both sector-specific ZX derivations and cross-checks all 455 single-location fault modes in each physical schedule. The two complementary terminal probes recover both components of the raw data Pauli and compare every measurement-record displacement. Replay the study with the same shell setup. [Model, boundaries and fault weights](ftqc_faults/GUIDE.md#five-ancilla-steane-extractor)
+
+```sh
+python3 -m ftqc_faults steane -o "$out/steane-bridge.json"
+python3 -m ftqc_faults steane --verify "$out/steane-bridge.json"
 ```
 
 ## QR-47 as an outer code
@@ -130,10 +136,11 @@ python3 -m ftqc_decoders verify "$out/bb144_ler.receipt.json"
 
 ## Reproduce the integration checks
 
-From BootLoops, run the eight registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+From BootLoops, run the eight established suites, including the separate audit and ZX engine batteries, then run the cross-engine checks. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
 
 ```sh
 python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute
+python3 run_selftests.py ftqc_faults
 ```
 
 ## Supply states from inside a CSS memory

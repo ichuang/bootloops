@@ -4,7 +4,7 @@ from functools import reduce
 from operator import xor
 
 from ftqc_codes.gf2 import Echelon
-from ftqc_audit.circuit import Circuit
+from ftqc_faults.audit.circuit import Circuit
 from .algebra import bits, echelon, kernel, reduce_row
 from .gross import gross_z, port_frame, shifted_z
 from .gross_cycle import cycle, X0, Z0, NWIRES

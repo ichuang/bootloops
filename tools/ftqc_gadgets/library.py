@@ -29,7 +29,7 @@ Suffixes: `,ideal` makes every operation noiseless and adds noisy wires on the o
 specification of the gadget; for cnot one noisy two-qubit location per qubit pair, since one
 fault of a transversal gate may leave an error on both blocks); `,idles` inserts idle locations.
 """
-from ftqc_audit import library as fclib
+from ftqc_faults.audit import library as fclib
 import ftqc_codes
 from ftqc_codes import gf2
 
@@ -244,7 +244,7 @@ def from_circuit(circ, code=None):
 def idealize(g):
     """The specification of a gadget: the same circuit with every operation noiseless
     (input-error idles excepted), followed by one noisy wire on every output qubit."""
-    from ftqc_audit.circuit import Circuit
+    from ftqc_faults.audit.circuit import Circuit
     c = g.circuit
     ticks = []
     for k, t in enumerate(c.ticks):
