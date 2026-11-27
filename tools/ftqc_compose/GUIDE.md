@@ -185,3 +185,7 @@ independent-noise premise. A terminal qLDPC/C2T experiment requires a
 fresh catalyst with empty history and retirement at this batch. Lifetime
 declarations apply to this workload. Physical non-Clifford preparation and
 factory-to-memory distance require a separate circuit audit.
+
+The [in-situ BB144 factory guide](../ftqc_extractors/BICYCLE_FACTORY.md)
+covers injection batch replay, RM15 input assignment, signed native pivot
+measurements, physical scheduling and full-attempt pricing.

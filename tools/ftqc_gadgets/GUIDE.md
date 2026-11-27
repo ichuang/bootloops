@@ -434,3 +434,7 @@ signed checks, a complete ordered logical basis, and the destination slot.
 Checking the Pauli images certifies transfer into that slot and identity on
 every spectator, including its reference. The physical circuit and its wire
 order are part of the receipt.
+
+The [in-situ BB144 factory guide](../ftqc_extractors/BICYCLE_FACTORY.md)
+covers injection batch replay, RM15 input assignment, signed native pivot
+measurements, physical scheduling and full-attempt pricing.

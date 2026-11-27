@@ -29,6 +29,8 @@ def bind(compiled, source):
         or not evidence["acceptance_exact"]
     ):
         raise ValueError("PBC needs one T with a replayed exact acceptance law")
+    if evidence["active_qubits"] is None:
+        raise ValueError("installed PBC requires a priced physical factory inventory")
     latency = tick(install["latency"])
     blocks = source["blocks"]
     offsets = [sum(b["n"] for b in blocks[:i]) for i in range(len(blocks))]
