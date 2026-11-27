@@ -121,6 +121,10 @@ def analyze(s, budget):
             terms[cache] = (x, z ^ (1 << scratch), sgn)
             issue(terms, "rotation parity b")
             issue({cache: (1 << scratch, 0, 0)}, "resource X m")
+            # The local frames depend on both bits, including the cache's X
+            # readout. A disjoint rotation may still start in the same cycle.
+            for block in terms:
+                time[block] = max(time[block], time[cache])
             if gate == "T":
                 if b:
                     history[i].append(["S", j])

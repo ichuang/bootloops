@@ -106,3 +106,43 @@ class PBCTests(unittest.TestCase):
         s["bridges"][0]["matching"] = [[0, 0], [0, 1]]
         with self.assertRaises(ValueError):
             receipt(s)
+
+    def test_frame_availability_and_disjoint_rotations(self):
+        s = json.loads(EXAMPLE.read_text())
+        s["gates"] = [["T", [0, 0]]]
+        branch = receipt(s)["result"]["branches"][0]["program"]
+        cycles = {op["role"]: op["cycle"] for op in branch if "role" in op}
+        self.assertGreater(cycles["output Z(0,0)"], cycles["resource X m"])
+        s.update(
+            gates=[["T", [0, 0]], ["T", [1, 0]]], magic_supplies=[0, 1], bridges=[]
+        )
+        branches = receipt(s)["result"]["branches"]
+        self.assertEqual(len(branches), 16)
+        for b in branches:
+            self.assertEqual(
+                [
+                    op["cycle"]
+                    for op in b["program"]
+                    if op.get("role") == "rotation parity b"
+                ],
+                [0, 0],
+            )
+            self.assertEqual(
+                [
+                    op["cycle"]
+                    for op in b["program"]
+                    if op.get("role", "").startswith("output")
+                ],
+                [2, 2],
+            )
+
+    def test_partial_ports_need_not_cover_first_basis_z(self):
+        from .block_map import Hardware
+
+        s = json.loads(EXAMPLE.read_text())
+        s.update(blocks=s["blocks"][:1], bridges=[])
+        s["blocks"][0]["ports"] = [0, 1, -1, -1]
+        hw = Hardware(s, 2000000)
+        self.assertEqual(hw.select((0,), "+ZZII")["support"], [0, 1])
+        with self.assertRaises(ValueError):
+            hw.select((0,), "+ZIZI")

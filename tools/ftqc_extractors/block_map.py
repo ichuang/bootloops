@@ -1,6 +1,6 @@
 """Physical addresses for extractor blocks, bridges and adapters (He et al. §4)."""
 
-from .algebra import bits, parity
+from .algebra import bits, kernel, parity
 from .extractor import matching
 from .fixed_graph import analyze, pauli, signed_basis
 
@@ -104,6 +104,21 @@ def join(a, b, links):
     )
 
 
+def supported_logical(layout):
+    """Find a normalizer representative confined to the installed ports."""
+    n = layout["n"]
+    gens = [pauli(w, n) for w in layout["checks"]]
+    stabilizers = signed_basis(gens, n)
+    constraints = [g.z | (g.x << n) for g in gens]
+    for q, port in enumerate(layout["ports"]):
+        if port == -1:
+            constraints.extend((1 << q, 1 << (q + n)))
+    for op in kernel(constraints, 2 * n):
+        if op not in stabilizers:
+            return word(n, op & ((1 << n) - 1), op >> n)
+    raise ValueError("installed ports support no nontrivial logical")
+
+
 class Hardware:
     def __init__(self, s, budget):
         self.budget = budget
@@ -122,10 +137,7 @@ class Hardware:
             self.layouts[i, j] = join(locals_[i], locals_[j], link["matching"])
         for ids, b in self.layouts.items():
             # Select one supported logical to verify the universal wiring hypotheses.
-            logical = self.blocks[ids[0]]["basis"][0][1] + "I" * (
-                b["n"] - locals_[ids[0]]["n"]
-            )
-            cert = self.select(ids, logical)
+            cert = self.select(ids, supported_logical(b))
 
             def labels(kind, key):
                 return [(i, kind, j) for i in ids for j in range(len(locals_[i][key]))]
