@@ -48,6 +48,10 @@ def evaluate(spec):
         from .tails import cone_bound_result
 
         return cone_bound_result(spec)
+    if spec["kind"] == "volume":
+        from .volumes import volume_result
+
+        return volume_result(spec)
     if spec["kind"] == "filter-contract":
         from .filters import filter_contract_result
 

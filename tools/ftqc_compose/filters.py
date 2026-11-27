@@ -524,10 +524,12 @@ def encoded_result(spec):
     from . import tails
 
     keys = ["kind", "level", "p", "inner", "contracts", "raw", "factory" if "factory" in spec else "tree"]
-    for opt in ("modes", "order", "max_modes", "costs"):
+    for opt in ("modes", "order", "max_modes", "costs", "inner_costs"):
         if opt in spec:
             keys.append(opt)
     fields(spec, *keys)
+    if "costs" in spec and "inner_costs" in spec:
+        raise ValueError("give costs or inner_costs, not both")
     p = probability(spec["p"])
     modes, order, cap = _options(spec)
     profile, n, wmin, seq = _tree_of(spec)
@@ -586,6 +588,21 @@ def encoded_result(spec):
     costs = spec.get("costs", {})
     if costs:
         fields(costs, "raw", "X", "Z")
+    priced = None
+    if "inner_costs" in spec:
+        # expected physical locations: the raw preparation and one check, priced by the ledger
+        from . import volumes
+
+        fields(spec["inner_costs"], "plus", "zero")
+        inner_costs = {k: volumes.cost_of(v, f"inner cost of {k}") for k, v in spec["inner_costs"].items()}
+        n1 = spec["inner"]["n"]
+        raw_counts, _, raw_total, _ = volumes.program_volume(raw, n1, None, inner_costs)
+        costs = dict(raw=str(raw_total))
+        priced = dict(raw=dict(counts=raw_counts, locations=decimal(up(raw_total, 15))))
+        for s in sorted(set(seq)):
+            st_counts, _, st_total, _ = volumes.program_volume(_step_program(s), n1, None, inner_costs)
+            costs[s] = str(n * st_total)
+            priced[s] = dict(counts=st_counts, locations_per_column=decimal(up(st_total, 15)))
     leaf_c["cost"] = Fraction(str(costs["raw"])) if costs else Fraction(1)
     # one check of each sector
     steps, step_report = {}, {}
@@ -621,7 +638,8 @@ def encoded_result(spec):
                         junk={s: sci(leaf_c[s]["pi"]) for s in "XZ"}, last_round={s: sci(leaf_c[s]["last"]) for s in "XZ"},
                         last_round_local=True, blocks_end_as_just_corrected=True),
                step=step_report, shared_sources=shared, carry_last=carry,
-               cost_unit="as declared" if costs else "raw preparations",
+               cost_unit=("physical locations" if priced else "as declared") if costs else "raw preparations",
+               priced=priced,
                uniting="sources may be shared: a + b",
                rounding=f"bounds upward, acceptance downward, {SIG} significant digits",
                premises=PREMISES_ENCODED, check=CHECK, reset=RESET)
