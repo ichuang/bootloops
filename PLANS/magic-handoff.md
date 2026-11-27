@@ -42,3 +42,23 @@ Next implement the three-wire CCZ consumption instrument and its branch-dependen
 ## Acceptance and rollout
 
 Land stages 1 and 2 together as the minimum usable integration. Place positive, negative and inconclusive cases in the owning package suites. Bank source specs, native receipts, installed schedules, noise and retry premises, and a replay command in the research study. Run `python3 run_selftests.py ftqc_magic ftqc_gadgets ftqc_extractors ftqc_compose ftqc_faults` from BootLoops, then replay the existing research studies at the candidate pin. Stages 3 and 4 can then extend the same consumer without changing how legacy factories or conditional T fixtures are verified.
+
+## Implementation status
+
+The `magic-logical-t`, `magic-batch` and `magic-interleaved` Compose studies
+and the PBC `magic_delivery` installation implement the four milestones
+above. Gadgets exposes `magic-transfer` and native receipt replay. The
+correcting and postselected RM15 laws, BH14 shared-output law, paired qLDPC
+CCZ ports, terminal C2T, the installed four-qubit lifted product, and the
+HGP450 reference-preserving SWAP have executable controls. The research
+repository banks inputs, receipts and replay instructions in
+`studies/magic-handoff/`.
+
+The largest block check covers transfer. The installed tiny program has
+per-setting evidence at ideal boundaries. Enclosing whole-program noisy
+distance, noisy factory-to-memory scheduling, reusable catalyst histories,
+arbitrary correlated distillation cascades, and a conditional final logical
+error bound remain open. The joint CCZ twirl is verified for one or two CCZ
+states followed by the ideal consumption instrument. See the
+[Compose guide](../tools/ftqc_compose/GUIDE.md) and
+[Extractors guide](../tools/ftqc_extractors/GUIDE.md).

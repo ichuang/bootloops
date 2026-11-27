@@ -137,3 +137,41 @@ The `injection-batch` verifier rebuilds the actual location responses. Within on
 ## Signed surgery instruments
 
 See [the surgery interface and replay examples](../ftqc_gadgets/SURGERY.md) for physical measurement receipts, installed feed-forward schedules and conditional residual laws.
+
+### Magic-backed logical T
+
+Run `python3 -m ftqc_compose check study.json -o proof.json` and replay with
+`verify study.json proof.json`. A `magic-logical-t` study embeds the Magic
+factory spec and strict receipt, an attempt ID, a native extractor gate and
+receipt, and a Gadgets fresh-transfer receipt. Build the latter with
+`magic_handoff.transfer_for(gate, port)`. The port names its block, ordered
+logical X/Z pair, applied input frame and matching correction (I/I or Z/Z).
+The source reader re-evaluates the target phases and exact joint accepted
+Z-mask law. The consumer uses its conditional error once and reports the
+joint accepted failure per original factory attempt. An optional
+`encoded_origin` can forward the same verified encoded output with its ordered
+data wires. The original noisy transfer is charged once. Separate factory,
+transfer and online locations and a resource independent of the logical data,
+reference and later faults are required. A final conditional logical error
+requires a lower bound on the final acceptance probability.
+
+### Correlated logical consumers
+
+A `magic-batch` binds one verified factory attempt to ordered resource-wire
+groups and distinct logical data ports. For a binary producer with an exact
+mask law, each atom lists all affected data ports and its original accepted
+mass and conditional mass. The T and CCZ injection checks enumerate every
+measurement transcript and residual Z mask. A CCZ correction uses only
+diagonal Clifford gates. A qLDPC pair uses six wires in two groups and
+carries the native joint state bound. Its detailed Pauli law is unknown.
+
+For an exact CCZ source, `twirl: joint_3twirl` samples an independent uniform
+GL(3,2) change of basis per CCZ with diagonal Clifford compensation. Replay
+transports the full mask distribution through the consumers. A generic
+native cascade with only a normalized kernel has no verified downstream
+mask transfer. For separate factory lanes, use `magic-interleaved` with
+distinct instance IDs, a verified member from each, and an explicit
+independent-noise premise. A terminal qLDPC/C2T experiment requires a
+fresh catalyst with empty history and retirement at this batch. Lifetime
+declarations apply to this workload. Physical non-Clifford preparation and
+factory-to-memory distance require a separate circuit audit.

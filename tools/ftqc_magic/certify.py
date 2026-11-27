@@ -65,12 +65,27 @@ def _export_bundle(contract: MagicSourceContract) -> dict[str, Any]:
     return exports
 
 
-def build_receipt(
+def binary_factory(spec: Mapping[str, Any]) -> BinaryFactory:
+    if "catalog" in spec:
+        fac = get_catalog_factory(str(spec["catalog"]))
+        if not isinstance(fac, BinaryFactory):
+            raise ValueError(f"Catalog entry {spec['catalog']!r} is not a BinaryFactory; use kind='signed_stabilizer'")
+    else:
+        fac = BinaryFactory.from_row_strings(
+            output_rows=spec["output_rows"],
+            check_rows=spec["check_rows"],
+            gamma=spec.get("gamma"),
+            name=str(spec.get("name", "custom_binary_factory")),
+        )
+    return fac
+
+
+def evaluate_source(
     spec: Mapping[str, Any],
     *,
     crosscheck_external: bool = False,
-) -> dict[str, Any]:
-    """Build a source-pinned `ftqc_magic-receipt-1` certificate from `spec`."""
+) -> tuple[str, MagicSourceContract, dict, dict | None]:
+    """Evaluate the native producer with exact internal arithmetic."""
     kind = str(spec.get("kind", "pipeline")).strip().lower()
     p_in = parse_exact_fraction(spec.get("p_phys", spec.get("p_input", "1/1000")))
 
@@ -79,17 +94,7 @@ def build_receipt(
     optimality_gap: dict[str, Any] | None = None
 
     if kind == "factory":
-        if "catalog" in spec:
-            fac = get_catalog_factory(str(spec["catalog"]))
-            if not isinstance(fac, BinaryFactory):
-                raise ValueError(f"Catalog entry {spec['catalog']!r} is not a BinaryFactory; use kind='signed_stabilizer'")
-        else:
-            fac = BinaryFactory.from_row_strings(
-                output_rows=spec["output_rows"],
-                check_rows=spec["check_rows"],
-                gamma=spec.get("gamma"),
-                name=str(spec.get("name", "custom_binary_factory")),
-            )
+        fac = binary_factory(spec)
         rec_info = None
         active_ovr = None
         if bool(spec.get("recycle", False)):
@@ -166,6 +171,11 @@ def build_receipt(
     else:
         raise ValueError(f"Unsupported spec kind {kind!r}")
 
+    return kind, contract, details, optimality_gap
+
+
+def build_receipt(spec: Mapping[str, Any], *, crosscheck_external: bool = False) -> dict[str, Any]:
+    kind, contract, details, optimality_gap = evaluate_source(spec, crosscheck_external=crosscheck_external)
     return {
         "schema": SCHEMA,
         "kind": kind,
