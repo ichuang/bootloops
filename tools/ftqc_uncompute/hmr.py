@@ -27,7 +27,7 @@ from .gf2 import (
     anf_var,
     anf_vars_mask,
     anf_xor,
-    gf2_rank,
+    gf2_rref,
 )
 from .ir_kickmix import ANNOTATION_OPS, KickMixCircuit, KickMixOp, Qubit
 
@@ -208,15 +208,14 @@ def _check_injectivity_anf(
     # Fast check 2: if affine (degree <= 1), exact GF(2) matrix rank check for ANY width!
     if max_deg <= 1:
         rows = [anf_vars_mask(e) & x_mask_all for e in y_exprs]
-        rk = gf2_rank(rows, num_x)
+        reduced, pivots = gf2_rref(rows, num_x)
+        rk = len(pivots)
         if rk < num_x:
-            # Find a nonzero kernel vector `k != 0` with `A k == 0`
-            # Search small basis/pairs or solve nullspace:
-            ker = 1
-            for cand in range(1, 1 << min(num_x, 16)):
-                if all(((row & cand).bit_count() & 1) == 0 for row in rows):
-                    ker = cand
-                    break
+            free = next(i for i in range(num_x) if i not in pivots)
+            ker = 1 << free
+            for row, pivot in zip(reduced, pivots):
+                if row & (1 << free):
+                    ker |= 1 << pivot
             return HMRFinding(
                 code="NON-INJECTIVE-KICKMIX-BRANCH",
                 message=f"Affine output map has GF(2) rank {rk} < {num_x}",
@@ -250,7 +249,9 @@ def _check_injectivity_anf(
                     },
                 )
             seen[out_val] = x_val
-    return None
+        return None
+    return HMRFinding("INJECTIVITY-NOT-PROVED",
+                      f"Nonlinear map on {num_x} inputs exceeds enumeration limit {exact_enum_cap}")
 
 
 def _symbolic_verify_ops(
@@ -417,7 +418,11 @@ def _symbolic_verify_ops(
             )
 
     # 3. Check branch injectivity on public qubits
-    inj_finding = _check_injectivity_anf(pub_qids, q_anf, num_x, total_hmr)
+    # With no measurements, all active gates are permutations or phases.
+    # Resets of provably zero bits and projection of clean scratch preserve injectivity.
+    reversible = (not total_hmr and dirty_reset_free and
+                  (check_scratch_clean or len(pub_set) == num_qubits) and scratch_cleaned)
+    inj_finding = None if reversible else _check_injectivity_anf(pub_qids, q_anf, num_x, total_hmr)
     branch_injective = dirty_reset_free and basis_outcome_independent and (inj_finding is None)
     if inj_finding is not None:
         findings.append(inj_finding)

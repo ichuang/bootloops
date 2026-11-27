@@ -488,12 +488,34 @@ def _regress_audit_feedback() -> str:
     return "zero, one, complemented and overwritten records export the correct Z feedback"
 
 
+def _regress_injectivity() -> str:
+    from tools.ftqc_uncompute.hmr import _check_injectivity_anf
+    from tools.ftqc_uncompute.gf2 import anf_eval
+
+    # (a,b,...) -> (a, a*b,...) contains every input variable but collides at a=0.
+    exprs = [frozenset([1 << i]) for i in range(13)]
+    exprs[1] = frozenset([3])
+    finding = _check_injectivity_anf(tuple(range(13)), exprs, 13, 0)
+    assert finding and finding.code == "INJECTIVITY-NOT-PROVED" and finding.witness is None
+    reversible = KickMixCircuit.from_kmx("CCX q0 q1 q12")
+    assert verify_hmr_circuit(reversible).branch_injective
+    rows = [frozenset([1 << i]) for i in range(16)] + [frozenset([1 << 16, 1 << 17])] * 2
+    finding = _check_injectivity_anf(tuple(range(18)), rows, 18, 0)
+    witness = finding.witness
+    x2 = sum(witness["x2"][f"x{i}"] << i for i in range(18))
+    assert x2 and all(anf_eval(row, 0) == anf_eval(row, x2) for row in rows)
+    erased = simulate_trajectories(KickMixCircuit.from_kmx("HMR q0 b0"), shots=4)
+    assert not erased.coherent_bound_valid and erased.coherent_trace_distance_upper is None
+    return "wide nonlinear obligations, affine witnesses and standalone trajectory bounds checked"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
         ("_regress_global_budget", _regress_global_budget),
         ("_regress_receipt_replay", _regress_receipt_replay),
         ("_regress_audit_feedback", _regress_audit_feedback),
+        ("_regress_injectivity", _regress_injectivity),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),

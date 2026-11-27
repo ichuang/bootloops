@@ -294,7 +294,7 @@ def simulate_trajectories(
     salt: str = "ftqc_uncompute-fs-v1",
     delta_neg_log2: int = 128,
     phase_tol_turns: Fraction | int | str = 0,
-    branch_injective: bool = True,
+    branch_injective: bool | None = None,
     allow_global_phase: bool = False,
     check_scratch_clean: bool = True,
     check_classical_clean: bool = False,
@@ -517,6 +517,9 @@ def simulate_trajectories(
         shot_offset += batch
 
     eps_up = clopper_pearson_upper_bound(failures, shots, delta_neg_log2=delta_neg_log2)
+    if branch_injective is None:
+        from .hmr import verify_hmr_circuit
+        branch_injective = verify_hmr_circuit(circuit, check_scratch_clean=check_scratch_clean).branch_injective
     coh_valid = bool(branch_injective and dirty_resets == 0)
     coh_up = coherent_trace_distance_bound(eps_up, phase_tol_turns=tol_turns) if coh_valid else None
     z_budget = z_pow_synthesis_cost(circuit)
