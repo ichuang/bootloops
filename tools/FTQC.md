@@ -1,6 +1,35 @@
 # Fault-tolerant quantum computing in BootLoops
 
-The seven tools on `ftqc_integration` cover different parts of a fault-tolerance and logical-compilation argument. Start with the object you want to certify and identify what the next step needs from its receipt.
+Seven tools are available on `ftqc_integration`. An eighth, `ftqc_magic`, is in development for magic-state factories.
+
+The arrows show what one tool supplies to another in selected studies. The dashed arrow marks a proposed connection.
+
+```mermaid
+flowchart TD
+    accTitle: How the eight FTQC tools fit together
+    accDescr: Code checks feed extractor and decoder studies. Extractor circuits go to fault analysis. Decoder rules and propagated faults feed gadget checks. Composition uses gadget fault cones, and uncompute uses ZX cost contracts. The dashed arrow marks the proposed magic-state factory connection.
+
+    codes["ftqc_codes<br/>CSS codes and distances"]
+    extractors["ftqc_extractors<br/>Logical measurements"]
+    decoders["ftqc_decoders<br/>Syndrome decoding"]
+    faults["ftqc_faults<br/>Circuit and ZX proofs"]
+    gadgets["ftqc_gadgets<br/>Encoded operations"]
+    uncompute["ftqc_uncompute<br/>Reversible circuit cleanup"]
+    compose["ftqc_compose<br/>End-to-end guarantees"]
+    magic["ftqc_magic · planned<br/>Magic-state factories"]
+
+    codes -->|CSS checks| extractors
+    codes -->|Syndrome model| decoders
+    extractors -->|Scheduled probes| faults
+    faults -->|ZX cost contracts| uncompute
+    faults -->|Fault propagation| gadgets
+    decoders -->|Decoder rules| gadgets
+    gadgets -->|Fault cones| compose
+    magic -.->|Proposed factory guarantee| compose
+
+    classDef planned stroke-dasharray:5 4
+    class magic planned
+```
 
 | Tool | Input and question | Evidence |
 |---|---|---|
@@ -11,6 +40,7 @@ The seven tools on `ftqc_integration` cover different parts of a fault-tolerance
 | [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, component refinement, two-level checks on concatenated codes, and the faults that can reach each decoding event in a scheduled program. |
 | [ftqc_compose](ftqc_compose/GUIDE.md) | Do the output and fault guarantees of one operation meet the next operation’s input requirements? | Typed joins, residual data and frame checks, level reduction and local-stochastic error bounds for a composed study. |
 | [ftqc_uncompute](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup preserve the logical quantum action? Is a pebbling schedule legal, and what error does a declared mask allow? | Exact symbolic HMR checks, sampled trajectory bounds, mask and schedule checks, and source-bound replay of `ftqc_uncompute-receipt-1`. |
+| **`ftqc_magic` (planned)** | What output quality and yield can a magic-state factory deliver? | In development. For current studies, see [simultaneous injection](ftqc_extractors/INJECTION.md) and [15-to-1 distillation](ftqc_compose/GUIDE.md#correcting-15-to-1-distillation). |
 
 ## Where the tools connect
 
