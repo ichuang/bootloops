@@ -208,6 +208,12 @@ def leg_cuts_and_blocks() -> str:
     leak = KickMixCircuit((KickMixOp("HMR", (1,), (0,)), KickMixOp("X", (0,), condition=0)), num_qubits=2, num_bits=1)
     cut = verify_with_cuts(leak, inputs=[0], outputs=[0])
     assert {f.code for f in cut.findings} == {"OUTCOME-DEPENDENT-BASIS-OUTPUT"} and not cut.valid
+    left = verify_with_cuts(KickMixCircuit((KickMixOp("CX", (0, 1)),), num_qubits=2), inputs=[0], outputs=[0])
+    assert not left.valid and {f.code for f in left.findings} == {"UNCLEANED-SCRATCH-QUBIT"}
+    assert left.findings[0].witness["inputs"] == {"x0": 1}
+    reset = KickMixCircuit((KickMixOp("R", (1,)), KickMixOp("CX", (0, 1))), num_qubits=2)
+    assert verify_with_cuts(reset, inputs=[0, 1], zero_public=[1]).valid
+    assert not verify_with_cuts(reset, inputs=[0, 1]).dirty_reset_free
     phase = KickMixCircuit((KickMixOp("CZ", (0, 1)),), num_qubits=2)
     cut = verify_with_cuts(phase)
     assert cut.valid and not cut.phase_free                    # a unitary phase is not a deletion fault
@@ -248,6 +254,11 @@ def leg_cuts_and_blocks() -> str:
             raise AssertionError("a malformed specification was accepted")
         except blocks.BlockError:
             pass
+    neg = dict(kind="block-program", program=dict(inputs=["a"], outputs=["a"], ops=[]),
+               spec=dict(relation=[[1, [{"at": "in", "xor": ["a"], "not": True}]], [1, [{"at": "out", "xor": ["a"]}]], [-1, []]]))
+    assert blocks.certify(neg)["status"] == "proved"
+    neg["spec"]["relation"][0][1][0]["not"] = False
+    assert blocks.certify(neg)["status"] == "refused"
     # the relation prover on its own: x + y = (x xor y) + 2 (x and y)
     two = KickMixCircuit((KickMixOp("CX", (0, 2)), KickMixOp("CX", (1, 2)), KickMixOp("CCX", (0, 1, 3))), num_qubits=4)
     cut = verify_with_cuts(two, inputs=[0, 1], outputs=[0, 1, 2, 3])
@@ -291,12 +302,27 @@ def leg_cuts_and_blocks() -> str:
                    [[(["NEW", "plus2", op[2]] if op[0] == "NEW" and len(op) == 3 else op) for op in l] for l in layers],
                    layers[:gate] + [layers[gate] + layers[gate]] + layers[gate + 1:],
                    layers[:gate] + [[["TOF", 1] + layers[gate][-1][1:]]] + layers[gate + 1:]]
+        # two dependent operations in one layer, written in the right order, are still not a layer
+        dep = next(i for i, j in zip(plain, plain[1:]) if set(map(repr, layers[i][-1][1:3])) & set(map(repr, layers[j][-1][1:3]))
+                   and layers[i][-1][0] == "CX" and layers[j][-1][0] == "CX" and len(layers[j]) == 1)
+        nxt = plain[plain.index(dep) + 1]
+        corrupt.append(layers[:dep] + [layers[dep] + layers[nxt]] + layers[dep + 1:nxt] + layers[nxt + 1:])
+        # the same operations on a wire in another order; one gate reversed in place; an
+        # operation the lowering does not have, added to an otherwise correct schedule
+        reordered = list(layers)
+        reordered[dep], reordered[nxt] = layers[nxt], layers[dep]
+        corrupt.append(reordered)
+        corrupt.append(layers[:gate] + [layers[gate][:-1] + [["CX", layers[gate][-1][2], layers[gate][-1][1]]]] + layers[gate + 1:])
+        corrupt.append(layers + [[["TOF", 1, prog["inputs"][0]]]])
+        assert blocks.certify(dict(spec, layers=corrupt[0]))["status"] == "refused"
         for j, bad_layers in enumerate(corrupt):
             assert not blocks.bind(spec["program"], bad_layers)["bound"], (prog["name"], j)
         other = _layers(_spec(blocks.adder(3, "constant", 5), ("add", 3, "constant", 5))["program"])
         assert not blocks.bind(spec["program"], other)["bound"]
         bound += 1 + int(moved)
     # 8. receipts
+    banked = json.loads((__import__("pathlib").Path(__file__).parent / "examples" / "block_adder_4bit.json").read_text(encoding="utf-8"))
+    assert banked == blocks.arithmetic_spec(blocks.adder(4), "add", 4) and blocks.certify(banked)["status"] == "proved"
     rec = blocks.receipt(good)
     assert rec["schema"] == blocks.SCHEMA and rec["result"]["status"] == "proved"
     blocks.verify_receipt(good, json.loads(json.dumps(rec)))

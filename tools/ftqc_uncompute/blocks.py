@@ -183,49 +183,97 @@ def _value(result: CutResult, km: dict[str, Any], factor: dict[str, Any]) -> ANF
     return acc
 
 
-def gadget_identities() -> dict[str, Any]:
-    """Exact check of the two measurement gadgets of the lowering, on basis inputs, for every
-    outcome.  A branch that maps every basis input to the same multiple of its target is the
-    target isometry on all superpositions."""
+def _run_primitives(prims: list[tuple[Any, ...]], state: dict[tuple[tuple[str, int], ...], Fraction],
+                    outcomes: dict[Any, int]) -> dict[tuple[tuple[str, int], ...], Fraction]:
+    """Exact run of lowered operations on a superposition of basis states of named wires, for
+    one choice of measurement outcomes.  Amplitudes are not normalised after a measurement."""
     half = Fraction(1, 2)
+    for op in prims:
+        k = op[0]
+        nxt: dict[tuple[tuple[str, int], ...], Fraction] = {}
+
+        def put(d: dict[Any, int], amp: Fraction) -> None:
+            key = tuple(sorted(d.items(), key=repr))
+            nxt[key] = nxt.get(key, Fraction(0)) + amp
+
+        for key, amp in state.items():
+            d = dict(key)
+            if k == "NEW" and op[1] == "zero":
+                d[op[2]] = 0
+                put(d, amp)
+            elif k == "NEW":                                      # the AND resource (1/2) sum |a, b, ab>
+                for x in (0, 1):
+                    for y in (0, 1):
+                        e = dict(d)
+                        e[op[2]], e[op[3]], e[op[4]] = x, y, x & y
+                        put(e, amp * half)
+            elif k == "CX":
+                d[op[2]] ^= d[op[1]]
+                put(d, amp)
+            elif k == "MZ":
+                if d.pop(op[1]) == outcomes[op[2]]:
+                    put(d, amp)
+            elif k == "MX":
+                put(d, amp * (-1) ** (outcomes[op[2]] & d.pop(op[1])))
+            elif k == "CXg":
+                if outcomes[op[3]]:
+                    d[op[2]] ^= d[op[1]]
+                put(d, amp)
+            elif k == "CZg":
+                put(d, amp * (-1) ** (outcomes[op[3]] & d[op[1]] & d[op[2]]))
+            else:
+                raise BlockError(f"no rule for {op!r}")
+        state = {key: amp for key, amp in nxt.items() if amp}
+    return state
+
+
+def gadget_identities() -> dict[str, Any]:
+    """Exact check of the two measurement gadgets, as `lower` writes them, on every basis
+    input and for every outcome.  A branch that maps every basis input to the same multiple
+    of its target is the target isometry on all superpositions.  The Pauli-frame terms are
+    applied here as the rule states them: X on t when both outcomes of an AND are 1; Z on z
+    (or a sign, for a constant) when the outcome of an ERASE is 1."""
     report: dict[str, Any] = {}
-    # AND: resource (1/2) sum |a, b, ab>; CX u a; CX v b; measure a, b; CX v t if m1; CX u t if m2;
-    # frame X on t if m1 m2
+    prims = lower(dict(inputs=["u", "v"], outputs=["u", "v", "t"], ops=[["AND", "u", "v", "t"]]))
+    bits = [op[2] for op in prims if op[0] == "MZ"]
     for frame in (True, False):
         consts, ok = set(), True
         for u in (0, 1):
             for v in (0, 1):
-                for m1 in (0, 1):
-                    for m2 in (0, 1):
-                        amp: dict[tuple[int, int, int], Fraction] = {}
-                        for a in (0, 1):
-                            for b in (0, 1):
-                                if a ^ u != m1 or b ^ v != m2:        # after the CNOTs, a and b are measured
-                                    continue
-                                t = (a & b) ^ (m1 & v) ^ (m2 & u) ^ ((m1 & m2) if frame else 0)
-                                amp[(u, v, t)] = amp.get((u, v, t), Fraction(0)) + half
-                        if set(amp) != {(u, v, u & v)}:
-                            ok = False
-                        else:
-                            consts.add(amp[(u, v, u & v)])
+                for m in ((0, 0), (0, 1), (1, 0), (1, 1)):
+                    out = _run_primitives(prims, {(("u", u), ("v", v)): Fraction(1)}, dict(zip(bits, m)))
+                    if frame and m == (1, 1):
+                        out = {tuple(sorted({**dict(k), "t": dict(k)["t"] ^ 1}.items(), key=repr)): a for k, a in out.items()}
+                    want = tuple(sorted({"u": u, "v": v, "t": u & v}.items(), key=repr))
+                    if set(out) != {want}:
+                        ok = False
+                    else:
+                        consts.add(out[want])
         report["and_with_frame" if frame else "and_without_frame"] = bool(ok and len(consts) == 1)
-    # ERASE: t = uv xor z; measure t in X (outcome r); CZ u v if r; frame Z on z if r (or a sign)
-    for name, zs in (("erase_wire", (0, 1)), ("erase_none", (None,)), ("erase_const1", ("one",))):
+    for name, z in (("erase_wire", "z"), ("erase_none", None), ("erase_const1", ["const", 1])):
+        wires = ["u", "v"] + (["z"] if z == "z" else [])
+        prims = lower(dict(inputs=wires + ["t"], outputs=wires, ops=[["ERASE", "t", "u", "v", z]]))
+        bit = next(op[2] for op in prims if op[0] == "MX")
         for frame in (True, False):
-            signs = {0: set(), 1: set()}
-            for u in (0, 1):
-                for v in (0, 1):
-                    for z in zs:
-                        zval = 1 if z == "one" else (z or 0)
-                        t = (u & v) ^ zval
-                        for r in (0, 1):
-                            sign = (r & t) ^ (r & u & v)
-                            if frame and z in (0, 1):
-                                sign ^= r & zval
-                            signs[r].add(sign)
-            # each branch is the identity on (u, v, z) up to one sign for the whole branch
-            good = all(len(s) == 1 for s in signs.values())
-            report[f"{name}_{'with' if frame else 'without'}_frame"] = bool(good)
+            signs: dict[int, set[Fraction]] = {0: set(), 1: set()}
+            ok = True
+            for vals in ((u, v, zz) for u in (0, 1) for v in (0, 1) for zz in ((0, 1) if z == "z" else (0,))):
+                u, v, zz = vals
+                zval = zz if z == "z" else (1 if z else 0)
+                start = {"u": u, "v": v, "t": (u & v) ^ zval}
+                if z == "z":
+                    start["z"] = zz
+                for r in (0, 1):
+                    out = _run_primitives(prims, {tuple(sorted(start.items(), key=repr)): Fraction(1)}, {bit: r})
+                    want = tuple(sorted({w: start[w] for w in wires}.items(), key=repr))
+                    if set(out) != {want}:
+                        ok = False
+                        continue
+                    amp = out[want]
+                    if frame and z == "z":
+                        amp *= (-1) ** (r & zz)
+                    signs[r].add(amp)
+            report[f"{name}_{'with' if frame else 'without'}_frame"] = bool(ok and all(len(x) == 1 for x in signs.values()))
     report["holds"] = bool(report["and_with_frame"] and not report["and_without_frame"]
                            and report["erase_wire_with_frame"] and not report["erase_wire_without_frame"]
                            and report["erase_none_with_frame"] and report["erase_const1_with_frame"])
@@ -233,7 +281,7 @@ def gadget_identities() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------- binding
-def lower(program: dict[str, Any], kinds: dict[str, list[str]] | None = None) -> list[tuple[Any, ...]]:
+def lower(program: dict[str, Any]) -> list[tuple[Any, ...]]:
     """Primitive operations of the program, with canonical names for the ancillas and bits of
     its gadgets: ("~a", t, k) and ("~b", t, k) for the k-th AND onto wire t, ("m", ancilla) for
     their measured bits, ("r", t, k) for the k-th ERASE of wire t."""

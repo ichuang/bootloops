@@ -124,6 +124,8 @@ python3 -m tools.ftqc_uncompute check "$out/pebble12.json" -o "$out/pebble12.rec
 python3 -m tools.ftqc_uncompute verify "$out/pebble12.receipt.json" --target "$out/pebble12.json"
 ```
 
+Wide arithmetic exceeds the global symbolic budget: a 16-bit ripple adder is already refused. The `blocks` command certifies such programs compositionally. It names intermediate values, proves every deletion locally, proves the arithmetic statement as one exact integer relation, and binds a correction schedule in the format of `ftqc_gadgets cones` to the program, so the schedule whose failure probability `cone-bound` bounds is shown to compute the stated function. [Cuts and block programs](ftqc_uncompute/GUIDE.md#wide-arithmetic-cuts-and-block-programs)
+
 Receipt verification needs the matching input and compares the complete regenerated evidence. The rewrite advisor recognizes seven rule families. For KickMix, `--apply` implements temporary-AND cleanup, bilinear cleanup and scratch reuse, then compares the symbolic public action. For arithmetic DAGs the verification checks the lowered circuit’s HMR obligations. Abstract nodes can still be costed and inspected. [Uncomputation guide](ftqc_uncompute/GUIDE.md) · [Packaged examples](ftqc_uncompute/examples)
 
 ## Expose a qLDPC trapping set and certify operational decoding

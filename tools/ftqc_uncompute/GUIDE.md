@@ -62,6 +62,25 @@ python3 -m tools.ftqc_uncompute convert tools/ftqc_uncompute/examples/gidney_add
 python3 tools/ftqc_uncompute/selftest.py
 ```
 
+## WIDE ARITHMETIC: CUTS AND BLOCK PROGRAMS
+
+`verify_hmr_circuit` writes every wire as one polynomial in the circuit inputs. A ripple carry doubles at every bit, so a 16-bit adder already exceeds the budget and is refused with `SYMBOLIC-BUDGET-EXCEEDED`. `cuts.py` proves the same obligations locally.
+
+A **cut** replaces the value of a wire by a fresh variable and keeps its polynomial as the definition of that variable. An identity that holds for every value of the cut variables holds for their actual values, so a proof is sound wherever the cuts are placed; cuts only decide whether a proof is found. `verify_with_cuts` places them itself (a wire of degree two or more that is about to control a non-linear gate, or a wire whose polynomial has grown long) and accepts `INFO_TAG "@cut:q7"`. A wire that depends on a measurement outcome is never cut. When an obligation is not an identity in the free variables, the latest cut variable in it is replaced by its definition, and so on until none is left; a polynomial that is still not zero then comes with an input at which it is not zero. The checks are the ones of `hmr.py`: dirty resets, scratch at exit, outputs independent of outcomes, cancellation of every outcome-dependent phase. Branch injectivity follows from the last: a kickback (-1)^(r q) can only be cancelled by diagonal fix-ups on the remaining wires, so q is a function of them.
+
+`prove_relation` shows that an integer combination of products of wire values, taken at entry, at exit or at a probe (`INFO_TAG "@probe:name"`), is zero for every input. Values are lifted to exact integer multilinear polynomials and the cut variables are eliminated latest first. On a carry chain each elimination is a + b + k = (a xor b xor k) + 2k', so the polynomial stays small. A multilinear polynomial in the inputs that vanishes on all 0/1 points has all coefficients zero, so the final test is exact.
+
+`blocks.py` applies both to **block programs**: lists of logical operations on named wires, `ZERO`, `CX`, `XF` (logical X), `AND` (onto a fresh wire, by consuming an AND resource), `ERASE t u v z` (measurement deletion, claimed valid because t = (u AND v) XOR z), `DROP` (retire a wire claimed to hold 0), with optional `CUT` hints and `PROBE` marks.
+
+```sh
+python3 -m tools.ftqc_uncompute blocks tools/ftqc_uncompute/examples/block_adder_4bit.json -o /tmp/add4.receipt.json
+python3 -m tools.ftqc_uncompute blocks tools/ftqc_uncompute/examples/block_adder_4bit.json --verify /tmp/add4.receipt.json
+```
+
+A specification is `{"kind": "block-program", "program": ..., "spec": {"relation": [[coef, [factor, ...]], ...], "preserved": [wires], "reading": text}}`, with a factor `{"at": "in" | "out" | probe, "xor": [wires]}`. The result is `proved` when every deletion is exact, no phase is left, the relation is an identity and the preserved wires leave as they entered. The relation is a statement; its `reading` (for instance "B_out + 2^n C = B + A") is carried into the receipt unchecked. `blocks.adder`, `subtractor`, `comparator` and `multiplier` build standard programs and `blocks.arithmetic_spec` their relations. A comparator is stated as A + (2^n − 1 − B) = S + 2^n F with S a sum of n bits read at a probe, from which F = [A > B].
+
+With `"layers"` (a scheduled program in the format of `ftqc_gadgets cones`) the result also **binds** the schedule to the program: without its error-correction steps it must have the same operations on every wire and every classical bit in the same order as the tool's own lowering, every controlled correction in a later layer than its measurement, and no wire used twice in a layer. Two words with equal projections on every wire and bit are the same circuit. The lowering replaces `AND` and `ERASE` by measurement gadgets, and `gadget_identities` runs exactly those lowered operations on every basis input and outcome. The identities hold only with their Pauli-frame terms (X on t when both outcomes of an AND are 1; Z on z when the outcome of an ERASE is 1). Those terms and `XF` have no location in the layers. They belong to the classical control, which is assumed perfect, and the AND resource is assumed ideal.
+
 ## KNOWN HAZARDS
 
 1. **Non-injective KickMix branches invalidate $D_{\mathrm{tr}} \le 2\sqrt{\varepsilon} + 2\pi\tau$**: Khattar et al.'s coherent trace-distance bound requires each fixed-outcome branch operator $V_r$ to preserve state norm on superpositions (injective computational-basis action). Measuring an uncopied input qubit (`HMR q0 b0`) or conditioning `X` on `b0` without restoring injectivity passes naive single-basis checks on $|0\rangle$ while collapsing $|+\rangle \mapsto |0\rangle$ ($D_{\mathrm{tr}} > 0.707$). `hmr.py` catches this via `NON-INJECTIVE-KICKMIX-BRANCH`, and `kickmix_sim.py` sets `coherent_bound_valid = False` whenever branch injectivity or clean-reset invariants fail.
@@ -79,6 +98,7 @@ python3 tools/ftqc_uncompute/selftest.py
   - `L4_superposition_masking`: $\lvert R_{15}\rangle$ vs $\lvert M_{15}\rangle$ and carry-runway bounds cross-checked to $20+$ digits against `kraus_oracle.py`, RSA-2048 factor-free bound, and streaming Fibonacci ladder proof.
   - `L5_advisor_r1_r7`: All seven simplification rules (`R1`–`R7`) and `--apply` equivalence verification.
   - `L6_receipts_and_bridges`: `ftqc_uncompute-receipt-1` round-trips on all 5 `examples/*` fixtures plus live `ftqc_audit` and `ftqc_zx` bridges.
+  - `L7_cuts_and_block_programs`: the cut verifier against `hmr.py` wire by wire and against a run on every input; relations against integer arithmetic; every single-operation corruption of small adders, comparators and multipliers refused or shown to be the same function; hazard witnesses replayed; bindings with corrupted layers refused; 64-bit adder proved where the global method exceeds its budget. Thirty-nine planted defects in `cuts.py` and `blocks.py` each fail this leg; four needed a new check first.
   - `N1_N6_sabotage_controls`: Six planted-failure controls (`UNCOMPENSATED-HMR-PHASE`, `DIRTY-RESET-HAZARD`, `NON-INJECTIVE-KICKMIX-BRANCH`, `UNCLEANED-GHOST-AT-EXIT`, `MASK-NON-BIJECTIVE-GARBAGE` / `MASK-SUPPORT-OVERFLOW-HAZARD`, `FLOAT-LITERAL-IN-RECEIPT`).
   - `M1_M4_mutant_kills`: Four subprocess code-mutation self-audits on isolated temp copies confirming zero surviving mutants.
 - Expected summary line: `SELF-TEST: ALL PASS (rc 0)`.
