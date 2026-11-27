@@ -146,6 +146,9 @@ def derive(node):
     op = node["op"]
     if op in ("prepare0", "majority", "bit-wire"):
         return classical(node)
+    if op == "surgery":
+        from .surgery import leaf
+        return leaf(node)
     if op == "hgp-z":
         from .hgp import hgp_leaf
 
