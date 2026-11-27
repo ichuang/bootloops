@@ -45,14 +45,15 @@ def compile_schedule(s):
             control=setting.get("control")
             guard=[]
             if control is not None:
-                index,q=control
-                if type(index)!=int or not 0<=index<len(readouts) or type(q)!=int or q not in pos[:g["n"]]:
+                index,sites=control
+                sites=[sites] if type(sites)==int else sites
+                if type(index)!=int or not 0<=index<len(readouts) or not isinstance(sites,list) or not sites or len(set(sites))!=len(sites) or any(type(q)!=int or q not in pos[:g["n"]] for q in sites):
                     raise ValueError("invalid earlier bit or conditional Z site")
                 ctl=readouts[index]
-                guard=[[["Z_IF",q,r]] for r in ctl["records"]]
+                guard=[[["Z_IF",q,r] for q in sites] for r in ctl["records"]]
                 if ctl["sign"]:
-                    guard += [[["S",q]],[["S",q]]]
-                touched.add(q)
+                    guard += [[["S",q] for q in sites] for _ in range(2)]
+                touched.update(sites)
             if used & touched:
                 raise ValueError("parallel settings need disjoint physical gate supports")
             used.update(touched)
@@ -95,8 +96,9 @@ def compile_schedule(s):
                 bits={ids[r] for r in read["records"]}
                 sign=read["sign"]
                 if p["control"]:
-                    index,q=p["control"]
-                    if pauli(word,n).x >> q & 1:
+                    index,sites=p["control"]
+                    sites=[sites] if type(sites)==int else sites
+                    if (pauli(word,n).x & sum(1<<q for q in sites)).bit_count()%2:
                         bits.symmetric_difference_update(readouts[index]["records"])
                         sign ^= readouts[index]["sign"]
                 targets.append(word)

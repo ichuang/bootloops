@@ -116,8 +116,23 @@ class Instrument:
             initial.add(Gen(0,1 << q))
         if len(initial.rows) != width:
             raise ValueError("incomplete Choi preparation")
+        self.initial = list(initial.rows.values())
+        self.readouts = []
+        for read in spec["readouts"]:
+            if set(read) != {"records","sign"} or type(read["sign"]) != int or read["sign"] not in (0,1):
+                raise ValueError("invalid signed readout")
+            self.readouts.append(record_mask(read["records"],len(c.meas)))
+        if width >= 64:
+            try:
+                import stim
+            except ImportError:
+                pass
+            else:
+                from .surgery_stim import compile_probe
+                compile_probe(c,spec,self.initial)
+                return
         sim = Sim(width)
-        sim.gens = list(initial.rows.values())
+        sim.gens = [Gen(g.x,g.z,g.s) for g in self.initial]
         sim.run(SimpleNamespace(ticks=c.ticks[1:]))
         final = Group(width,sim.gens)
         def require(g):
@@ -132,12 +147,10 @@ class Instrument:
             require(Gen(g.x << shift,g.z << shift,g.s ^ dot(g.x,g.z)))
         for g in centralizer(generators,n):
             require(paired(g,shift))
-        self.readouts = []
         variables = Echelon()
         for g, read in zip(targets,spec["readouts"],strict=True):
             if set(read) != {"records","sign"} or type(read["sign"]) != int or read["sign"] not in (0,1):
                 raise ValueError("invalid signed readout")
-            self.readouts.append(record_mask(read["records"],len(c.meas)))
             form = sim.parity_form(read["records"]) ^ read["sign"]
             if not variables.add(form >> 1):
                 raise ValueError("ideal public outcomes lack full rank")
@@ -174,7 +187,8 @@ class Instrument:
     def audit(self, order, cap):
         if type(order) != int or type(cap) != int or order < 0 or cap < 1:
             raise ValueError("invalid fault search budget")
-        locs = list(self.locations()) if order else []
+        from .surgery_faults import columns
+        locs = columns(self)[0] if order else []
         tested = 0
         for w in range(1,min(order,len(locs))+1):
             for sites in combinations(range(len(locs)),w):
