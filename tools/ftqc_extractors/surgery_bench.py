@@ -127,6 +127,10 @@ def architecture(case):
             initial=[[0, 0], [0, 3], [3, 0], [3, 3]], layers=layers, gate_range=1
         )
         return s
+    if case == "hgp-connection":
+        return product_connection(
+            [[1, 1, 1]], [[1, 1], [1, 1]], [[0, 0, 0]], [[0, 0], [0, 1]], 1, 2
+        )
     if case == "product-connection":
         return product_connection([[5]], [[5]], [[1]], [[3]], 4, 2)
     if case == "pcpp":
@@ -165,7 +169,13 @@ def architecture(case):
 
     checks = [word(7, r, "Z") for r in (7, 24)]
     targets = [word(7, r, "Z") for r in (9, 43)]
-    if case == "branched":
+    if case == "branch-code":
+        parts = [
+            build(dict(n=7, method=case, hx=[], hz=[7, 24], targets=targets, rounds=2))[
+                "spec"
+            ]
+        ]
+    elif case == "branched":
         parts = [branch(7, checks, targets, 2)]
     elif case == "parallel-parsimonious":
         parts = []
@@ -225,6 +235,8 @@ def main():
             "hgp-padded",
             "shuttle-packed",
             "shuttle-serial",
+            "hgp-connection",
+            "branch-code",
             "product-connection",
             "cyclic-seed",
             "pcpp",

@@ -20,7 +20,7 @@ class LayoutTests(unittest.TestCase):
 
     def test_parallel(self):
         targets = None
-        for case in ("serial", "branched", "parallel-parsimonious"):
+        for case in ("serial", "branched", "branch-code", "parallel-parsimonious"):
             s = architecture(case)
             spec, _ = compile_schedule(s)
             Instrument(spec)
@@ -30,6 +30,21 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(len(targets), 3)
 
     def test_product_and_cyclic(self):
+        hgp = architecture("hgp-connection")
+        self.assertEqual(len(hgp["targets"]), 2)
+        Instrument(build(hgp)["spec"])
+        # Nonempty restricted Tanner incidences create an odd cylinder layer.
+        design = dict(
+            n=8,
+            method="branch-code",
+            hx=[15, 240],
+            hz=[15, 240],
+            targets=["+ZIZIIIII", "+IZZIIIII"],
+            rounds=2,
+        )
+        branched = build(design)
+        self.assertEqual(branched["geometry"]["n"], 16)
+        Instrument(branched["spec"])
         s = architecture("product-connection")
         self.assertEqual(len(s["targets"]), 2)
         Instrument(build(s)["spec"])
