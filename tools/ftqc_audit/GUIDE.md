@@ -199,3 +199,5 @@ The [ftqc_extractors comparison guide](../ftqc_extractors/AUDIT.md) shows how to
 Run `python3 -m ftqc_audit records CIRCUIT.json` on an exported CSS probe with explicit detectors and record-only endpoints. The report checks through weight two. Supply repeatable `--fault LOCATION:LABEL` arguments for forward replay, or `--stim` for an independent comparison of all single-fault signatures. ftqc_extractors combines both probes with the bounded projected-support search and the readout check to certify the gross-code measurement. [Run and interpret the gross-code experiment](../ftqc_extractors/GROSS_CIRCUIT.md)
 
 Receipts use `ftqc_audit-receipt-1`. The verifier also accepts archived `faultcert-receipt-1` evidence.
+
+The `injection` command audits the closed Y probes built from simultaneous CSS preparations. The optional fault ledger retains the physical sites and Pauli mode of each accepted fault. [Circuit models and command](../ftqc_extractors/GUIDE.md#closed-physical-y-probes)

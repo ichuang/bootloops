@@ -1,0 +1,8 @@
+{
+  "kind": "injection-batch",
+  "case": "bb-uniform",
+  "locations": [[25, [38, 254]], [59, [144]], [19, [64]]],
+  "frame": [0, 0, 0, 0],
+  "slots": [2, 3],
+  "state_budget": 500
+}

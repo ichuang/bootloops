@@ -1,0 +1,14 @@
+{
+  "name": "Inner and outer correction on one delivered block",
+  "inputs": [],
+  "outputs": ["Q"],
+  "layers": [
+    [["NEW", "zero2", "Q"]],
+    [["ECa", "Q"]],
+    [["ECb", "Q"]],
+    [["EC2a", "Q"]],
+    [["EC2b", "Q"]],
+    [["ECa", "Q"]],
+    [["ECb", "Q"]]
+  ]
+}

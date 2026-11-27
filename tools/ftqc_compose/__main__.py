@@ -33,6 +33,10 @@ def receipt(spec):
 
 
 def evaluate(spec):
+    if spec["kind"] == "injection-batch":
+        from .injection_batch import result
+
+        return result(spec)
     if spec["kind"] == "local-stochastic":
         from .stochastic import stochastic_result
 
