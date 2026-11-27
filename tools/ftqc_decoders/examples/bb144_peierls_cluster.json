@@ -1,0 +1,11 @@
+{
+  "digits": 24,
+  "physical_p": "1/10000",
+  "problem": {
+    "kind": "bb144",
+    "prior": "1/10000",
+    "sector": "X"
+  },
+  "study": "enclose_peierls_cluster",
+  "verified_component_radius": 5
+}

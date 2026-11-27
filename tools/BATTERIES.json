@@ -96,6 +96,10 @@
   "cmd": "python3 -m unittest discover -s tools/ftqc_compose -t tools",
   "cwd": "root"
  },
+ "ftqc_decoders": {
+  "cmd": "python3 tools/ftqc_decoders/selftest.py",
+  "cwd": "root"
+ },
  "ftqc_extractors": {
   "cmd": "python3 -m unittest ftqc_extractors.test_algebra ftqc_extractors.test_extractor ftqc_extractors.test_receipts ftqc_extractors.test_magic ftqc_extractors.test_audit ftqc_extractors.test_gross ftqc_extractors.test_architecture ftqc_extractors.test_pbc",
   "cwd": "root"

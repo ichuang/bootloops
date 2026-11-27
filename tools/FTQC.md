@@ -1,12 +1,13 @@
 # Fault-tolerant quantum computing in BootLoops
 
-The seven tools on `ftqc_integration` cover different parts of a fault-tolerance and logical-compilation argument. Start with the object you want to certify and identify what the next step needs from its receipt.
+The eight tools on `ftqc_integration` cover different parts of a fault-tolerance and logical-compilation argument. Start with the object you want to certify and identify what the next step needs from its receipt.
 
 | Tool | Input and question | Evidence |
 |---|---|---|
 | [ftqc_codes](ftqc_codes/GUIDE.md) | Given CSS check matrices, which logical errors can the memory detect? | Code parameters, bounds on X and Z distance, witnesses and hierarchical decoding guarantees. |
 | [ftqc_extractors](ftqc_extractors/GUIDE.md) | Which logical measurements can a fixed apparatus perform, and what fault distance does a surgery sequence preserve? | Fixed-coupler graphs and bridges, transversal block readings, padded hypergraph surgery, physical fault witnesses, and resource-conditional logical T receipts. |
 | [ftqc_audit](ftqc_audit/GUIDE.md) | Which physical faults can evade a Clifford circuit’s detectors? | Detector and observable flips per location, replayable fault sets, circuit-distance intervals and preparation checks. |
+| [ftqc_decoders](ftqc_decoders/GUIDE.md) | Does a polynomial-time decoder achieve the code or circuit distance without trapping sets, and what operational error rate does it certify? | Operational radius proofs, split-stabilizer trapping-set witnesses, two-stage metacheck repair, Peierls cluster LER bounds, Stim `.dem` export and audited external (`Tesseract`, `PyMatching`, `ldpc`) runs. |
 | [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, refinement receipts for component substitution and two-level checks on concatenated codes. |
 | [ftqc_zx](ftqc_zx/GUIDE.md) | Can a candidate replace a reference circuit under the specified noise model? | Pauli-web equivalence checks, ZX rewrite proofs, flag decoder tables and stochastic gadget contracts. |
 | [ftqc_compose](ftqc_compose/GUIDE.md) | Do the output and fault guarantees of one operation meet the next operation’s input requirements? | Typed joins, residual data and frame checks, level reduction and local-stochastic error bounds for a composed study. |
@@ -16,6 +17,7 @@ The seven tools on `ftqc_integration` cover different parts of a fault-tolerance
 
 - **From a code to a noisy circuit.** The audit, gadget and extractor packages reuse code constructions or binary linear algebra from `ftqc_codes`. A static distance counts data qubits supporting a logical Pauli. To count faulty circuit locations, the study also specifies preparations, gates, idles, measurements, detectors and protected outputs.
 - **From extractor to audit to composition.** The extractor defines the measured logical and its spectators, and exports physical X and Z probes as native audit circuits. The compose gross-code checker replays the extractor distance receipt and uses the audit fault model to calculate the residual data Pauli after applying the split-record frame. The HGP bridge also supports replay in the enclosing circuit and export of verified-cat preparations. [HGP bridge](ftqc_extractors/AUDIT.md) · [Gross-code probes](ftqc_extractors/GROSS_CIRCUIT.md) · [Residual checker](ftqc_compose/GUIDE.md#gross-code-residual-data-and-frame)
+- **From code or circuit distance to operational decoding.** Static and circuit distances count undetected faults under an ideal minimum-weight oracle or postselection. `ftqc_decoders` checks concrete polynomial-time decoders (`BP+OSD`, `BP+LSD`, `Relay-BP`, `Union-Find`, `MWPM`, `SSF`, and audited `.dem` solvers such as `Tesseract`), plugs procedural decoding into `ftqc_gadgets` beyond lookup-table limits, repairs noisy surgery syndromes via metachecks, and bounds classical feedback stall latency for `ftqc_uncompute`. [Decoder guide](ftqc_decoders/GUIDE.md)
 - **From a Clifford schedule to a concatenated gadget.** `ftqc_gadgets` uses the audit fault propagator and adds encoded Bell inputs, reference qubits and decoders. Its two-level checker binds inner receipts to signed logical operations and outer faults to physical columns. It verifies the decoder radius and records any specified ancillas and the rectangle argument assumed by the reduction. A purification tree that makes such an ancilla gets a factory certificate, which the reduction accepts in place of the assumption. [Gadget guide](ftqc_gadgets/GUIDE.md)
 - **From gadgets to a circuit-wide noise bound.** `ftqc_compose` checks ordered wires, residual filters and bad fault supports. Its level-reduction checker substitutes physical supports into a logical circuit. A local-stochastic bound also needs a joint fault-support model. A two-level gadget receipt can inform the local claim; a Definition 4.8 hypothesis supplied to compose remains an explicit premise. [Composition guide](ftqc_compose/GUIDE.md#level-reduction)
 - **Comparing a ZX design with a location-fault study.** Run the ZX verifier on the proposed circuit and its reference. To use its result in another argument, match the gates and idles, input codespace, flag or detector handling, output frame and fault-counting convention. The ZX contract has its own verifier and noise model. [ZX guide](ftqc_zx/GUIDE.md)
@@ -100,10 +102,20 @@ python3 -m tools.ftqc_uncompute verify "$out/pebble12.receipt.json" --target "$o
 
 Receipt verification needs the matching input and compares the complete regenerated evidence. The rewrite advisor recognizes seven rule families. For KickMix, `--apply` implements temporary-AND cleanup, bilinear cleanup and scratch reuse, then compares the symbolic public action. For arithmetic DAGs the verification checks the lowered circuit’s HMR obligations. Abstract nodes can still be costed and inspected. [Uncomputation guide](ftqc_uncompute/GUIDE.md) · [Packaged examples](ftqc_uncompute/examples)
 
-## Reproduce the integration checks
+## Expose a qLDPC trapping set and certify operational decoding
 
-From BootLoops, run the seven registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+On the `[[144,12,12]]` bivariate bicycle gross code, a weight-3 half of a weight-6 stabilizer lies strictly inside the unique-decoding radius five yet stagnates plain iterative belief propagation. `ftqc_decoders` finds that trapping-set witness deterministically, verifies that `Relay-BP`, `BP+LSD` (with cluster rank 1) and `BP+OSD` all heal it, and computes a non-vacuous connected-cluster error bound. When the optional `uv` decoder environment is active, the same `.dem` can be solved and audited with `Tesseract`. [Decoder guide](ftqc_decoders/GUIDE.md)
 
 ```sh
-python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute
+python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb72_trapping_set.json -o "$out/bb_ts.receipt.json"
+python3 -m ftqc_decoders verify "$out/bb_ts.receipt.json"
+python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb144_peierls_cluster.json -o "$out/bb144_ler.receipt.json"
+```
+
+## Reproduce the integration checks
+
+From BootLoops, run the eight registered suites together. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise both external audit checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
+
+```sh
+python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute
 ```

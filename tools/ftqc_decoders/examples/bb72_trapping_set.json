@@ -1,0 +1,16 @@
+{
+  "compare_decoders": [
+    "relay_bp",
+    "bp_lsd",
+    "bp_osd"
+  ],
+  "decoder": "bp_only",
+  "max_exhaustive_weight": 0,
+  "max_splits_per_generator": 8,
+  "problem": {
+    "kind": "bb144",
+    "prior": "1/1000",
+    "sector": "X"
+  },
+  "study": "trapping_set"
+}

@@ -1,0 +1,17 @@
+{
+  "decoder": {
+    "algorithm": "bp_osd",
+    "osd_order": 1
+  },
+  "digits": 24,
+  "max_exact_weight": 2,
+  "physical_p": "1/1000",
+  "problem": {
+    "code": "steane",
+    "kind": "css_code",
+    "prior": "1/1000",
+    "sector": "X"
+  },
+  "study": "enclose_exact_shells",
+  "verified_radius": 1
+}
