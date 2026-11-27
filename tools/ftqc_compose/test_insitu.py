@@ -1,5 +1,6 @@
 import copy
 import unittest
+from importlib.util import find_spec
 from fractions import Fraction
 from ftqc_extractors.__main__ import receipt
 from ftqc_extractors.injection import analyze
@@ -120,9 +121,7 @@ class DistillTests(unittest.TestCase):
         self.assertEqual(r["resource_trace_distance_upper"], "1/1000")
 
     def test_y_evidence_is_not_a_t_input(self):
-        try:
-            import stim
-        except ImportError:
+        if find_spec("stim") is None:
             self.skipTest("optional Stim")
         from ftqc_extractors.injection_circuit import run
 

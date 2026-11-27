@@ -1,7 +1,6 @@
 import copy
 import unittest
 from .__main__ import receipt, verify
-from .bicycle import mapping
 from .algebra import parity
 
 

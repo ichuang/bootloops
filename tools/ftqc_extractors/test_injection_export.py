@@ -1,14 +1,13 @@
 import copy
 import unittest
+from importlib.util import find_spec
 from fractions import Fraction
 from .__main__ import receipt, verify
 
 
 class ExportTests(unittest.TestCase):
     def test_joint_and_replay(self):
-        try:
-            import stim
-        except ImportError:
+        if find_spec("stim") is None:
             self.skipTest("optional Stim")
         m = dict(
             type="closed-Y",

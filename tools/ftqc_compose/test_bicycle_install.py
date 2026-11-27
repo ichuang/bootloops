@@ -1,8 +1,9 @@
 import copy
 import unittest
+from importlib.util import find_spec
 from .test_insitu import study
 from .bicycle_install import install
-from ftqc_gadgets.bicycle_ports import generators, route
+from ftqc_gadgets.bicycle_ports import generators
 
 
 class InstalledTests(unittest.TestCase):
@@ -45,9 +46,7 @@ class InstalledTests(unittest.TestCase):
             install(dict(self.spec, couplers=self.proof["installed_couplers"][1:]))
 
     def test_physical_probe(self):
-        try:
-            import stim
-        except ImportError:
+        if find_spec("stim") is None:
             self.skipTest("optional physical tableau probe")
         from .bicycle_probe import physical_probe
 
