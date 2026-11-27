@@ -1587,6 +1587,41 @@ def t_cones(heavy):
           not pat["corrects_after_every_step"] and pat["steps"] == 7 and pat["uncorrected"] == 4 and pat["corrected"] == 1
           and pat["measured"] == 1 and pat["ended"] == 1 and pat["gates_not_followed_by_correction"] == 4
           and pat["runs"] == {"1": 1, "3": 2} and pat["longest_run"] == 3, str(pat))
+    # ---- the conventional arrangement: an inner correction after every gate and idle tick
+    bare = cones.Program([[("NEW", "zero2", "Q"), ("CX", "A", "B")], [("NEW", "and2", "a", "b", "t"), ("CX", "A", "a"), ("CX", "B", "b")],
+                          [("MZ", "a", "m"), ("MZ", "b", "n")], [("CXg", "B", "t", "m"), ("CX", "A", "Q")], [("CXg", "A", "t", "n")],
+                          [("CX", "t", "Q")], [("MX", "t", "r")], [("CZg", "A", "B", "r")]], ["A", "B"], ["A", "B", "Q"], "bare")
+    sched, n_outer = cones.strict_schedule(bare)
+    fs2 = cones.Flow(sched)
+    pat = cones.correction_pattern(sched, outer_atomic=True)
+    stripped = [[op for op in l if op[0] not in ("ECa", "ECb")] for l in sched.layers]
+    check("cones: the strict schedule is the program with an inner correction of every live block after every layer",
+          n_outer == 0 and [l for l in stripped if l] == [l for l in bare.layers] and pat["corrects_after_every_step"]
+          and pat["longest_run"] == 1 and pat["steps"] > 20 and len(sched.layers) == 3 * len(bare.layers)
+          and cones.ledger(fs2)["inner_corrections"] == sum(len(l) for l in sched.layers if l and l[0][0] == "ECa"),
+          str(pat))
+    _, _, tracked = cones._strict(bare)
+    sizes = {}
+    ev_src = {i for i, s_ in enumerate(fs2.sources) if s_["level"] == 2 and s_["kind"] == "event"}
+    for o in fs2.outer:
+        if o["tag"] == "out":
+            sizes[(str(o["block"]), o["sector"])] = len([i for i in cones._bits(fs2.cone_of[o["node"]]) if i in ev_src]) - 1
+    check("cones: the outer cones the scheduler tracks are the ones the flow computes",
+          sizes == {(b, s_): tracked[b][j].bit_count() for b in ("A", "B", "Q") for j, s_ in enumerate("XZ")}
+          and max(sizes.values()) > 6, f"{sizes} vs {tracked}")
+    sched3, n3 = cones.strict_schedule(bare, outer_after=3)
+    f3 = cones.Flow(sched3)
+    pat3, raw3 = cones.correction_pattern(sched3, outer_atomic=True), cones.correction_pattern(sched3)
+    check("cones: with a threshold the strict schedule adds outer corrections and stays strict",
+          n3 > 0 and cones.ledger(f3)["outer_corrections"] == n3 and pat3["corrects_after_every_step"]
+          and raw3["uncorrected"] == n3 and not cones.contained(sched3, f3, samples=2)["outside"]
+          and [l for l in [[op for op in l if op[0] not in ("ECa", "ECb", "EC2a", "EC2b")] for l in sched3.layers] if l]
+          == [l for l in bare.layers], f"{n3} {pat3} {raw3}")
+    lazy = cones.strict_schedule(bare, outer_after=10 ** 6)
+    check("cones: a threshold no cone reaches gives the schedule without outer corrections",
+          lazy[1] == 0 and lazy[0].layers == sched.layers)
+    refuses("cones: a program that already holds corrections is not given a strict schedule",
+            lambda: cones.strict_schedule(sched), "without error correction", exc=GadgetError)
     # ---- algebra against the rule
     P = cones.Program([[("CX", "A", "C")], [("CX", "A", "B")], [("CX", "A", "B")]], ["A", "B", "C"],
                       ["A", "B", "C"], "twice")

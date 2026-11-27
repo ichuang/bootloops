@@ -944,9 +944,10 @@ class Direct:
 
 
 # ---------------------------------------------------------------------- receipts
-def correction_pattern(program):
+def correction_pattern(program, outer_atomic=False):
     """How a schedule follows its gates and idle ticks.  A step is a gate or an idle tick of a
-    live block.  Each step is classed by what happens to the block in the next layer: an inner
+    live block.  The two halves of an outer correction are two gates; with outer_atomic they
+    are one step, counted at the second half (no inner correction can come between them).  Each step is classed by what happens to the block in the next layer: an inner
     correction, a measurement or drop, the end of the program, or another gate or idle tick
     (uncorrected).  A run is a maximal sequence of consecutive steps of one block without a
     correction between them; `runs` counts them by length.  A schedule with no uncorrected
@@ -961,7 +962,8 @@ def correction_pattern(program):
                 live |= set(op[2:])
                 continue
             for b in program.blocks_of(op):
-                what[b] = "ec" if k in ("ECa", "ECb") else "end" if k in ("MZ", "MX", "DROP") else "gate"
+                what[b] = ("ec" if k in ("ECa", "ECb") else "end" if k in ("MZ", "MX", "DROP") else
+                           "half" if k == "EC2a" and outer_atomic else "gate")
         for b in live:
             what.setdefault(b, "idle")
         rows.append(what)
@@ -995,6 +997,90 @@ def correction_pattern(program):
     out["longest_run"] = max(runs, default=0)
     out["corrects_after_every_step"] = out["uncorrected"] == 0
     return out
+
+
+def strict_schedule(program, outer_after=None):
+    """See `_strict`: (Program, number of outer corrections)."""
+    layers, outer, _ = _strict(program, outer_after)
+    return Program(layers, program.inputs, program.outputs, program.name + " (strict)"), outer
+
+
+def _strict(program, outer_after=None):
+    """The conventional arrangement of a program given without error correction: after every
+    layer, every live block is corrected at the inner level, so that every gate and every idle
+    tick is followed by an inner correction.  With outer_after = T (two levels), a block whose
+    outer cone has grown beyond T inner events in a sector is corrected at the outer level
+    after the inner round, unless it is measured or dropped in the next layer; the other blocks
+    are corrected at the inner level meanwhile, and all are corrected again afterwards, since
+    the outer correction is a gate.  Outer cones are tracked here by the propagation rules (one
+    inner event per half correction); `Flow` recomputes them.  Returns (layers, number of
+    outer corrections, outer cones of the live blocks at the end)."""
+    for layer in program.layers:
+        for op in layer:
+            if op[0] in ("ECa", "ECb", "EC2a", "EC2b"):
+                raise ConeError("strict_schedule takes a program without error correction")
+    live = list(program.inputs)
+    cone = {b: [0, 0] for b in live}                           # outer cone per sector, as bit masks
+    fresh, layers, outer = 0, [], 0
+
+    def ending(layer):
+        return {op[1] for op in layer if op[0] in ("MZ", "MX", "DROP")}
+
+    def inner_round(blocks):
+        nonlocal fresh
+        for b in blocks:
+            cone[b][0] |= 1 << fresh
+            cone[b][1] |= 1 << (fresh + 1)
+            fresh += 2
+
+    for i, layer in enumerate(program.layers):
+        layers.append([list(op) for op in layer])
+        for op in layer:
+            k = op[0]
+            if k == "NEW":
+                for b in op[2:]:
+                    live.append(b)
+                    cone[b] = [0, 0]
+            elif k in ("CX", "CXg"):
+                c, t = op[1], op[2]
+                cone[t][0] |= cone[c][0]
+                cone[c][1] |= cone[t][1]
+            elif k in ("CZ", "CZg"):
+                u, v = op[1], op[2]
+                xu, xv = cone[u][0], cone[v][0]
+                cone[u][1] |= xv
+                cone[v][1] |= xu
+            elif k == "TOF":
+                bs = list(op[2:])
+                both = [0, 0]
+                for b in bs:
+                    both[0] |= cone[b][0] | cone[b][1]
+                for b in bs:
+                    cone[b] = [both[0], both[0]]
+        gone = ending(layer)
+        live = [b for b in live if b not in gone]
+        if not live:
+            continue
+        layers.append([["ECa", b] for b in live])
+        layers.append([["ECb", b] for b in live])
+        inner_round(live)
+        if outer_after is None:
+            continue
+        soon = ending(program.layers[i + 1]) if i + 1 < len(program.layers) else set()
+        need = [b for b in live if b not in soon and max(cone[b][0].bit_count(), cone[b][1].bit_count()) > outer_after]
+        if not need:
+            continue
+        rest = [b for b in live if b not in need]
+        layers.append([["EC2a", b] for b in need] + [["ECa", b] for b in rest])
+        layers.append([["EC2b", b] for b in need] + [["ECb", b] for b in rest])
+        inner_round(rest)
+        for b in need:
+            cone[b] = [0, 0]
+        outer += len(need)
+        layers.append([["ECa", b] for b in live])
+        layers.append([["ECb", b] for b in live])
+        inner_round(live)
+    return layers, outer, {b: tuple(cone[b]) for b in live}
 
 
 def count(program):
