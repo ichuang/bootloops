@@ -559,6 +559,33 @@ def _regress_rewrite_action() -> str:
     return "verified rewrites preserve the complete public basis map and phase"
 
 
+def _regress_pricing() -> str:
+    from decimal import localcontext
+    from tools.ftqc_uncompute.suggest import _price_delta_wire_ticks
+
+    contract = {"schema": "ftqc_zx-contract-v1", "verdict": "CONTRACT-CERTIFIED",
+                "enclosures": {"expected_wire_ticks_per_shot_hi": "1.2345",
+                               "conditional_escape_hi": "0.012345"}}
+    with localcontext() as context:
+        context.prec = 2
+        price = adapters.price_circuit_with_zx_contract(KickMixCircuit.from_kmx("X q0"), contract)
+        assert price["total_wire_ticks_upper"] == "1.2345"
+        assert Decimal(price["total_logical_escape_upper"]) == Decimal("0.012345")
+    for rate in ("-1", "NaN", "1.5"):
+        try:
+            adapters.price_circuit_with_zx_contract(KickMixCircuit.from_kmx("X q0"), contract,
+                                                    t_factory_escape_hi=rate)
+        except ValueError:
+            continue
+        raise AssertionError("invalid factory rate accepted")
+    contract["verdict"] = "REFUSED"
+    try:
+        _price_delta_wire_ticks(-1, 0, 0, contract)
+    except ValueError:
+        return "pricing validates contract status, probability ranges and precision"
+    raise AssertionError("refused ZX contract used for savings")
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
@@ -569,6 +596,7 @@ def run_selftest() -> int:
         ("_regress_abstract_dag", _regress_abstract_dag),
         ("_regress_public_wires", _regress_public_wires),
         ("_regress_rewrite_action", _regress_rewrite_action),
+        ("_regress_pricing", _regress_pricing),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),

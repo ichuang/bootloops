@@ -101,11 +101,15 @@ def _price_delta_wire_ticks(
         raise ValueError(f"Unsupported ZX contract schema: {zx_contract.get('schema')!r}")
     ctx = Context(prec=28, rounding=ROUND_CEILING)
     ec_wt = Decimal(str(zx_contract["enclosures"]["expected_wire_ticks_per_shot_hi"]))
+    if zx_contract.get("verdict") != "CONTRACT-CERTIFIED":
+        raise ValueError("Refusing uncertified ZX contract")
+    if not ec_wt.is_finite() or ec_wt < 0 or t_factory_wire_ticks < 0:
+        raise ValueError("Wire-tick costs must be finite and nonnegative")
     # Each T gate consumes 1 magic-state factory volume + 1 EC gadget; each reaction layer costs 1 EC cycle;
     # each Clifford 2Q gate costs 1 EC gadget fraction.
-    term_t = ctx.multiply(Decimal(delta_t), ctx.add(Decimal(t_factory_wire_ticks), ec_wt))
-    term_c = ctx.multiply(Decimal(delta_clifford_2q + delta_reaction), ec_wt)
-    return +ctx.add(term_t, term_c)
+    # Combine signed coefficients before rounding a potentially negative cost delta.
+    ec_count = delta_t + delta_clifford_2q + delta_reaction
+    return ctx.fma(Decimal(ec_count), ec_wt, Decimal(delta_t * t_factory_wire_ticks))
 
 
 # ---------------------------------------------------------------------------

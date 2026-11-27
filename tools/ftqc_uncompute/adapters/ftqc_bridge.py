@@ -201,6 +201,14 @@ def price_circuit_with_zx_contract(
     else:
         esc_per_t = Decimal(str(t_factory_escape_hi))
 
+    if type(t_factory_wire_ticks) is not int or t_factory_wire_ticks < 0:
+        raise ValueError("Factory wire-ticks must be a nonnegative integer")
+    if not wt_per_ec.is_finite() or wt_per_ec < 0:
+        raise ValueError("Expected EC wire-ticks must be finite and nonnegative")
+    for rate in (esc_per_ec, esc_per_t):
+        if not rate.is_finite() or not 0 <= rate <= 1:
+            raise ValueError("Escape bounds must lie in [0,1]")
+
     ec_volume = ctx.multiply(Decimal(cliff_rounds + total_t), wt_per_ec)
     factory_volume = ctx.multiply(Decimal(total_t), Decimal(t_factory_wire_ticks))
     total_volume = ctx.add(ec_volume, factory_volume)
@@ -218,8 +226,8 @@ def price_circuit_with_zx_contract(
         "logical_t_upper": total_t,
         "reaction_depth": rx_depth,
         "ec_gadget_invocations": cliff_rounds + total_t,
-        "ec_wire_ticks_upper": str(+ec_volume),
-        "t_factory_wire_ticks_upper": str(+factory_volume),
-        "total_wire_ticks_upper": str(+total_volume),
-        "total_logical_escape_upper": str(+total_escape),
+        "ec_wire_ticks_upper": str(ec_volume),
+        "t_factory_wire_ticks_upper": str(factory_volume),
+        "total_wire_ticks_upper": str(total_volume),
+        "total_logical_escape_upper": str(total_escape),
     }
