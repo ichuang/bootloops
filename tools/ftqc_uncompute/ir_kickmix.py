@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from fractions import Fraction
 import hashlib
+import json
 import re
 from typing import Iterable, Iterator, Sequence
 
@@ -409,6 +410,8 @@ class KickMixCircuit:
                 lines.append(f"REGISTER r{r.reg_id}")
             for w in r.wires:
                 lines.append(f"APPEND_TO_REGISTER {w} r{r.reg_id}")
+        for mask in self.masks:
+            lines.append("# @mask " + json.dumps([mask.register, mask.kind, mask.params], sort_keys=True))
         for op in self.ops:
             if op.kind not in ANNOTATION_OPS:
                 lines.append(op.to_kmx_line())
@@ -438,18 +441,15 @@ class KickMixCircuit:
                 body = stripped[1:].strip()
                 if body.startswith("@mask "):
                     toks = body[6:].split()
-                    if len(toks) >= 2:
-                        reg_nm = toks[0]
-                        kv_map: dict[str, int | str] = {}
-                        m_kind = "uniform_mod_n"
-                        for tok in toks[1:]:
-                            if "=" in tok:
-                                k, v = tok.split("=", 1)
-                                if k == "kind":
-                                    m_kind = v
-                                else:
-                                    kv_map[k] = int(v) if v.lstrip("-").isdigit() else v
-                        masks.append(MaskDirective(register=reg_nm, kind=m_kind, params=kv_map))
+                    if len(toks) < 2:
+                        raise ValueError(f"Line {lineno}: incomplete mask directive")
+                    params = {}
+                    for token in toks[1:]:
+                        key, sep, value = token.partition("=")
+                        if not sep or not value or not key or key in params:
+                            raise ValueError(f"Line {lineno}: invalid mask parameter {token!r}")
+                        params[key] = int(value) if value.lstrip("-").isdigit() else value
+                    masks.append(MaskDirective(toks[0], params.pop("kind", "uniform_mod_n"), params))
                 elif body.startswith("@meta ") and "=" in body[6:]:
                     k, v = body[6:].split("=", 1)
                     metadata[k.strip()] = v.strip()

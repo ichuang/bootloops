@@ -115,12 +115,22 @@ def build_receipt_for_kmx(
     mask_reports: list[dict[str, Any]] = []
     masks_ok = True
     for md in circuit.masks:
-        m_res = verify_mask_spec(
-            md.kind,
-            modulus=int(md.params["modulus"]) if "modulus" in md.params else None,
-            width=int(md.params["width"]) if "width" in md.params else None,
-            runway_bits=int(md.params["runway_bits"]) if "runway_bits" in md.params else None,
-        )
+        registers = circuit.register_data
+        wires = registers.get(md.register)
+        if not wires or md.register not in {
+            r.name if r.name is not None else f"r{r.reg_id}" for r in circuit.registers if r.kind == "q"
+        }:
+            raise ValueError(f"Mask register {md.register!r} must name a quantum register")
+        params = dict(md.params)
+        width = int(params.pop("width", len(wires)))
+        if width != len(wires) or int(params.get("modulus", 0)) > 1 << width:
+            raise ValueError(f"Mask dimensions exceed register {md.register!r}")
+        if md.kind == "carry_runway" and int(params.get("runway_bits", width)) > width:
+            raise ValueError("Runway exceeds declared register width")
+        for name in ("multipliers", "prime_factors_list"):
+            if name in params:
+                params[name] = [int(v) for v in str(params[name]).split(",")]
+        m_res = verify_mask_spec(md.kind, width=width, **params)
         if not m_res.valid:
             masks_ok = False
         mask_reports.append({"register": md.register, **m_res.to_dict()})
@@ -234,6 +244,8 @@ def build_receipt_for_spec_dict(
             mask_kind=str(spec.get("mask_kind", "mult_mod_n")),
             expected_control_weights=exp_w,
             runs=int(spec.get("runs", 1)),
+            prime_factors_list=spec.get("prime_factors_list"),
+            min_prime_factor=spec.get("min_prime_factor"),
             subroutine_kind=spec.get("subroutine_kind"),
             subroutine_steps=int(spec["subroutine_steps"]) if spec.get("subroutine_steps") is not None else None,
         )

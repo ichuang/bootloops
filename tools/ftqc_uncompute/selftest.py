@@ -613,6 +613,26 @@ def _regress_mask_factors() -> str:
     return "exact totients require a complete set of proved prime factors"
 
 
+def _regress_mask_directives() -> str:
+    header = 'REGISTER r0 "a"\n' + "".join(f"APPEND_TO_REGISTER q{i} r0\n" for i in range(4))
+    prefix = header + "# @mask a kind=mult_mod_n modulus=15 multipliers="
+    clean = KickMixCircuit.from_kmx(prefix + "2")
+    bad = KickMixCircuit.from_kmx(prefix + "3")
+    assert clean.sha256() != bad.sha256()
+    assert build_receipt_for_kmx(clean, shots=8, run_kraus=False)["verdict"] == "CERTIFIED"
+    refused = build_receipt_for_kmx(bad, shots=8, run_kraus=False)
+    assert refused["verdict"] == "REFUSED"
+    assert refused["mask_verifications"][0]["findings"][0]["code"] == "MASK-NON-BIJECTIVE-GARBAGE"
+    for directive in ("a kind=add_mod_2w width=7", "absent kind=phase_grad", "a kind=phase_grad width"):
+        try:
+            build_receipt_for_kmx(KickMixCircuit.from_kmx(header + "# @mask " + directive),
+                                  shots=1, run_kraus=False)
+        except ValueError:
+            continue
+        raise AssertionError("malformed mask certified")
+    return "mask declarations bind the register, parameters and target digest"
+
+
 def run_selftest() -> int:
     t0 = time.perf_counter_ns()
     legs: list[tuple[str, Callable[[], str]]] = [
@@ -626,6 +646,7 @@ def run_selftest() -> int:
         ("_regress_pricing", _regress_pricing),
         ("_regress_directed_bounds", _regress_directed_bounds),
         ("_regress_mask_factors", _regress_mask_factors),
+        ("_regress_mask_directives", _regress_mask_directives),
         ("L0_purity_and_lineage", _leg_l0_purity),
         ("L1_ir_gf2_qasm3", _leg_l1_ir_and_algebra),
         ("L2_hmr_sim_kraus_dual", _leg_l2_hmr_sim_kraus),
