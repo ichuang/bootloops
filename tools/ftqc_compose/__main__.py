@@ -52,6 +52,14 @@ def evaluate(spec):
         from .filters import filter_contract_result
 
         return filter_contract_result(spec)
+    if spec["kind"] == "magic-interleaved":
+        from .magic_correlations import interleaved
+
+        return interleaved(spec)
+    if spec["kind"] == "magic-batch":
+        from .magic_batch import consume_batch
+
+        return consume_batch(spec)
     if spec["kind"] == "magic-logical-t":
         from .magic_handoff import consume_t
 

@@ -583,7 +583,9 @@ class BinaryFactory:
         target: PhasePolynomialTarget = alg["target"]
 
         if error_correcting_z:
-            return self._evaluate_correcting_css_at_p(pf, target, wire_ticks_per_input)
+            contract, report = self._evaluate_correcting_css_at_p(pf, target, wire_ticks_per_input)
+            report["algebraic"] = {key: alg[key] for key in ("check_s_corrections", "check_cz_corrections", "output_s_corrections", "output_cz_corrections")}
+            return contract, report
 
         dcert = distance_cert or self.certify_distance()
         d = dcert.distance

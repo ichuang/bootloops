@@ -18,6 +18,13 @@ def css_encoder(n, hx, logical_x, logical_z):
 
 
 def verify_fresh(n, hx, hz, x, z, ops):
+    if (
+        type(n) is not int
+        or n < 1
+        or any(type(v) is not int or not 0 <= v < 1 << n for v in [*hx, *hz])
+        or any(dot(a, b) for a in hx for b in hz)
+    ):
+        raise ValueError("invalid CSS checks")
     k = css_dimension((n, hx, hz))
     if not dot(x, z) or any(dot(x, h) for h in hz) or any(dot(z, h) for h in hx):
         raise ValueError("invalid logical encoding port")
@@ -114,3 +121,29 @@ def fresh_receipt(n, hx, hz, port):
         bell_isometry="positive equal CSS cosets correlated coherently with the untouched reference",
         verification=checked,
     )
+
+
+def transfer_receipt(spec):
+    if spec.get("kind") == "fresh" and set(spec) == {"kind", "n", "hx", "hz", "port"}:
+        return fresh_receipt(spec["n"], spec["hx"], spec["hz"], spec["port"])
+    if spec.get("kind") == "swap" and set(spec) == {"kind", "block", "slot"}:
+        from .occupied_transfer import occupied_swap
+
+        return occupied_swap(spec["block"], spec["slot"])
+    raise ValueError("expected a fresh or swap transfer specification")
+
+
+def verify_transfer(rec):
+    if rec["schema"] == "ftqc-gadgets-fresh-transfer-1":
+        hx, hz = rec["checks"]
+        expected = fresh_receipt(rec["input_wire"], hx, hz, rec["port"])
+    elif rec["schema"] == "ftqc-gadgets-occupied-swap-1":
+        from .occupied_transfer import occupied_swap
+
+        expected = occupied_swap(
+            dict(n=rec["raw"], checks=rec["checks"], basis=rec["basis"]), rec["slot"]
+        )
+    else:
+        raise ValueError("unknown transfer receipt")
+    if digest(rec) != digest(expected):
+        raise ValueError("transfer differs from replay")

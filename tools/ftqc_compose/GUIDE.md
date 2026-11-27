@@ -154,3 +154,24 @@ data wires. The original noisy transfer is charged once. Separate factory,
 transfer and online locations and a resource independent of the logical data,
 reference and later faults are required. A final conditional logical error
 requires a lower bound on the final acceptance probability.
+
+### Correlated logical consumers
+
+A `magic-batch` binds one verified factory attempt to ordered resource-wire
+groups and distinct logical data ports. For a binary producer with an exact
+mask law, each atom lists all affected data ports and its original accepted
+mass and conditional mass. The T and CCZ injection checks enumerate every
+measurement transcript and residual Z mask. A CCZ correction uses only
+diagonal Clifford gates. A qLDPC pair uses six wires in two groups and
+carries the native joint state bound. Its detailed Pauli law is unknown.
+
+For an exact CCZ source, `twirl: joint_3twirl` samples an independent uniform
+GL(3,2) change of basis per CCZ with diagonal Clifford compensation. Replay
+transports the full mask distribution through the consumers. A generic
+native cascade with only a normalized kernel has no verified downstream
+mask transfer. For separate factory lanes, use `magic-interleaved` with
+distinct instance IDs, a verified member from each, and an explicit
+independent-noise premise. A terminal qLDPC/C2T experiment requires a
+fresh catalyst with empty history and retirement at this batch. Lifetime
+declarations apply to this workload. Physical non-Clifford preparation and
+factory-to-memory distance require a separate circuit audit.

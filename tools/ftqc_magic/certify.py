@@ -65,6 +65,21 @@ def _export_bundle(contract: MagicSourceContract) -> dict[str, Any]:
     return exports
 
 
+def binary_factory(spec: Mapping[str, Any]) -> BinaryFactory:
+    if "catalog" in spec:
+        fac = get_catalog_factory(str(spec["catalog"]))
+        if not isinstance(fac, BinaryFactory):
+            raise ValueError(f"Catalog entry {spec['catalog']!r} is not a BinaryFactory; use kind='signed_stabilizer'")
+    else:
+        fac = BinaryFactory.from_row_strings(
+            output_rows=spec["output_rows"],
+            check_rows=spec["check_rows"],
+            gamma=spec.get("gamma"),
+            name=str(spec.get("name", "custom_binary_factory")),
+        )
+    return fac
+
+
 def evaluate_source(
     spec: Mapping[str, Any],
     *,
@@ -79,17 +94,7 @@ def evaluate_source(
     optimality_gap: dict[str, Any] | None = None
 
     if kind == "factory":
-        if "catalog" in spec:
-            fac = get_catalog_factory(str(spec["catalog"]))
-            if not isinstance(fac, BinaryFactory):
-                raise ValueError(f"Catalog entry {spec['catalog']!r} is not a BinaryFactory; use kind='signed_stabilizer'")
-        else:
-            fac = BinaryFactory.from_row_strings(
-                output_rows=spec["output_rows"],
-                check_rows=spec["check_rows"],
-                gamma=spec.get("gamma"),
-                name=str(spec.get("name", "custom_binary_factory")),
-            )
+        fac = binary_factory(spec)
         rec_info = None
         active_ovr = None
         if bool(spec.get("recycle", False)):

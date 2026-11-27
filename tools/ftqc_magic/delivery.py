@@ -1,9 +1,10 @@
 """Replay a producer before exposing its ordered, acceptance-conditioned output."""
 
+import json
 from fractions import Fraction
 from math import isqrt
 
-from .certify import evaluate_source, verify_receipt
+from .certify import binary_factory, evaluate_source, verify_receipt
 from .ir import PhasePolynomialTarget
 
 
@@ -16,6 +17,17 @@ def sqrt_upper(q):
 
 def read_delivery(spec, receipt):
     identity = verify_receipt(spec, receipt)
+    if spec.get("kind", "pipeline").strip().lower() == "pipeline":
+        stages = spec["stages"]
+        if any(
+            s.get("correlation_propagation") == "joint_3twirl" or s.get("interleaving")
+            for s in stages
+        ):
+            raise ValueError(
+                "a correlated cascade needs verified downstream joint transfer or independent instance evidence"
+            )
+        if [s["kind"] for s in stages] != ["qldpc", "catalyzed_c2t"]:
+            raise ValueError("unsupported delivery pipeline")
     kind, c, _, _ = evaluate_source(spec)
     mode = str(spec.get("mode", "postselect")).lower().strip()
     correcting = mode in ("ec", "correct", "correcting")
@@ -51,7 +63,28 @@ def read_delivery(spec, receipt):
             raise ValueError("joint law disagrees with factory infidelity")
         joint = {str(m): str(v) for m, v in sorted(masses.items())}
         conditional = {m: str(Fraction(v) / acc) for m, v in joint.items()}
+    algebraic = c.metadata.get("algebraic") or {}
+    corrections = {
+        key: value for key, value in algebraic.items() if key.endswith("_corrections")
+    }
+    witness = None
+    columns = c.metadata.get("witness_columns")
+    if kind == "factory" and not correcting and columns:
+        fac = binary_factory(spec)
+        syndrome = mask = 0
+        for i in columns:
+            syndrome ^= fac.column_syndrome(i)
+            mask ^= fac.column_label(i)
+        if syndrome or not mask:
+            raise ValueError(
+                "replayed postselection witness is not accepted and harmful"
+            )
+        witness = dict(input_columns=list(columns), output_mask=mask)
     return dict(
+        accepted_fault_witness=witness,
+        producer_clifford_corrections=json.loads(json.dumps(corrections))
+        if kind == "factory"
+        else None,
         schema="ftqc-magic-delivery-1",
         producer=identity,
         state=name,

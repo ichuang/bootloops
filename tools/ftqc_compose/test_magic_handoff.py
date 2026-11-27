@@ -103,3 +103,10 @@ class HandoffTests(unittest.TestCase):
         s["encoded_origin"]["wire_order"].reverse()
         with self.assertRaisesRegex(ValueError, "origin"):
             consume_t(s)
+
+    def test_ccz_substitution(self):
+        s = study("correcting")
+        s["factory"] = dict(kind="factory", catalog="cube_8_3_2_ccz")
+        s["factory_receipt"] = build_receipt(s["factory"])
+        with self.assertRaisesRegex(ValueError, "one verified T"):
+            consume_t(s)

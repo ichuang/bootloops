@@ -1,7 +1,7 @@
 """Clifford SWAP between a raw wire and a CSS logical port in a live block."""
 
 from ftqc_codes.gf2 import supp
-from .surgery import pauli, validate_basis
+from .surgery import commute, pauli, validate_basis
 
 
 def occupied_swap(block, slot):
@@ -10,6 +10,8 @@ def occupied_swap(block, slot):
         raise ValueError("invalid occupied block slot")
     names = [str(i) for i in range(len(basis))]
     checks = [pauli(w, n) for w in block["checks"]]
+    if any(not commute(a, b) for i, a in enumerate(checks) for b in checks[:i]):
+        raise ValueError("noncommuting memory checks")
     validate_basis(
         dict(
             input=[
