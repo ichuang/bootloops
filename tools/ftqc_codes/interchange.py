@@ -546,4 +546,20 @@ def load_import_manifest(manifest_or_path, *, base_dir=None):
         code.meta["candidate_logicals"] = cand_meta
     if wit_meta:
         code.meta["witnesses"] = wit_meta
+    if isinstance(d.get("tanner"), dict):
+        t_in = dict(d["tanner"])
+        t_coords = t_in.get("coordinates", "native")
+        for nkey in ("v0_neighborhoods", "v1_neighborhoods"):
+            if isinstance(t_in.get(nkey), list):
+                mapped_views = []
+                for view in t_in[nkey]:
+                    row_v = []
+                    for q_raw in view:
+                        q0 = int(q_raw) - default_ibase
+                        if not (0 <= q0 < n):
+                            raise codes.SpecError(f"tanner {nkey} qubit {q_raw} out of range")
+                        row_v.append(perm_q[q0] if (t_coords == "external" and cmap_meta is not None) else q0)
+                    mapped_views.append(row_v)
+                t_in[nkey] = mapped_views
+        code.meta["tanner"] = t_in
     return code

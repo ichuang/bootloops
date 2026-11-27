@@ -253,6 +253,36 @@ def _lp6_2():
     return constructions.lifted_product([[3]], [[3]], 3, name="LP(6,2)")
 
 
+def _pp184():
+    from . import families_highrate
+    return families_highrate.pp184_50()
+
+
+def _pp256():
+    from . import families_highrate
+    return families_highrate.pp256_68()
+
+
+def _pp576():
+    from . import families_highrate
+    return families_highrate.pp576_148()
+
+
+def _apm1152():
+    from . import families_highrate
+    return families_highrate.apm1152_580()
+
+
+def _qt_d8_36():
+    from . import families_highrate
+    return families_highrate.quantum_expanders_d8_36_8_3()
+
+
+def _qt_s3_288():
+    from . import families_highrate
+    return families_highrate.quantum_expanders_s3_288_8()
+
+
 FAMILIES = {
     "steane": (steane, "Steane [[7,1,3]]"),
     "golay": (golay, "Golay [[23,1,7]]"),
@@ -278,6 +308,12 @@ NAMED = {
     "bb144": lambda: bb(12, 6, ["x3", "y1", "y2"], ["y3", "x1", "x2"], "BB144"),
     "radial90": _radial90,
     "lp6_2": _lp6_2,
+    "pp184": _pp184,
+    "pp256": _pp256,
+    "pp576": _pp576,
+    "apm1152": _apm1152,
+    "qt_d8_36": _qt_d8_36,
+    "qt_s3_288": _qt_s3_288,
 }
 
 

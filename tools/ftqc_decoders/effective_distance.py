@@ -1,26 +1,5 @@
 """Operational decoding radius certifier & adversarial quantum trapping-set / `d_eff` finder.
 
-Turns silent "ideal minimum-weight decoder" assumptions into falsifiable BootLoops
-certificates:
-  1. `certify_operational_radius`: proves by bounded enumeration (or connected
-     syndrome-cluster enumeration for local decoders) that *every* fault set of
-     weight `<= target_radius` is corrected with zero logical flip by a concrete
-     deterministic decoder (`BP+OSD`, `BP+LSD`, `Relay-BP`, `UF`, `MWPM`, `SSF`, or
-     an audited external decoder such as `Tesseract`), OR emits a replayable
-     sub-distance counterexample witness!
-  2. `search_trapping_sets`: combines three directed adversarial probes to expose
-     `d_eff < d_code` failures on large qLDPC / BB / HGP codes without exponential
-     brute force:
-       - **Stabilizer split-support probe** (Poulin & Chung, QIC 8, 987, 2008;
-         Raveendran & Vasic, Quantum 5, 562, 2021): splits low-weight stabilizers
-         `g in G_stab` (and pairwise generator sums) into balanced halves `e_1 + e_2 = g`
-         of weight `floor(wt(g)/2)` and `ceil(wt(g)/2)`, deterministically exposing
-         symmetric iterative-BP trapping sets on `BB72`, `BB144`, `HGP`, and `Toric`!
-       - **Logical-coset midpoint probe** (Fossorier & Lin, IEEE TIT 41, 1379, 1995;
-         Delfosse, Londe & Beverland, IEEE TIT 68, 3187, 2022): probes subsets of
-         minimum-weight logical operators around `floor((d-1)/2)`.
-       - **Bounded low-weight exhaustive scan**.
-
 Zero `float` or `complex` literals/calls appear anywhere in this module.
 """
 
@@ -38,6 +17,7 @@ from .mwpm import decode_mwpm
 from .relay_bp import decode_relay_bp
 from .sat_mwd import decode_sat_mwd
 from .ssf_metacheck import decode_small_set_flip
+from .tanner_local import decode_tanner_local
 from .union_find import decode_union_find
 
 
@@ -132,6 +112,17 @@ def run_decoder(
             max_subset_weight=int(cfg.get("max_subset_weight", 2)),
             max_steps=int(cfg.get("max_steps", 200)),
         )
+    if alg == "tanner_local":
+        return decode_tanner_local(
+            problem,
+            syndrome,
+            neighborhoods=cfg.get("neighborhoods"),
+            local_shape=tuple(cfg["local_shape"]) if "local_shape" in cfg else None,
+            max_rounds=int(cfg.get("max_rounds", 32)),
+            max_local_flip_weight=int(cfg.get("max_local_flip_weight", 2)),
+            min_gain_numer=int(cfg.get("min_gain_numer", 1)),
+            min_gain_denom=int(cfg.get("min_gain_denom", 4)),
+        )
     if alg == "sat_mwd":
         return decode_sat_mwd(problem, syndrome, timeout_sec=int(cfg.get("timeout_sec", 60)))
 
@@ -212,12 +203,7 @@ def certify_operational_radius(
     *,
     budget_cap: int = 200_000,
 ) -> dict[str, Any]:
-    """Exhaustively certify operational decoding through fault weight `target_radius`.
-
-    If `sum_{w=1..target_radius} C(n, w)` exceeds `budget_cap`, evaluates complete
-    shells in increasing weight order until the next shell would exceed `budget_cap`,
-    reporting `holds_through` honestly (matching `ftqc_gadgets` budget semantics!).
-    """
+    """Exhaustively certify operational decoding through fault weight `target_radius`."""
     if target_radius < 0:
         raise RefusalError("INVALID-TARGET-RADIUS", f"target_radius must be >= 0, got {target_radius}")
     if budget_cap < 1:
@@ -231,7 +217,6 @@ def certify_operational_radius(
     max_clust_rank = 0
     decoder_label: str | None = None
 
-    # Always verify weight 0
     r0 = run_decoder(problem, 0, decoder_spec)
     decoder_label = r0.decoder
     if not r0.converged or problem.syndrome_of(r0.error_mask) != 0 or problem.observable_of(r0.error_mask) != 0:
@@ -307,7 +292,6 @@ def certify_operational_radius(
 
 def _find_light_logical_representatives(problem: DecodingProblem, max_reps: int = 16) -> list[int]:
     """Compute low-weight representatives in `ker(H) \\ ker(L)` via pivoted RREF for midpoint probing."""
-    # Build echelon basis of `H` over `0..n-1`
     n = problem.num_mechanisms
     piv_map: dict[int, int] = {}
     for r in problem.check_rows:
@@ -344,14 +328,8 @@ def search_trapping_sets(
     max_splits_per_generator: int = 32,
     compare_decoders: list[str | dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Directed adversarial search for quantum trapping sets & sub-distance decoder failures.
-
-    Combines:
-      1) Stabilizer split-support probe (`e_1 + e_2 = g in G_stab`),
-      2) Logical-operator midpoint probe (`e subset supp(L_bar)` of weight `<= floor((wt(L_bar)-1)/2)`),
-      3) Bounded low-weight exhaustive scan (`w <= max_exhaustive_weight`).
-    """
-    candidates_to_probe: list[tuple[int, str]] = []  # (error_mask, probe_label)
+    """Directed adversarial search for quantum trapping sets & sub-distance decoder failures."""
+    candidates_to_probe: list[tuple[int, str]] = []
     seen_masks: set[int] = set()
 
     def enqueue(mask: int, tag: str) -> None:
@@ -359,7 +337,6 @@ def search_trapping_sets(
             seen_masks.add(mask)
             candidates_to_probe.append((mask, tag))
 
-    # 1. Bounded exhaustive low-weight probe
     for w in range(1, max_exhaustive_weight + 1):
         if comb(problem.num_mechanisms, w) <= 5000:
             for cols in combinations(range(problem.num_mechanisms), w):
@@ -368,9 +345,7 @@ def search_trapping_sets(
                     m |= 1 << c
                 enqueue(m, f"exhaustive_w{w}")
 
-    # 2. Stabilizer split-support probe (Poulin & Chung 2008; Raveendran & Vasic 2021)
     stab_pool = list(problem.stabilizer_generators)
-    # Also include low-weight pairwise XORs of overlapping stabilizer generators!
     for i in range(min(len(problem.stabilizer_generators), 24)):
         gi = problem.stabilizer_generators[i]
         for j in range(i + 1, min(len(problem.stabilizer_generators), 24)):
@@ -396,7 +371,6 @@ def search_trapping_sets(
             if count_s >= max_splits_per_generator:
                 break
 
-    # 3. Logical-operator midpoint probe
     for l_idx, l_mask in enumerate(_find_light_logical_representatives(problem)):
         supp_l = bit_positions(l_mask)
         wl = len(supp_l)
@@ -413,7 +387,6 @@ def search_trapping_sets(
             if count_l >= max_splits_per_generator:
                 break
 
-    # Sort probes by increasing Hamming weight so the very first failure found is lightest!
     candidates_to_probe.sort(key=lambda item: (item[0].bit_count(), item[0]))
 
     probed = 0

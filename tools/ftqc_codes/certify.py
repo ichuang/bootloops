@@ -1,4 +1,4 @@
-"""Code-facts receipts: build them (leg A here; legs B and C attach evidence)
+"""Code-facts receipts: build them (leg A here; legs B, C, D, E, F, G attach evidence)
 and re-verify them.
 
 A receipt separates three kinds of statement about a quantity q:
@@ -206,8 +206,8 @@ def add_lower_bound(receipt, quantity, bound, evidence):
 def verify(receipt, full=False, max_combos=5_000_000):
     """Re-check a receipt.  Cheap mode: hash, commutation, ranks, flags, every
     upper-bound witness, and internal consistency.  Full mode also re-proves
-    every leg-A lower bound.  Returns a list of check lines; raises Refusal on
-    the first failure."""
+    every leg-A and leg-G lower bound.  Returns a list of check lines; raises
+    Refusal on the first failure."""
     if receipt.get("schema") not in (SCHEMA, *LEGACY_SCHEMAS):
         raise Refusal("unknown receipt schema")
     try:
@@ -269,6 +269,10 @@ def verify(receipt, full=False, max_combos=5_000_000):
                 from . import concat
                 do, di = concat.recheck(code, q, ev)
                 lines.append(f"{q} >= {do} * {di}: concatenation structure re-checked")
+            if ev.get("leg") == "G":      # orbit automorphisms + optional full re-search
+                from . import orbit_minweight
+                mg = orbit_minweight.recheck(code, q, ev, full=full, max_nodes=max_combos)
+                lines.append(f"{q} >= {mg}: orbit automorphisms{' and search' if full else ''} re-checked")
         if full and lo is not None:
             gens, excl = quantities[q]
             a_claims = [int(ev["claim"].split(">=")[1]) for ev in proved if ev.get("leg") == "A"]

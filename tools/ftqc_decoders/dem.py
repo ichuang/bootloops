@@ -112,7 +112,6 @@ class DecodingProblem:
         if len(self.priors) != self.num_mechanisms or len(self.weights) != self.num_mechanisms:
             raise RefusalError("PRIOR-LEN-MISMATCH", "priors/weights length must equal num_mechanisms")
 
-        # Validate stabilizer generators lie in ker(H) cap ker(L)
         for g in self.stabilizer_generators:
             if g < 0 or (g >> self.num_mechanisms):
                 raise RefusalError("STAB-OUT-OF-RANGE", "Stabilizer generator support exceeds num_mechanisms")
@@ -122,7 +121,6 @@ class DecodingProblem:
                     "Declared stabilizer generator either triggers a check or flips a logical observable",
                 )
 
-        # Validate metachecks M satisfy M * H == 0 (mod 2)
         for m_row in self.metacheck_rows:
             if m_row < 0 or (m_row >> self.num_checks):
                 raise RefusalError("METACHECK-OUT-OF-RANGE", "Metacheck row support exceeds num_checks")
@@ -274,17 +272,8 @@ class DecodingProblem:
         raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(raw).hexdigest()
 
-    # ------------------------------------------------------------------
-    # Universal Stim `.dem` serializer & parser (pure stdlib, zero floats)
-    # ------------------------------------------------------------------
     def to_stim_dem_text(self, *, decimal_digits: int = 15) -> str:
-        """Serialize to Stim `DetectorErrorModel` (`.dem`) text format.
-
-        Probabilities are formatted as exact finite decimals when `p` is dyadic/decimal
-        or outward-rounded `Decimal` strings in `(0, 0.5]` so `stim.DetectorErrorModel`
-        and external `.dem` consumers (`Tesseract`, `PyMatching`, `Chromobius`, `MWPF`)
-        can parse the output directly.
-        """
+        """Serialize to Stim `DetectorErrorModel` (`.dem`) text format."""
         from decimal import Context, Decimal, ROUND_HALF_EVEN
 
         ctx = Context(prec=decimal_digits, rounding=ROUND_HALF_EVEN)
@@ -326,13 +315,10 @@ class DecodingProblem:
         merge_parallel: bool = True,
         scale: int = 1024,
     ) -> DecodingProblem:
-        """Parse a Stim `.dem` string (supporting `error`, `detector`, `logical_observable`,
-        `shift_detectors`, `^` separators, and `repeat N { ... }` blocks) with zero floats.
-        """
+        """Parse a Stim `.dem` string with zero floats."""
         raw_lines = [ln.split("#", 1)[0].strip() for ln in text.splitlines()]
         tokens_lines = [ln for ln in raw_lines if ln]
 
-        # Expand `repeat N { ... }` blocks recursively
         def parse_block(idx: int, det_offset: int) -> tuple[int, int, list[tuple[Fraction, int, int, tuple[tuple[int, int], ...]]], int, int]:
             mechs: list[tuple[Fraction, int, int, tuple[tuple[int, int], ...]]] = []
             max_det = -1
@@ -388,7 +374,6 @@ class DecodingProblem:
                     continue
 
                 if ln.startswith("shift_detectors"):
-                    # shift_detectors(x, y, ...) det_shift  OR  shift_detectors det_shift
                     after = re.sub(r"^shift_detectors(\s*\([^)]*\))?\s*", "", ln).strip()
                     if after:
                         cur_offset += int(after.split()[0])
@@ -428,7 +413,6 @@ class DecodingProblem:
                 key = (d_m, o_m)
                 if key in merged:
                     prev_p, prev_legs = merged[key]
-                    # Keep a graphlike decomposition if one of the merged mechanisms has one
                     best_legs = prev_legs if all(dm.bit_count() <= 2 for dm, _ in prev_legs) else legs
                     merged[key] = (xor_prob(prev_p, p), best_legs)
                 else:
@@ -466,9 +450,6 @@ class DecodingProblem:
             source_meta={"format": "stim_dem", "merged_parallel": merge_parallel},
         )
 
-    # ------------------------------------------------------------------
-    # Loaders from sibling `ftqc_codes` & `ftqc_audit` / `ftqc_extractors`
-    # ------------------------------------------------------------------
     @classmethod
     def from_css_code(
         cls,
@@ -479,12 +460,7 @@ class DecodingProblem:
         scale: int = 1024,
     ) -> DecodingProblem:
         """Build a single-sector CSS code `DecodingProblem` from an `ftqc_codes.CSSCode`,
-        family name (e.g. `'steane'`, `'golay'`, `'qr:47'`, `'bb:...'`), or receipt dict.
-
-        * `sector == 'X'`: decodes X-type data errors from Z-check syndromes (`H = H_Z`,
-          `L = logical_Z` symplectic duals in `ker(H_X) \\ rowspace(H_Z)`, `stabilizer_generators = H_X`).
-        * `sector == 'Z'`: decodes Z-type data errors from X-check syndromes (`H = H_X`,
-          `L = logical_X` symplectic duals in `ker(H_Z) \\ rowspace(H_X)`, `stabilizer_generators = H_Z`).
+        family name, or receipt dict, preserving `tanner` local neighborhoods when present.
         """
         _ensure_tools_on_path()
         from ftqc_codes import codes as fc_codes, gf2 as fc_gf2
@@ -512,10 +488,19 @@ class DecodingProblem:
         else:
             raise RefusalError("INVALID-CSS-SECTOR", f"sector must be 'X' or 'Z', got {sector!r}")
 
-        # Symplectic dual logical parity rows lie in `ker(stabs) \ rowspace(checks)`:
-        # they vanish on all stabilizers `stabs` and detect every nontrivial logical error in `ker(checks) / rowspace(stabs)`.
         ech_checks = fc_gf2.Echelon(checks)
         logical_duals = [v for v in fc_gf2.nullspace(stabs, n) if ech_checks.add(v)]
+        smeta: dict[str, Any] = {
+            "kind": "css_code",
+            "code_name": code.name,
+            "code_sha256": code.sha256(),
+            "sector": sector,
+            "n": n,
+            "k": len(logical_duals),
+        }
+        if isinstance(getattr(code, "meta", None), dict) and "tanner" in code.meta:
+            smeta["tanner"] = code.meta["tanner"]
+
         return cls.from_matrices(
             checks,
             logical_duals,
@@ -524,14 +509,7 @@ class DecodingProblem:
             default_prior=prior,
             scale=scale,
             stabilizer_generators=stabs,
-            source_meta={
-                "kind": "css_code",
-                "code_name": code.name,
-                "code_sha256": code.sha256(),
-                "sector": sector,
-                "n": n,
-                "k": len(logical_duals),
-            },
+            source_meta=smeta,
         )
 
     @classmethod
@@ -543,13 +521,7 @@ class DecodingProblem:
         location_prior: str | Fraction = "1/1000",
         scale: int = 1024,
     ) -> DecodingProblem:
-        """Convert an `ftqc_audit.RecordModel` (including `ftqc_extractors` BB144 `gross_circuit`,
-        `reading_audit`, and HGP probes) into an exact spacetime `DecodingProblem`.
-
-        Each physical location's non-identity Pauli modes receive uniform share `p_loc / |modes|`,
-        and identical `(det_mask, obs_mask)` columns are merged via exact `xor_prob` while
-        retaining a canonical `(location_idx, label)` witness in `witness_map` for forward replay!
-        """
+        """Convert an `ftqc_audit.RecordModel` into an exact spacetime `DecodingProblem`."""
         p_loc = parse_exact_probability(location_prior, allow_zero=False, allow_one=False, max_half=True)
         nd = int(record_model.nd)
         det_mask_all = (1 << nd) - 1
@@ -611,9 +583,6 @@ class DecodingProblem:
         )
 
 
-# ----------------------------------------------------------------------
-# Standard Built-in Benchmark Codes (100% stdlib, cold-clone ready)
-# ----------------------------------------------------------------------
 def repetition_problem(distance: int, *, prior: str | Fraction = "1/100") -> DecodingProblem:
     """1D repetition code `[d, 1, d]` with open boundaries (graphlike, column weight <= 2)."""
     if distance < 3:
@@ -626,36 +595,29 @@ def repetition_problem(distance: int, *, prior: str | Fraction = "1/100") -> Dec
 
 
 def toric_x_problem(length: int, *, prior: str | Fraction = "1/100") -> DecodingProblem:
-    """2D `[[2 L^2, 2, L]]` Kitaev toric code X-error decoding instance (graphlike, exact column weight 2).
-
-    Reference: E. Dennis, A. Kitaev, A. Landahl, and J. Preskill, J. Math. Phys. 43, 4452 (2002).
-    """
+    """2D `[[2 L^2, 2, L]]` Kitaev toric code X-error decoding instance."""
     if length < 2:
         raise RefusalError("INVALID-LATTICE-SIZE", "Toric lattice length L must be >= 2")
     L = length
-    # Horizontal edges: 0 .. L^2 - 1; Vertical edges: L^2 .. 2*L^2 - 1
+
     def h_edge(x: int, y: int) -> int:
         return (y % L) * L + (x % L)
 
     def v_edge(x: int, y: int) -> int:
         return L * L + (y % L) * L + (x % L)
 
-    # Vertex Z-checks (4 edges incident to vertex (x, y)); drop last redundant check? Keep all L^2 checks!
     hz_rows: list[int] = []
     for y in range(L):
         for x in range(L):
             row = (1 << h_edge(x, y)) | (1 << h_edge(x - 1, y)) | (1 << v_edge(x, y)) | (1 << v_edge(x, y - 1))
             hz_rows.append(row)
 
-    # Plaquette X-stabilizers (for stabilizer_generators!)
     hx_rows: list[int] = []
     for y in range(L):
         for x in range(L):
             plaq = (1 << h_edge(x, y)) | (1 << h_edge(x, y + 1)) | (1 << v_edge(x, y)) | (1 << v_edge(x + 1, y))
             hx_rows.append(plaq)
 
-    # Two noncontractible Z-logical cocycle ladders in ker(H_X) detecting X-logical cycles:
-    # L_Z1: horizontal ladder at x = 0; L_Z2: vertical ladder at y = 0
     lz1 = 0
     lz2 = 0
     for k in range(L):

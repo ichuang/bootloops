@@ -1,4 +1,4 @@
-"""ftqc_codes: certified code facts, interchange, constructions, and logical bases."""
+"""ftqc_codes: certified code facts, interchange, constructions, bases, and high-rate families."""
 from .codes import CSSCode, load, SpecError  # noqa: F401
 from .certify import build, verify, summary, Refusal, VERSION, add_witness  # noqa: F401
 from .constructions import (  # noqa: F401
@@ -31,3 +31,18 @@ from .symmetry import (  # noqa: F401
     verify_chain_map,
     build_cyclic_extension_chain_map,
 )
+from .families_highrate import (  # noqa: F401
+    two_block_ga,
+    reconcile_bb_as_2bga,
+    balanced_product,
+    quantum_tanner_lrcc,
+    lifted_quantum_tanner,
+    quantum_expanders_d8_36_8_3,
+    quantum_expanders_s3_288_8,
+    cpm_pair_partition,
+    pp184_50,
+    pp256_68,
+    pp576_148,
+    apm1152_580,
+)
+from .orbit_minweight import orbit_min_weight  # noqa: F401

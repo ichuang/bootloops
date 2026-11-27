@@ -1130,7 +1130,182 @@ def t_cli():
               _legacy_shim.VERSION == certify.VERSION and _LegacyCSSCode is codes.CSSCode)
 
 
-# ---------------------------------------------------------------- 8. Lean leg (needs lake + Lean-QEC)
+# ---------------------------------------------------------------- 8. High-rate paper families & Leg G orbit search
+def t_highrate_families_and_orbit_leg():
+    import itertools
+    from ftqc_codes import families_highrate, orbit_minweight
+
+    # Row 1: Trivial lift L=1 HGP equality + finite-lift Raveendran LP witnesses/bounds
+    c_hgp, c_lp1 = families_highrate.trivial_lift_hgp_equivalence(
+        [0b011, 0b110], 3, [0b0011, 0b0110, 0b1100], 4, name="HGP_L1"
+    )
+    check("trivial lift L=1 LP equals HGP byte-for-byte", c_hgp.sha256() == c_lp1.sha256() and c_hgp.n == 18)
+
+    rav4 = families_highrate.raveendran_lp_instance(4)
+    rav5 = families_highrate.raveendran_lp_instance(5)
+    rec_rav4 = certify.build(rav4)
+    rec_rav5 = certify.build(rav5)
+    check("Raveendran finite LP L=4,5 exact receipts verify",
+          bool(certify.verify(rec_rav4)) and bool(certify.verify(rec_rav5))
+          and rec_rav4["facts"]["d"]["exact"] and rec_rav5["facts"]["d"]["exact"])
+
+    # Row 2: Two-Block Group Algebra (2BGA) over nonabelian S_3 + exact BB reconciliation
+    s3_elems = list(itertools.permutations(range(3)))
+    s3_idx = {p: i for i, p in enumerate(s3_elems)}
+    s3_left = [[s3_idx[tuple(g[h[i]] for i in range(3))] for h in s3_elems] for g in s3_elems]
+    s3_right = [[s3_idx[tuple(h[g[i]] for i in range(3))] for h in s3_elems] for g in s3_elems]
+    ga_s3 = families_highrate.two_block_ga(
+        6, s3_left, s3_right,
+        [s3_idx[(0, 1, 2)], s3_idx[(1, 2, 0)], s3_idx[(1, 0, 2)]],
+        [s3_idx[(0, 1, 2)], s3_idx[(2, 0, 1)], s3_idx[(0, 2, 1)]],
+        name="2BGA_S3",
+    )
+    check("nonabelian S_3 2BGA commutes and is nonabelian",
+          ga_s3.commutes() and ga_s3.n == 12 and ga_s3.meta["two_block_ga"]["abelian"] is False)
+
+    for bb_name, args in (
+        ("BB18", (3, 3, ["x0", "x1", "y1"], ["x0", "x2", "y2"])),
+        ("GB54", (27, 1, ["x8", "x13", "x15", "x16"], ["x7", "x8", "x10", "x15"])),
+        ("BB144", (12, 6, ["x3", "y1", "y2"], ["y3", "x1", "x2"])),
+    ):
+        ga_c, cmap = families_highrate.reconcile_bb_as_2bga(*args, name=bb_name)
+        check(f"2BGA reconciles {bb_name} canonical + inverted-shift coordinate map",
+              ga_c.sha256() == codes.load(bb_name.lower()).sha256() and len(cmap["perm_q"]) == ga_c.n)
+
+    # Row 3: Nonabelian balanced product + Quantum Tanner codes (D_8 [[36,8,3]] and S_3 [[288,8]])
+    # Left-Cayley checks {g, r*g} are equivariant under RIGHT G-action; right-Cayley checks {g, g*r} under LEFT G-action!
+    r_s3 = s3_idx[(1, 2, 0)]
+    hx_a = [gf2.from_supp([g, s3_left[r_s3][g]]) for g in range(6)]
+    hz_b = [gf2.from_supp([g, s3_right[r_s3][g]]) for g in range(6)]
+    bp_s3 = families_highrate.balanced_product(
+        6, s3_left, s3_right,
+        hx_a, 6, s3_right, s3_right,
+        hz_b, 6, s3_left, s3_left,
+        name="BP_S3",
+    )
+    check("nonabelian S_3 balanced product commutes with free 6-element orbits",
+          bp_s3.commutes() and bp_s3.n == 12 and bp_s3.meta["balanced_product"]["abelian"] is False)
+
+    # Negative control: non-equivariant H_A in balanced_product refused
+    bad_hx_a = list(hx_a)
+    bad_hx_a[0] ^= 1
+    try:
+        families_highrate.balanced_product(
+            6, s3_left, s3_right, bad_hx_a, 6, s3_right, s3_right, hz_b, 6, s3_left, s3_left
+        )
+        check("non-equivariant balanced_product refused", False)
+    except certify.Refusal:
+        check("non-equivariant balanced_product refused", True)
+
+    qt_d8 = families_highrate.quantum_expanders_d8_36_8_3()
+    rec_d8 = certify.build(qt_d8)
+    hyps = qt_d8.meta["tanner"]["hypotheses"]
+    check("Quantum Tanner D_8 [[36,8,3]] exact parameters + checked/assumed hypotheses",
+          rec_d8["facts"]["n"] == 36 and rec_d8["facts"]["k"] == 8
+          and rec_d8["facts"]["d"] == {"lower": 3, "upper": 3, "exact": True}
+          and hyps["total_non_conjugacy"] == "checked"
+          and hyps["spectral_expansion_ramanujan"] == "assumed")
+
+    d8_imp_path = os.path.join(HERE, "examples", "quantum_expanders_d8_36_8_3.import.json")
+    if os.path.isfile(d8_imp_path):
+        d8_imp = codes.load(d8_imp_path)
+        check("banked quantum_expanders_d8_36_8_3.import.json matches native generator",
+              d8_imp.sha256() == qt_d8.sha256() and "tanner" in d8_imp.meta)
+
+    # Negative control: TNC violation refused in quantum_tanner_lrcc
+    try:
+        # Taking gen_b == gen_a guarantees a*e == e*a (TNC violation at g=e)
+        d8_l = [[0] * 8 for _ in range(8)]
+        # Reuse valid S_3 with overlapping generator!
+        t_s3 = s3_idx[(1, 0, 2)]
+        families_highrate.quantum_tanner_lrcc(
+            6, s3_left, s3_right, [t_s3], [t_s3], [[1]], [[1]], [[1]], [[1]]
+        )
+        check("TNC violation refused in quantum_tanner_lrcc", False)
+    except certify.Refusal:
+        check("TNC violation refused in quantum_tanner_lrcc", True)
+
+    qt_s3 = families_highrate.quantum_expanders_s3_288_8()
+    st_s3 = certify.structure(qt_s3)
+    check("Lifted Quantum Tanner S_3 [[288,8]] commutes with max check weight 12",
+          st_s3["n"] == 288 and st_s3["k"] == 8
+          and max(gf2.wt(r) for r in qt_s3.hx + qt_s3.hz) == 12
+          and qt_s3.meta["paper_claims"]["d_upper"] == 15)
+
+    # Row 4: Pair-Partition CPM & APM high-rate codes + construction receipts
+    for fn, want_n, want_k, want_d_claim in (
+        (families_highrate.pp184_50, 184, 50, 10),
+        (families_highrate.pp256_68, 256, 68, 12),
+        (families_highrate.pp576_148, 576, 148, 18),
+        (families_highrate.apm1152_580, 1152, 580, 12),
+    ):
+        c_hr = fn()
+        crec_hr = constructions.build_construction_receipt(c_hr)
+        constructions.verify_construction_receipt(crec_hr)
+        check(f"{c_hr.name} reproduces [[{want_n},{want_k}]] with paper_claims d={want_d_claim} separated from proved_lower",
+              crec_hr["metrics"]["n"] == want_n and crec_hr["metrics"]["k"] == want_k
+              and crec_hr["payload"]["ancestry"] == "reproduced"
+              and crec_hr["claims"]["paper_claims"].get("d") == want_d_claim
+              and crec_hr["claims"]["proved_lower"]["d"] is None)
+
+    # Negative controls for cpm_pair_partition: non-CSS refused & broken pair-partition refused
+    try:
+        families_highrate.cpm_pair_partition(8, [[0, 1]], [[0, 1]], code_type="symplectic")
+        check("non-CSS cpm_pair_partition refused", False)
+    except certify.Refusal:
+        check("non-CSS cpm_pair_partition refused", True)
+
+    try:
+        families_highrate.cpm_pair_partition(8, [[0, 1, 2, 3]], [[0, 2, 5, 7]])
+        check("broken pair-partition shift array refused", False)
+    except certify.Refusal:
+        check("broken pair-partition shift array refused", True)
+
+    # Leg G: orbit_minweight exact cross-check against Leg A + cheap & full verification + negative controls
+    for spec_name, want_d in (("lp6_2", 2), ("bb18", 4), ("toric:4", 4)):
+        c_g = codes.load(spec_name)
+        gens_g = orbit_minweight.infer_default_automorphisms(c_g)
+        if gens_g is None and spec_name == "toric:4":
+            # Toric(L=4) has n = 32 = 16 + 16; shift x by 1 on both 4x4 blocks!
+            sh4 = [((i // 4 + 1) % 4) * 4 + (i % 4) for i in range(16)]
+            gens_g = [sh4 + [16 + x for x in sh4]]
+        rec_a = certify.build(c_g, legs=("A",))
+        rec_g = certify.build(c_g, legs=())
+        orbit_minweight.run_leg(rec_g, c_g, aut_generators=gens_g)
+        check(f"Leg G matches unrestricted Leg A on {spec_name} (d={want_d})",
+              rec_g["facts"]["d"] == rec_a["facts"]["d"]
+              and rec_g["facts"]["d"]["lower"] == want_d
+              and bool(certify.verify(rec_g, full=False))
+              and bool(certify.verify(rec_g, full=True)))
+
+    # Negative controls on Leg G: tampered word_to_root and non-automorphism generator refused
+    c_bb18 = codes.load("bb18")
+    rec_bb18_g = certify.build(c_bb18, legs=())
+    orbit_minweight.run_leg(rec_bb18_g, c_bb18)
+    bad_rec_g = json.loads(json.dumps(rec_bb18_g))
+    for ev in bad_rec_g["evidence"]:
+        if ev.get("leg") == "G":
+            # Corrupt a non-root word_to_root witness so it lands on the wrong qubit
+            orb0 = ev["orbits"][0]
+            non_root = [m for m in orb0["members"] if m != orb0["root"]][0]
+            orb0["words_to_root"][str(non_root)] = []
+            break
+    try:
+        certify.verify(bad_rec_g, full=False)
+        check("tampered Leg G word_to_root witness refused", False)
+    except certify.Refusal:
+        check("tampered Leg G word_to_root witness refused", True)
+
+    bad_aut = list(range(c_bb18.n))
+    bad_aut[0], bad_aut[1] = bad_aut[1], bad_aut[0]
+    try:
+        orbit_minweight.orbit_min_weight(c_bb18, "d_x", [bad_aut], target=2)
+        check("non-automorphism generator refused by Leg G", False)
+    except certify.Refusal:
+        check("non-automorphism generator refused by Leg G", True)
+
+
+# ---------------------------------------------------------------- 9. Lean leg (needs lake + Lean-QEC)
 def t_lean(enabled):
     try:
         from ftqc_codes import leangen
@@ -1183,6 +1358,7 @@ def main():
         (t_hier, ()),
         (t_interchange_and_constructions, ()),
         (t_basis_and_symmetry, ()),
+        (t_highrate_families_and_orbit_leg, ()),
         (t_sat, (heavy,)),
         (t_cli, ()),
         (t_lean, (lean,)),

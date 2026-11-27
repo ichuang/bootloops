@@ -1,12 +1,12 @@
 """Command line:  python3 -m ftqc_codes <command> ...   (with tools/ on PYTHONPATH)
 
-  certify   SPEC [-o receipt.json] [--legs A,B,C,D,E|none] [--target q=v ...] [--max-combos N]
+  certify   SPEC [-o receipt.json] [--legs A,B,C,D,E,G|none] [--target q=v ...] [--max-combos N]
   construct SPEC [-o construction.receipt.json] [--static-receipt receipt.json]
   basis     SPEC [-o basis.receipt.json] [--method binary|candidate|spectral]
   verify    RECEIPT.json [--full] [--static-receipt receipt.json] [--code SPEC]
   spec      SPEC [-o code.json]          write the code's matrices as JSON
   families                               list family constructors
-SPEC is a code/import/construction JSON file or family[:args], e.g. golay, qr:47, toric:5, bb72, radial90.
+SPEC is a code/import/construction JSON file or family[:args], e.g. golay, qr:47, toric:5, bb72, radial90, pp256.
 
 Exit codes: 0 ok, 1 refusal (not a CSS code, receipt fails, legs disagree),
 2 usage or malformed spec.
@@ -151,8 +151,8 @@ def main(argv=None):
             return 0
         raw_legs = [x.strip().upper() for x in a.legs.split(",") if x.strip()]
         legs = [] if raw_legs == ["NONE"] else raw_legs
-        if set(legs) - {"A", "B", "C", "D", "E"}:
-            raise codes.SpecError("--legs takes a subset of A,B,C,D,E or none")
+        if set(legs) - {"A", "B", "C", "D", "E", "G"}:
+            raise codes.SpecError("--legs takes a subset of A,B,C,D,E,G or none")
         code = codes.load(a.spec)
         targets = _targets(a.target)
         rec = certify.build(code, targets, a.max_combos, legs)
@@ -162,6 +162,9 @@ def main(argv=None):
         if "E" in legs:
             from . import cuts
             cuts.run_leg(rec, code)
+        if "G" in legs:
+            from . import orbit_minweight
+            orbit_minweight.run_leg(rec, code, targets=targets, max_nodes=a.max_combos)
         if "B" in legs:
             from . import sat
             sat.run_leg(rec, code, targets, a.workdir, a.sat_timeout)

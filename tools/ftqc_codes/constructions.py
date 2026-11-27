@@ -726,6 +726,18 @@ def from_spec(
     elif kind == "radial90":
         estimate_expansion(spec, max_n=max_n, max_rows=max_rows, max_nnz=max_nnz)
         code = radial90(name=nm or "Radial90")
+    elif kind == "cpm_pair_partition":
+        from . import families_highrate
+        code = families_highrate.cpm_pair_partition(
+            spec.get("lift"),
+            spec.get("ex_shifts"),
+            spec.get("ez_shifts"),
+            code_type=spec.get("code_type", "css"),
+            verify_pair_partition=spec.get("verify_pair_partition", True),
+            name=nm,
+            provenance=spec.get("provenance"),
+            paper_claims=spec.get("paper_claims"),
+        )
     elif kind == "named_family":
         fam_spec = spec.get("family_spec")
         if not isinstance(fam_spec, str) or not fam_spec:
@@ -825,6 +837,29 @@ def _reconstruct_spec_from_code(code):
             "name": code.name,
             "family_spec": fam_s,
         }
+    if "cpm_pp" in code.meta:
+        cpp = code.meta["cpm_pp"]
+        return {
+            "schema": SPEC_SCHEMA,
+            "kind": "cpm_pair_partition",
+            "name": code.name,
+            "lift": cpp["lift"],
+            "ex_shifts": cpp["ex_shifts"],
+            "ez_shifts": cpp["ez_shifts"],
+            "verify_pair_partition": cpp.get("pair_partition_verified", True),
+        }
+    named_alias = {
+        "APM1152": "apm1152",
+        "QE_D8_36_8_3": "qt_d8_36",
+        "QE_S3_288_8": "qt_s3_288",
+    }.get(code.name)
+    if named_alias and named_alias in codes.NAMED:
+        return {
+            "schema": SPEC_SCHEMA,
+            "kind": "named_family",
+            "name": code.name,
+            "family_spec": named_alias,
+        }
     return None
 
 
@@ -890,6 +925,7 @@ def build_construction_receipt(
     prov = copy.deepcopy(
         provenance
         or (code.meta.get("construction") or {}).get("provenance")
+        or code.meta.get("provenance")
         or (imp or {}).get("provenance")
         or {"paper": "unspecified", "version": "unspecified", "locator": "unspecified"}
     )
@@ -897,6 +933,7 @@ def build_construction_receipt(
         paper_claims
         if paper_claims is not None
         else (code.meta.get("construction") or {}).get("paper_claims")
+        or code.meta.get("paper_claims")
         or (imp or {}).get("paper_claims")
         or {}
     )

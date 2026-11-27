@@ -257,6 +257,71 @@ def leg_l5_enclosures_bridges_examples_cli() -> str:
     return f"{len(ex_files)} examples verified, gadgets bridge live, {ext_note}"
 
 
+def leg_l6_tanner_single_shot_and_sparse_handoff() -> str:
+    qt_d8_x = fd.DecodingProblem.from_css_code("qt_d8_36", sector="X")
+    qt_d8_z = fd.DecodingProblem.from_css_code("qt_d8_36", sector="Z")
+    r_x = fd.certify_operational_radius(qt_d8_x, "tanner_local", 1)
+    r_z = fd.certify_operational_radius(qt_d8_z, "tanner_local", 1)
+    assert r_x["status"] == "proved" and r_x["holds_through"] == 1
+    assert r_z["status"] == "proved" and r_z["holds_through"] == 1
+
+    # Consecutive single-shot rounds on [[36,8,3]] (t=1: 1 fault per round, alternating data & syndrome noise)
+    ss_d8 = fd.simulate_tanner_single_shot_rounds(
+        qt_d8_x,
+        data_errors_per_round=[1 << 0, 0, 1 << 14, 0, 1 << 28, 0],
+        syndrome_errors_per_round=[0, 1 << 5, 0, 1 << 2, 0, 1 << 4],
+        final_clean_readout=True,
+    )
+    assert ss_d8["max_intermediate_coset_weight"] <= 1
+    assert ss_d8["terminal"]["logical_success"] is True
+    assert ss_d8["terminal"]["final_coset_weight"] == 0
+
+    # Lifted Quantum Tanner [[288, 8]] over S_3 under simultaneous data + syndrome noise every round!
+    qt_s3_x = fd.DecodingProblem.from_css_code("qt_s3_288", sector="X")
+    ss_s3 = fd.simulate_tanner_single_shot_rounds(
+        qt_s3_x,
+        data_errors_per_round=[1 << 3, (1 << 55) | (1 << 190), 1 << 120, (1 << 12) | (1 << 211), 1 << 88, 0],
+        syndrome_errors_per_round=[1 << 2, (1 << 17) | (1 << 95), 1 << 40, 1 << 73, (1 << 8) | (1 << 110), 1 << 31],
+        final_clean_readout=True,
+    )
+    assert ss_s3["max_intermediate_coset_weight"] <= 2
+    assert ss_s3["terminal"]["logical_success"] is True
+
+    # Verify coset_reduced_weight collapses full stabilizer generators to weight 0
+    g_stab0 = qt_d8_x.stabilizer_generators[0]
+    assert fd.coset_reduced_weight(g_stab0, qt_d8_x.stabilizer_generators) == 0
+    assert fd.coset_reduced_weight(g_stab0 ^ (1 << 5), qt_d8_x.stabilizer_generators) == 1
+
+    # Negative control: non-Tanner problem refused by extract_tanner_neighborhoods
+    steane = fd.DecodingProblem.from_css_code("steane", sector="X")
+    try:
+        fd.decode_tanner_local(steane, steane.syndrome_of(1))
+        raise AssertionError("Expected MISSING-TANNER-META refusal on Steane")
+    except fd.RefusalError as exc:
+        assert exc.code == "MISSING-TANNER-META"
+
+    # Sparse O(nnz) scipy.sparse.csc_matrix handoff on high-rate PP256 & APM1152 when available
+    backends = fd.probe_external_backends()
+    sparse_note = "sparse=skipped"
+    if backends.get("scipy", {}).get("available"):
+        from ftqc_decoders.adapters.external_decoders import build_check_matrix_for_external
+
+        pp256_x = fd.DecodingProblem.from_css_code("pp256", sector="X")
+        apm_x = fd.DecodingProblem.from_css_code("apm1152", sector="X")
+        h_pp, fmt_pp = build_check_matrix_for_external(pp256_x, prefer_sparse=True)
+        h_apm, fmt_apm = build_check_matrix_for_external(apm_x, prefer_sparse=True)
+        assert fmt_pp == "scipy_csc" and fmt_apm == "scipy_csc"
+        assert h_pp.nnz == sum(r.bit_count() for r in pp256_x.check_rows)
+        assert h_apm.nnz == sum(r.bit_count() for r in apm_x.check_rows)
+        sparse_note = f"scipy_csc(pp256_nnz={h_pp.nnz},apm1152_nnz={h_apm.nnz})"
+        if backends.get("ldpc", {}).get("available"):
+            r_pp = fd.run_decoder(pp256_x, pp256_x.syndrome_of((1 << 5) | (1 << 140)), "external:ldpc_bplsd")
+            assert r_pp.converged and r_pp.stats["matrix_format"] == "scipy_csc"
+            assert pp256_x.observable_of(((1 << 5) | (1 << 140)) ^ r_pp.error_mask) == 0
+
+    return f"QE_D8_36_8_3 d_eff>=3 + 6-round single-shot + QE_S3_288_8 + {sparse_note}"
+
+
 def leg_n1_n6_sabotage_controls() -> str:
     def expect_refusal(fn: Callable[[], object], expected_code: str) -> None:
         try:
@@ -401,6 +466,7 @@ def run_all(argv: list[str] | None = None) -> int:
         ("L3_uf_ssf_metachecks_sat_lrat", leg_l3_uf_ssf_metachecks_sat_lrat),
         ("L4_trapping_sets_and_deff", leg_l4_trapping_sets_and_deff),
         ("L5_enclosures_bridges_examples_cli", leg_l5_enclosures_bridges_examples_cli),
+        ("L6_tanner_single_shot_and_sparse_handoff", leg_l6_tanner_single_shot_and_sparse_handoff),
         ("N1_N6_sabotage_controls", leg_n1_n6_sabotage_controls),
         ("M1_M4_mutant_kills", leg_m1_m4_mutant_kills),
     ]
