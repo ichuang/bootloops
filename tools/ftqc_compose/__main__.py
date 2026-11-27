@@ -37,6 +37,10 @@ def evaluate(spec):
         from .stochastic import stochastic_result
 
         return stochastic_result(spec)
+    if spec["kind"] == "cone-bound":
+        from .tails import cone_bound_result
+
+        return cone_bound_result(spec)
     if spec["kind"] == "distilled-logical-t":
         from .logical_t import logical_t_result
 

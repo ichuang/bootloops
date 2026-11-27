@@ -80,11 +80,18 @@ INNER_KINDS = ("zero", "plus", "cat", "std", "and1")
 
 def _bits(mask):
     """Positions of the set bits of a large, sparse mask."""
-    out = []
-    while mask:
-        low = mask & -mask
-        out.append(low.bit_length() - 1)
-        mask ^= low
+    if mask.bit_length() < 4096:
+        out = []
+        while mask:
+            low = mask & -mask
+            out.append(low.bit_length() - 1)
+            mask ^= low
+        return out
+    text = bin(mask)[:1:-1]                    # least significant bit first; one pass in C
+    out, i = [], text.find("1")
+    while i >= 0:
+        out.append(i)
+        i = text.find("1", i + 1)
     return out
 
 
@@ -94,6 +101,43 @@ class ConeError(GadgetError):
 
 def _name(b):
     return tuple(b) if isinstance(b, list) else b
+
+
+class _Cones:
+    """node -> source mask.  A value still feeding later values is kept as an integer; the
+    cone of an event is kept as the tuple of its sources (the masks of a long program are
+    wide and mostly zero); a value nothing can reach any more is released."""
+
+    def __init__(self):
+        self.data = []
+
+    def __len__(self):
+        return len(self.data)
+
+    def append(self, mask):
+        self.data.append(mask)
+
+    def __getitem__(self, i):
+        v = self.data[i]
+        if v is None:
+            raise ConeError("internal: a released cone was read")
+        if isinstance(v, tuple):
+            m = 0
+            for j in v:
+                m |= 1 << j
+            return m
+        return v
+
+    def __setitem__(self, i, mask):
+        self.data[i] = tuple(_bits(mask)) if isinstance(self.data[i], tuple) else mask
+
+    def freeze(self, i):
+        if not isinstance(self.data[i], tuple):
+            self.data[i] = tuple(_bits(self.data[i]))
+
+    def release(self, i):
+        if not isinstance(self.data[i], tuple):
+            self.data[i] = None
 
 
 class Program:
@@ -142,7 +186,8 @@ class Flow:
     def __init__(self, program, two=None):
         self.p = program
         self.two = program.two_level() if two is None else two
-        self.sources, self.cone_of = [], []          # node -> mask
+        self.sources, self.cone_of = [], _Cones()    # node -> mask
+        self._alive = set()
         self.events, self.outer, self.terms = [], [], []
         self.S, self.O, self.pend = {}, {}, {}
         self.known, self.tick = set(), 0
@@ -151,8 +196,10 @@ class Flow:
             self._blank(b)
         for layer in program.layers:
             self._layer(layer)
+            self._sweep()
             self.tick += 1
         self._finish()
+        self._sweep()
 
     # -- graph
     def _src(self, **kw):
@@ -174,7 +221,19 @@ class Flow:
         for s in srcs:
             m |= 1 << s
         self.cone_of.append(m)
+        self._alive.add(len(self.cone_of) - 1)
         return len(self.cone_of) - 1
+
+    def _keep(self, node):
+        if node is not None:
+            self.cone_of.freeze(node)
+            self._alive.discard(node)
+
+    def _sweep(self):
+        live = {v for d in self.S.values() for v in d.values()} | {v for d in self.O.values() for v in d.values()}
+        for i in self._alive - live:
+            self.cone_of.release(i)
+        self._alive &= live
 
     def _blank(self, b):
         if b in self.S:
@@ -184,6 +243,7 @@ class Flow:
             self.O[b] = {"X": self._node(()), "Z": self._node(())}
 
     def _event(self, kind, block, sector, node, tag):
+        self._keep(node)
         self.events.append(dict(kind=kind, block=block, sector=sector, tick=self.tick, node=node, tag=tag))
         i = len(self.events) - 1
         if not self.two:
@@ -191,6 +251,7 @@ class Flow:
         return self._src(level=2, kind="event", what=tag, event=i, blocks=[block], weight=1)
 
     def _outer(self, block, sector, node, tag):
+        self._keep(node)
         self.outer.append(dict(block=block, sector=sector, tick=self.tick, node=node, tag=tag))
 
     # -- pieces
@@ -376,6 +437,13 @@ class Flow:
     def members(self, mask):
         return _bits(mask)
 
+    def members_of(self, event):
+        """Source numbers in an event's cone, without building the wide mask."""
+        if event["node"] is None:
+            return ()
+        v = self.cone_of.data[event["node"]]
+        return v if isinstance(v, tuple) else tuple(_bits(v))
+
     def weight(self, mask):
         """(location classes counted with their weights, {(ancilla, sector): atoms})."""
         L, atoms = 0, {}
@@ -398,7 +466,7 @@ class Flow:
 def exact(program, flow, acts=None):
     """Inner cones by linear propagation of symbolic generators, for one setting of the
     classical controls: acts(tick, op) -> bool says whether a controlled gate is applied
-    (default: all are).  Returns a list of source masks, one per inner decoding event of
+    (default: all are).  Returns a list of sets of source numbers, one per inner decoding event of
     `flow`, in the same order (None for events without a cone).  Sources are numbered as
     in `flow`: the walk creates them in the same order and checks that it does."""
     src_of_gen, x, z = [], {}, {}
@@ -414,14 +482,13 @@ def exact(program, flow, acts=None):
         return i
 
     def gen(src):
+        # a set of generator numbers stands for their sum over GF(2): ^ adds, and the sets
+        # stay as small as the cones however long the program is
         src_of_gen.append(src)
-        return 1 << (len(src_of_gen) - 1)
+        return frozenset((len(src_of_gen) - 1,))
 
-    def emit(mask):
-        m = 0
-        for g in _bits(mask):
-            m |= 1 << src_of_gen[g]
-        out.append(m)
+    def emit(gens):
+        out.append(frozenset(src_of_gen[g] for g in gens))
 
     def post_ec(b):
         c = [take("class", ("std", w)) for w in ("c1", "m1", "c2", "m2")]
@@ -453,7 +520,7 @@ def exact(program, flow, acts=None):
             post_ec(b)
 
     for b in program.inputs:
-        x[b] = z[b] = 0
+        x[b] = z[b] = frozenset()
     pend_anc = {}
     for tick, layer in enumerate(program.layers):
         state["tick"] = tick
@@ -523,7 +590,7 @@ def exact(program, flow, acts=None):
                 del x[Z0], z[Z0]
             elif k == "TOF":
                 ids = [take("class", ("tof", i)) for i in range(int(op[1]))]
-                pool = 0
+                pool = frozenset()
                 for b in bs:
                     pool |= x[b] | z[b]
                 for i in ids:
@@ -552,20 +619,21 @@ def contained(program, flow, samples=8, seed=1):
         memo = {}
         settings.append((f"random {i}", lambda t, op, memo=memo: memo.setdefault((t, op), rnd.random() < 0.5)))
     outside, smaller = [], 0
-    union = [0] * len(flow.events)
+    union = [frozenset()] * len(flow.events)
+    rule = [None if ev["node"] is None else frozenset(flow.members_of(ev)) for ev in flow.events]
     for name, acts in settings:
         ex = exact(program, flow, acts)
         for i, (m, ev) in enumerate(zip(ex, flow.events)):
             if m is None:
                 continue
             union[i] |= m
-            extra = m & ~flow.cone(ev)
+            extra = m - rule[i]
             if extra and len(outside) < 5:
                 outside.append(dict(setting=name, event=i, kind=ev["kind"], block=str(ev["block"]),
                                     sector=ev["sector"], tick=ev["tick"],
-                                    sources=[flow.key(j) for j in _bits(extra)][:5]))
-    for m, ev in zip(union, flow.events):
-        if ev["node"] is not None and m != flow.cone(ev):
+                                    sources=[flow.key(j) for j in sorted(extra)][:5]))
+    for m, r in zip(union, rule):
+        if r is not None and m != r:
             smaller += 1
     return dict(settings=len(settings), events=sum(1 for e in flow.events if e["node"] is not None),
                 outside=outside, events_where_rule_exceeds_algebra=smaller)
