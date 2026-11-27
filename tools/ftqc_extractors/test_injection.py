@@ -159,3 +159,27 @@ class CircuitTests(unittest.TestCase):
                 self.assertEqual(
                     Fraction(result["first_order_silent_by_mask"][str(mask)]), expected
                 )
+
+
+class ObjectiveTests(unittest.TestCase):
+    def test_fixed_and_protected_closures(self):
+        try:
+            from scipy.optimize import milp
+        except ImportError:
+            self.skipTest("optional integer optimizer")
+        from .injection_optimize import optimize
+
+        # On two unconstrained spectators a fixed-check optimum is exactly two.
+        s = dict(
+            schema=1,
+            kind="injection",
+            method="selected",
+            memory=dict(n=3, hx=[2], hz=[4]),
+            logicals=[[1, 1, 0, 0]],
+            preparation=dict(carriers=[0], plus=[2], zero=[1], bells=[]),
+        )
+        a = optimize(s, "fixed")
+        self.assertEqual(a["postselect"], {"X": [0], "Z": [0]})
+        self.assertEqual(
+            receipt(optimize(s, "protected"))["result"]["status"], "proved"
+        )
