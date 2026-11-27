@@ -29,3 +29,16 @@ class BlockTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             receipt(dict(SMALL,pattern=[3,3]))
 
+
+class GraphTests(unittest.TestCase):
+    def test_signed_and_routing(self):
+        import json
+        from pathlib import Path
+        s=json.loads((Path(__file__).parent/"examples/fixed-graph.json").read_text())
+        for word in ("+XXII","-YYII","+ZZII"):
+            r=receipt(dict(s,logical=word))
+            verify(dict(s,logical=word),r)
+            self.assertEqual(r["result"]["readout_sign"],int(word[0]=="-"))
+        self.assertEqual(receipt(dict(s,routes=[1,7]))["result"]["obligation"],"even-subset routing")
+        with self.assertRaises(ValueError):
+            receipt(dict(s,checks=["-IIII","+ZZZZ"]))

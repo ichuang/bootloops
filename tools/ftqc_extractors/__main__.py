@@ -20,6 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
+    "fixed_graph": ("n checks vertices edges ports cycles routes max_degree logical target", "couplers"),
     "block_reading": ("memory blocks pattern axis target", "expected"),
     "gross_circuit": ("rounds target", "spacetime fault_witnesses"),
     "gross_z": ("target", ""),
@@ -74,6 +75,9 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     if backend == "sat" and kind not in ("circuit", "t_gate"):
         raise ValueError("SAT backend requires circuit input")
     try:
+        if kind == "fixed_graph":
+            from .fixed_graph import analyze
+            return analyze(s, budget)
         if kind == "block_reading":
             from .block_reading import analyze
             return analyze(s, budget)
