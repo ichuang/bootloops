@@ -130,6 +130,10 @@ Outputs (as receipts, every failure with a replayable input error and fault set)
   `cones.correction_pattern(program)` measures how gates and idle ticks are followed by
   corrections (runs of steps without one). The `volume` study of `ftqc_compose` prices the
   ledger.
+  `cones.strict_schedule(program, outer_after=None)` builds the conventional arrangement of
+  a program given without error correction: every live block is corrected at the inner level
+  after every layer, so every gate and every idle tick is followed by a correction; with a
+  threshold, a block whose outer cone exceeds it is corrected at the outer level as well.
 - **independent_of_input**: which decoders' check values no input error can change.
   For repeated error correction (`steane_ec:CODE,rounds=2`) the later rounds have
   this property and the first does not: after one round, what a block does next is
