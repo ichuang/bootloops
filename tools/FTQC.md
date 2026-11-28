@@ -29,6 +29,70 @@ The arrows show what one tool supplies to another in selected studies.
 - **Pricing a logical circuit.** The resource estimator combines logical gate counts and reaction depth with the supplied ZX contract enclosures and numerical factory cost and escape assumptions. A composed logical-T receipt can justify a factory input separately. The caller supplies that number to the estimator. [Pricing implementation](ftqc_uncompute/adapters/ftqc_bridge.py) · [Logical-T composition](ftqc_compose/GUIDE.md#from-a-distilled-qubit-to-logical-t)
 - **From cultivation and distillation to composed magic contracts.** `ftqc_magic` verifies binary/PPR, $\mathrm{GF}(2^s)$ trace, and non-triorthogonal $\mathbb{Z}[\omega_8]$ stabilizer factories, mid-circuit check recycling, $O(n^3)$ Clifford-hook cultivation (`d_T` vs `d_S`), Caliper open-boundary escape gaps (cross-checked with `ftqc_decoders` Blossom), and single-shot 3D tricycle $\to$ 4D quadcycle `CCZ` factories (repaired via `ftqc_decoders` metachecks). Its pipeline composer enforces `INDEPENDENT_SINGLE`, `BATCH_CORRELATED`, and `CATALYST_POISONED` rules before exporting `ftqc_compose` ancilla contracts and `ftqc_uncompute` pricing records. [Magic factory guide](ftqc_magic/GUIDE.md)
 
+## Compare a surface-code memory or lattice-surgery measurement
+
+The rotated patch uses one data qubit per grid point, with one meter per check
+during a memory round. One such round comprises preparation, four CNOT layers
+and measurement. For a distance-three memory, the standard and hook-aligned
+CNOT orders have circuit distances three and two in the two-round X and Z
+probes. The sector decoder projects each complete physical fault onto the
+measured CSS sector and applies equal-weight MWPM. Its report counts failures
+among all physical single-location alternatives. The exact audit measures
+undetected distance separately.
+
+```sh
+export PYTHONPATH="$PWD/tools"
+out=$(mktemp -d)
+python3 -m ftqc_codes certify rotated_surface:3 -o "$out/code.json"
+python3 -m ftqc_codes verify "$out/code.json" --full
+python3 -m ftqc_faults audit analyze surface:3,2,z,bad -o "$out/hook.json"
+python3 -m ftqc_decoders.surface_memory --distance 3 --rounds 3 --basis Z
+for axis in xx zz; do
+    python3 -m ftqc_extractors.surgery_bench "surface-$axis" -o "$out/$axis.json"
+    python3 -m ftqc_extractors check "$out/$axis.json" -o "$out/$axis-proof.json"
+    python3 -m ftqc_extractors verify "$out/$axis.json" "$out/$axis-proof.json"
+done
+```
+
+The installation accepts odd distances of at least three. It begins with one
+split-code round, measures the merged code for R rounds, then remeasures the
+split code for R rounds. The shared seam meters measure opposing half checks
+in successive subrounds. Their complementary seam checks encode the signed
+parity. The last split record controls the recovery on live data. Gates,
+feedback and idles carry physical faults. The initial encoded state and terminal
+syndrome are ideal. Static square-grid placements and a gate range of one
+check every coupler. Every ideal measurement branch preserves the named
+surviving logical pair. The distance receipt includes single-location and
+two-location exclusions and a forward-replayed physical witness, or a smaller
+counterexample. At d = R = 3 the exact circuit distance is three in both bases.
+A larger patch is opt-in with `--distance 5`; `--rounds` overrides the default
+R = d.
+
+To price a decoded measurement, carry the installed Gadgets proof into Compose:
+
+```sh
+python3 - "$out" <<'PY'
+import json, pathlib, sys
+directory = pathlib.Path(sys.argv[1])
+installed = json.loads((directory / "zz-proof.json").read_text())
+study = dict(kind="decoded-surgery", receipt=installed["result"]["gadget"],
+             incoming_weight=0, p="1/100000")
+(directory / "channel.json").write_text(json.dumps(study))
+PY
+python3 -m ftqc_compose check "$out/channel.json" -o "$out/bound.json"
+python3 -m ftqc_compose verify "$out/channel.json" "$out/bound.json"
+```
+
+The decoder uses one joint syndrome table for public bits and the residual
+Pauli frame. It scores every physical single-location alternative with its
+within-location probability, including correlated CNOT faults. For independent
+sites with common fault probability p, Compose adds a pair union bound for
+all higher orders. The resulting public, residual and joint failure bounds
+assume a clean encoded input. Residual failure means the corrected data Pauli
+lies outside the stabilizers and measured branch subgroup. The research
+checkout's `studies/surface-baseline` contains the matched HGP comparison,
+seeded sampling and twelve-parity resource accounting.
+
 ## Follow a gross-code measurement into the audit tool
 
 Run these commands from the BootLoops root with Python 3.10 or later.
