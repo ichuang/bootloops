@@ -83,3 +83,18 @@ class StagedIntegration(unittest.TestCase):
         s["couplers"].pop()
         with self.assertRaisesRegex(ValueError, "missing installed"):
             install_receipt(s)
+
+    def test_toffoli_cost_includes_spectator_idles(self):
+        study = load("pieceable-ccz")
+        h = dict(kind="staged-gadget", operation="target-h", blocks=["A", "B", "C"])
+        base = price(study, 0, 0, 0)
+        study.update(
+            target="CCX",
+            stages=[h, *study["stages"], h],
+            instances=["before", "body", "after"],
+        )
+        wrapped = price(study, 0, 0, 0)
+        self.assertEqual(
+            wrapped["reserved_wire_ticks_upper"] - base["reserved_wire_ticks_upper"], 42
+        )
+        self.assertEqual(wrapped["action"], "CCX")

@@ -60,9 +60,13 @@ def program(spec):
                 workload=result["workload"],
             )
         )
-    if spec["target"] not in ("I", "T", "CCZ") or actions != (
-        [] if spec["target"] == "I" else [spec["target"]]
-    ):
+    decompositions = {
+        "I": [],
+        "T": ["T"],
+        "CCZ": ["CCZ"],
+        "CCX": ["H-third", "CCZ", "H-third"],
+    }
+    if actions != decompositions.get(spec["target"]):
         raise ValueError("composed logical action differs from requested target")
     count = sum(r["workload"]["max_locations"] for r in rows)
     # Clean corrected output at each join: under the stated model a bad stage

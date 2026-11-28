@@ -83,7 +83,9 @@ table, the ideal action and the location census.
 
 Compose requires consecutive ports to match in block order, code hash,
 logical representatives, signs and frame. Instance IDs distinguish physical
-locations. The claimed program action is I, T or CCZ. With clean encoded
+locations. The claimed program action is I, T, CCZ or CCX. A CCX study wraps the CCZ
+stage in two `target-h` stages on the third Steane block and charges both
+transversal layers including idle controls. With clean encoded
 input and all ideal services supplied, each stage restores its output through
 one fault. If each pair of distinct reserved sites is jointly faulty with
 probability at most p², a union bound gives the sum over stages of
@@ -98,7 +100,8 @@ Single-site native phases are assumed available.
 
 Magic applies the closed switched T to a fresh ideal encoded plus. The output
 has unit yield and a conditional infidelity bound under the Compose model.
-Uncompute prices the reserved online wire-ticks and charges the supplied
+Magic also accepts a `switched-source` spec with a nested `program` via its
+ordinary `check` and `verify` commands. Uncompute prices the reserved online wire-ticks and charges the supplied
 feedback delay and per-stage seed and terminal service budgets. Zero service
 budgets show the online contribution. An end-to-end physical volume requires
 budgets for the actual supplied services.

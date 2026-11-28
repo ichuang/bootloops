@@ -15,8 +15,9 @@ def workload(spec, result):
         data, anc = 21, max(widths)
         clean, maximum = ngates + 6 * len(widths), ngates + 12 * len(widths)
         clean_reactions, max_reactions = 6, 12
-    elif op == "rm15-phase":
-        data, anc, extra = 15, 0, 0
+    elif op in ("rm15-phase", "target-h"):
+        data = 15 if op == "rm15-phase" else 21
+        anc, extra = 0, 0
         clean = maximum = 1
         clean_reactions = max_reactions = 0
     else:

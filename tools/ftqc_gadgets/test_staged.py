@@ -54,3 +54,35 @@ class StagedTests(unittest.TestCase):
         self.assertEqual(rec["result"]["status"], "counterexample")
         self.assertIn("second", rec["result"]["witness"])
         staged.verify(rec)
+
+    def test_physical_check_against_stim(self):
+        try:
+            import stim
+        except ImportError:
+            self.skipTest("Stim optional cat-leg cross-check")
+        from ftqc_faults.staged import cat_faults
+
+        for axis in ("X", "Z"):
+            gate = "CX" if axis == "X" else "CZ"
+            for mode, x, z, flip in cat_faults(3, 5, axis):
+                name, q, *bits = mode
+                error = stim.PauliString(4)
+
+                def pauli(a, b):
+                    return {(0, 0): 0, (1, 0): 1, (1, 1): 2, (0, 1): 3}[a, b]
+
+                if name == "read-X":
+                    error[3] = 3
+                elif name == "idle":
+                    error[q] = pauli(*bits)
+                elif name == "cat-leg":
+                    error[3] = pauli(*bits)
+                    error = error.after(
+                        stim.Tableau.from_named_gate(gate), targets=[3, q]
+                    )
+                else:
+                    error[3] = pauli(*bits[:2])
+                    error[q] = pauli(*bits[2:])
+                self.assertEqual(x, sum((error[i] in (1, 2)) << i for i in range(3)))
+                self.assertEqual(z, sum((error[i] in (2, 3)) << i for i in range(3)))
+                self.assertEqual(flip, int(error[3] in (2, 3)))

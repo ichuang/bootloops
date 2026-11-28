@@ -34,3 +34,15 @@ def prepare(study):
         ],
         basis="encoded resource; arbitrary logical noise on a bad attempt",
     )
+
+
+def source_receipt(spec):
+    from .certify import canonical_json_sha256
+
+    if set(spec) != {"kind", "program"} or spec["kind"] != "switched-source":
+        raise ValueError("expected a switched-source program")
+    return dict(
+        schema="ftqc_magic-switched-source-1",
+        spec_sha256=canonical_json_sha256(spec),
+        **prepare(spec["program"]),
+    )

@@ -50,6 +50,10 @@ def analyze(spec):
             from .staged_pieceable import check
 
             result = check(spec)
+        elif spec["operation"] == "target-h":
+            from .staged_h import check
+
+            result = check(spec)
         else:
             result = staged_switch.check(spec)
         from .staged_work import workload
