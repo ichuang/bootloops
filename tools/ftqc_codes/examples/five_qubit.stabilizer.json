@@ -1,0 +1,7 @@
+{
+  "schema": "ftqc_codes-stabilizer-1",
+  "name": "five-qubit perfect code",
+  "n": 5,
+  "checks": ["+XZZXI", "+IXZZX", "+XIXZZ", "+ZXIXZ"],
+  "slots": [{"name": "q0", "x": "+XXXXX", "z": "+ZZZZZ"}]
+}

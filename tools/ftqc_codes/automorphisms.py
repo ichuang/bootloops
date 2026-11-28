@@ -72,8 +72,34 @@ def conjugate(pauli, steps):
     return x, z, sign
 
 
+def expand_folds(n, steps):
+    """Expand a phase fold into S/SDG fixed points and one CZ per two-cycle."""
+    if not isinstance(steps, list):
+        raise codes.SpecError("steps must be a list")
+    out = []
+    for step in steps:
+        if not isinstance(step, dict) or "fold" not in step:
+            out.append(step)
+            continue
+        if set(step) - {"fold", "sdg"}:
+            raise codes.SpecError("unknown fold field")
+        perm = interchange.validate_permutation(step["fold"], n, "fold")
+        fixed = {q for q in range(n) if perm[q] == q}
+        negative = step.get("sdg", [])
+        if (any(perm[t] != q for q, t in enumerate(perm))
+                or not isinstance(negative, list)
+                or any(type(q) is not int or q not in fixed for q in negative)
+                or len(set(negative)) != len(negative)):
+            raise codes.SpecError("fold requires an involution and distinct SDG fixed points")
+        layer = [["SDG" if q in negative else "S", q] for q in sorted(fixed)]
+        layer.extend(["CZ", q, t] for q, t in enumerate(perm) if q < t)
+        out.append({"layer": layer})
+    return out
+
+
 def build(code, paired, steps):
     basis.verify_basis_receipt(code, paired)
+    steps = expand_folds(code.n, steps)
     validate(code.n, steps)
     checks = basis._code_signed_checks(code)
     group = basis._SignedStabilizerGroup(code.n, checks)

@@ -1,7 +1,7 @@
 """Search the signed Pauli orbit under supplied code actions; retain a replayable word."""
 from collections import deque
 
-from ftqc_codes import automorphisms as aut, basis, codes
+from ftqc_codes import action_domain, automorphisms as aut, basis
 from .algebra import Limit
 
 
@@ -21,7 +21,7 @@ def orbit(actions, seed, budget):
 
 
 def analyze(spec, budget):
-    code = codes.load(spec["code"])
+    code = action_domain.load(spec["code"])
     paired = spec["basis"]
     basis.verify_basis_receipt(code, paired)
     actions = spec["actions"]

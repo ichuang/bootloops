@@ -16,7 +16,7 @@ import json
 import os
 import sys
 
-from . import automorphisms, basis, certify, codes, constructions, symmetry
+from . import action_domain, automorphisms, basis, certify, codes, constructions, symmetry
 
 
 def _targets(items):
@@ -83,12 +83,12 @@ def main(argv=None):
                 print(txt)
             return 0
         if a.cmd == "action":
-            code = codes.load(a.spec)
+            code = action_domain.load(a.spec)
             if a.basis:
                 with open(a.basis) as f:
                     paired = json.load(f)
             else:
-                paired = basis.derive_paired_basis(code)
+                paired = action_domain.default_basis(code)
             with open(a.steps) as f:
                 rec = automorphisms.build(code, paired, json.load(f))
             if a.out:
@@ -148,7 +148,7 @@ def main(argv=None):
             if rec.get("schema") == automorphisms.SCHEMA:
                 if not a.code:
                     raise codes.SpecError("action verification requires --code SPEC")
-                automorphisms.verify(codes.load(a.code), rec)
+                automorphisms.verify(action_domain.load(a.code), rec)
                 print("ok   signed physical and logical action")
                 return 0
             if rec.get("schema") == constructions.RECEIPT_SCHEMA:
