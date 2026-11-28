@@ -30,7 +30,11 @@ def analyze(spec):
         raise ValueError("expected distinct ordered block names")
     from . import staged_switch
     try:
-        result = staged_switch.check(spec)
+        if spec["operation"] == "pieceable-ccz":
+            from .staged_pieceable import check
+            result = check(spec)
+        else:
+            result = staged_switch.check(spec)
     except Counterexample as failure:
         result = dict(status="counterexample", witness=failure.evidence)
     return dict(schema="ftqc_gadgets-staged-1", spec=spec,
