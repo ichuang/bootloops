@@ -1,6 +1,6 @@
 # ftqc_gadgets — GUIDE
 
-Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
 
 KIND: package (Python standard library; imports `ftqc_faults` (audit engine)
 and `ftqc_codes`). Core: `gadget.py`, `effects.py`, `props.py`, `library.py`,

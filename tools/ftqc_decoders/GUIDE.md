@@ -1,6 +1,6 @@
 # ftqc_decoders — GUIDE
 
-Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
 
 KIND: package (Python standard library for the default tier; no
 floating-point literals). Decoders: `bp_osd.py` (BP+OSD and BP+LSD),

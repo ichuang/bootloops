@@ -6,8 +6,7 @@ decoder, a schedule or a factory, answers one kind of question about it
 exactly, and writes the answer and its evidence to a JSON receipt that a
 verifier replays. Together they do not prove a threshold or an end-to-end
 logical error rate for a computation. They check pieces of such an argument
-and name every premise that is left. The packages are on the
-`ftqc_integration` branch and have no pages on bootloops.ai yet.
+and name every premise that is left.
 
 This page goes from the general to the particular: the argument the tools
 check and the conventions they share, what each tool is for, what the tools do
@@ -731,17 +730,14 @@ batch acceptance. Sampled histograms reproduce published figures but do not
 certify a noisy T source. [Injection study](ftqc_extractors/INJECTION.md) ·
 [Batch contract](ftqc_compose/GUIDE.md#simultaneous-y-source-and-ideal-consumers)
 
-## Reproduce the integration checks
+## Run all FTQC batteries
 
 ```sh
 python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute ftqc_magic
 python3 run_selftests.py ftqc_faults
 ```
 
-The second line runs the cross-engine checks of `ftqc_faults`. The research
-checkout beside BootLoops banks larger studies with replay commands under
-`studies/` (surface baselines, surgery, the in-situ bicycle factory); they are
-not part of this repository.
+The second line runs the cross-engine checks of `ftqc_faults`.
 
 CREDIT: each package's `GUIDE.md` names the papers and programs it follows,
 and bracketed keys resolve in [`REFERENCES.md`](../REFERENCES.md). Treating

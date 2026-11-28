@@ -54,7 +54,7 @@ clone differs by package:
 
 ## Package index
 
-The [FTQC tool guide](FTQC.md) explains what the eight FTQC tools on `ftqc_integration` check, what they do not, how their receipts connect, worked examples, and the [command for running all ten batteries](FTQC.md#reproduce-the-integration-checks).
+The [FTQC tool guide](FTQC.md) explains what the eight FTQC tools check, what they do not, how their receipts connect, worked examples, and the [command for running all ten batteries](FTQC.md#run-all-ftqc-batteries).
 
 | package | what it is | battery |
 |---|---|---|

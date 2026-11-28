@@ -1,6 +1,6 @@
 # ftqc_audit — GUIDE
 
-Tool page: none yet. This engine is part of [ftqc_faults](../ftqc_faults/GUIDE.md);
+This engine is part of [ftqc_faults](../ftqc_faults/GUIDE.md);
 overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
 
 KIND: engine (Python, stdlib only; imports `ftqc_codes` for the SAT leg and

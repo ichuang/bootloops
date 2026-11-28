@@ -1,6 +1,6 @@
 # ftqc_codes — GUIDE
 
-Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
 
 KIND: package (Python, standard library for the default tier). Construction
 and GF(2) algebra: `gf2.py`, `codes.py`, `interchange.py`, `constructions.py`,

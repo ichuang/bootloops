@@ -1,6 +1,6 @@
 # ftqc_extractors — GUIDE
 
-Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
 
 KIND: package (Python standard library for generation and replay; CaDiCaL
 optional for SAT evidence; Stim optional for some injection studies; a C++17

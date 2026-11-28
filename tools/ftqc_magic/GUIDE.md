@@ -1,6 +1,6 @@
 # ftqc_magic — GUIDE
 
-Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
 
 KIND: package (Python standard library for the default tier; no
 floating-point literals; optional `cadical` for live LRAT proofs and `stim`

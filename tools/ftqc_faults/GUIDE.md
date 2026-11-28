@@ -1,6 +1,6 @@
 # ftqc_faults — GUIDE
 
-Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
 
 KIND: package with two engines and a bridge. `audit/` is the location-fault
 engine ([guide](../ftqc_audit/GUIDE.md)); `zx/` is the ZX fault-equivalence

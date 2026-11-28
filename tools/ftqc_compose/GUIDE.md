@@ -1,6 +1,6 @@
 # ftqc_compose — GUIDE
 
-Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
 
 KIND: package (Python 3.10+, standard library; imports the sibling FTQC
 packages, whose receipts it re-verifies). Support families and contracts:

@@ -1,6 +1,6 @@
 # ftqc_uncompute — GUIDE
 
-Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
 
 KIND: library and CLI (`python3 -m tools.ftqc_uncompute`, or
 `python3 -m ftqc_uncompute` with `tools/` on `PYTHONPATH`), Python standard
