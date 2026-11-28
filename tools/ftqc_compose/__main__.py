@@ -33,6 +33,9 @@ def receipt(spec):
 
 
 def evaluate(spec):
+    if spec["kind"] == "installed-action":
+        from ftqc_gadgets.installed_action import analyze
+        return analyze(spec)
     if spec["kind"] == "decoded-surgery":
         from .surgery import decoded_channel
         return decoded_channel(spec)
