@@ -74,6 +74,7 @@ The `kind` field selects the study. Each has a section below.
 | `contract`, `hgp-repeat` | typed sequential and parallel joins under the accepted-diagonal-Pauli scope; the one-edge HGP measurement pair |
 | `level` | level reduction of a DAG of gadgets (Theorem 4.11), optionally with a classical output check or `distill15` |
 | `local-stochastic` | the probability bound of a checked support cover at an exact rate |
+| `syndrome-envelope` | all-order probability bound for a set of XOR syndromes under local-stochastic support noise |
 | `cone-bound`, `filter-contract`, `volume` | tail bounds over fault cones, purification-tree contracts, expected physical locations of a schedule |
 | `distilled-logical-t`, `magic-logical-t`, `addressable-magic-t` | a factory bound carried through an encoder or transfer into a logical T |
 | `magic-batch`, `magic-interleaved` | joint error laws of correlated factory outputs at their consumers |
@@ -194,6 +195,36 @@ The theorem gives an avoiding logical fault, potentially a general operation wit
 A `local-stochastic` study embeds a checked `source` study and an exact rate `p`, for example `"0.01"` or `"1/100"`. The checker regenerates the support cover and evaluates its nonnegative weight enumerator using rational arithmetic. It reports the raw sum and the probability bound capped at one. The premise bounds the joint inclusion probability for **every** subset of locations. It allows correlations. Per-site marginals alone are insufficient.
 
 Optionally provide a finite `law`, a list of objects with fields `support` and `mass`. The checker verifies normalization and every subset inequality on up to 16 physical sites, then calculates the actual covered-event probability. Without a law, the distribution condition is an explicit assumption. A family source gives an event bound. A level source with a checked logical output proof also bounds the unconditional output distance. An accepted-run contract bounds the joint probability of acceptance and harm under its input promise. A conditional error rate on accepted runs would also require an acceptance lower bound.
+
+## XOR syndrome envelopes
+
+A `syndrome-envelope` study bounds the unconditional probability that the
+observed syndrome lies in a specified set. Supply one class per group of
+distinct physical locations with the same possible XOR effects. The following
+input gives an upper bound of `1/50`. Syndrome 3 needs both sites to fault,
+and there are two ways to assign their effects.
+
+```json
+{"kind":"syndrome-envelope","bits":2,"p":"1/10",
+ "classes":[{"count":2,"effects":[1,2]}],"event":[3]}
+```
+
+Each nonzero contribution to the syndrome identifies a site and one allowed
+mask there. For a specified assignment to k distinct sites, the probability
+that all k sites fault is at most p^k by the local-stochastic premise. Summing
+these weights over assignments covers arbitrary choices of mask on faulty
+sites. A sparse table starts with weight one at syndrome zero. For each site
+it keeps the old weights and adds p times each old weight at every syndrome
+reachable by one nonzero effect. The implementation rounds each site's total
+increment upward to a multiple of 10^-48. It sums the requested entries and
+caps the resulting event bound at one. Runtime scales with the product of the
+site count, reachable syndromes (up to 2^bits), and effects per site.
+
+The caller supplies the circuit-to-mask projection and the event, including
+any decoder or acceptance predicate. A conditional-on-acceptance claim also
+requires a positive lower bound on acceptance. The Python function
+`ftqc_compose.syndrome.syndrome_envelope` exposes all per-syndrome upper
+weights for studying several predicates on the same circuit.
 
 ## Tail bounds over fault cones
 

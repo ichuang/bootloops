@@ -57,6 +57,10 @@ def evaluate(spec):
         from .stochastic import stochastic_result
 
         return stochastic_result(spec)
+    if spec["kind"] == "syndrome-envelope":
+        from .syndrome import syndrome_result
+
+        return syndrome_result(spec)
     if spec["kind"] == "cone-bound":
         from .tails import cone_bound_result
 
