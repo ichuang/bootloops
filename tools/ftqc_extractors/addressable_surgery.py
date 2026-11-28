@@ -716,6 +716,18 @@ def compare_translated_seed_vs_ordinary_surgery():
 
     # 1. Translated-seed schedule (equivariant cyclic port translation of one seed!)
     t_designs = translated_settings(lp8.n, lp8.hx, lp8.hz, 4, chosen_seed, [0, 1], 2)
+    from ftqc_codes import automorphisms as aut
+    shift = fc_symmetry.cyclic_cell_shift_perm(lp8.n, 4)
+    generator = aut.build(lp8, basis_rec, [{"perm": shift}])
+    logical = (0, orbit_cert["orbits"][0]["translates"][0]["logical_mask"], 0)
+    for design in t_designs:
+        physical = fc_basis.parse_pauli(design["targets"][0], lp8.n)
+        expected = fc_basis.parse_pauli(fc_basis.embed_logical_pauli(basis_rec, *logical), lp8.n)
+        delta = fc_basis.mul_pauli(physical, expected)
+        group = fc_basis._SignedStabilizerGroup(lp8.n, fc_basis._code_signed_checks(lp8))
+        if delta[2] % 2 or not group.contains_exact((delta[0], delta[1], delta[2] // 2)):
+            raise ValueError("translated LP instrument measures the wrong signed logical")
+        logical = aut.logical_image(generator, logical)
     t_parts = [build_surgery_design(d)["spec"] for d in t_designs]
     t_batches = []
     t_couplers = set()

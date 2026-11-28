@@ -90,6 +90,20 @@ def mapping():
         for dy in range(6):
             physical = shifted_z(dx, dy)
             orbit.setdefault(stabs.reduce(physical), (dx, dy, physical))
+    # Re-derive the entire reachable signed orbit in the factory's own basis.
+    # Keep the established (dx,dy) representative and route for each class.
+    from ftqc_codes import automorphisms as aut, basis
+    from ftqc_codes.orbit_minweight import infer_default_automorphisms
+    from .action_orbit import orbit as signed_orbit
+    paired = basis.build_basis_receipt(m, [
+        dict(name=f"q{j}", x=word(m.n, x, 0, 0), z=word(m.n, 0, z, 0))
+        for j, (x, z) in enumerate(zip(xs, zs))
+    ])
+    actions = [aut.build(m, paired, [{"perm": p}]) for p in infer_default_automorphisms(m)]
+    seed = (0, sum(dot(x, shifted_z()) << j for j, x in enumerate(xs)), 0)
+    reached = signed_orbit(actions, seed, 72)
+    if len(reached) != len(orbit):
+        raise ValueError("signed logical orbit disagrees with physical translations")
     rotations = []
     for rotation in program["rotations"]:
         i, mask = rotation["column"], rotation["parity"]
@@ -107,6 +121,12 @@ def mapping():
         ):
             raise ValueError("shift is not a BB automorphism")
         actual = sum(dot(x, physical) << j for j, x in enumerate(xs))
+        image = seed
+        for g, count in zip(actions, (dx, dy), strict=True):
+            for _ in range(count):
+                image = aut.logical_image(g, image)
+        if image != (0, actual, 0) or image not in reached:
+            raise ValueError("generator word disagrees with the installed Gross port")
         if actual != mask ^ (1 << 5) ^ extra:
             raise ValueError("native setting changes the signed port or spectators")
         rotations.append(
