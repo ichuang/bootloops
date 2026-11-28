@@ -10,7 +10,7 @@ from unittest.mock import patch
 def main():
     import numpy as np
     from autdec import code_capacity
-    sys.path.append(str(Path(__file__).resolve().parents[2]))
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
     from ftqc_codes import basis, codes, interchange
     from ftqc_decoders.dem import DecodingProblem
     from ftqc_decoders.effective_distance import run_decoder
