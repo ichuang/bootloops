@@ -453,6 +453,17 @@ def leg_m1_m4_mutant_kills() -> str:
     return f"{len(mutants)}/4 scratch-copy code mutants killed"
 
 
+def leg_surface_memory():
+    from ftqc_decoders.surface_memory import benchmark
+
+    for basis in ("X", "Z"):
+        good = benchmark(3, 2, basis)
+        bad = benchmark(3, 2, basis, bad=True)
+        assert good["single_modes"] == bad["single_modes"] == 1048
+        assert good["failed_single_modes"] == 0 < bad["failed_single_modes"]
+    return "both hook orders replayed against sector matching in X and Z"
+
+
 def run_all(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     if "--quick" in args:
@@ -461,6 +472,7 @@ def run_all(argv: list[str] | None = None) -> int:
 
     legs: list[tuple[str, Callable[[], str]]] = [
         ("L0_purity_and_lineage", leg_l0_purity_and_lineage),
+        ("surface_memory", leg_surface_memory),
         ("L1_dem_stim_and_mwpm", leg_l1_dem_stim_and_mwpm),
         ("L2_bp_osd_lsd_relay", leg_l2_bp_osd_lsd_relay),
         ("L3_uf_ssf_metachecks_sat_lrat", leg_l3_uf_ssf_metachecks_sat_lrat),

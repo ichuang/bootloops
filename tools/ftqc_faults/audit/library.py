@@ -104,17 +104,8 @@ def surface(d, rounds, basis="z", bad=False):
     z_order = Zshape if row_is_lx else Nshape            # logical Z is the other direction
     if bad:
         x_order, z_order = z_order, x_order
-    checks = []                                          # (type, {corner: data qubit})
-    for i in range(d + 1):
-        for j in range(d + 1):
-            corner = {"NW": (i - 1, j - 1), "NE": (i - 1, j), "SW": (i, j - 1), "SE": (i, j)}
-            cells = {k: r * d + c for k, (r, c) in corner.items() if 0 <= r < d and 0 <= c < d}
-            v = gf2.from_supp(cells.values())
-            if v in code.hx:
-                checks.append(("X", cells))
-            elif v in code.hz:
-                checks.append(("Z", cells))
-    assert len(checks) == len(code.hx) + len(code.hz)
+    from ftqc_codes.codes import rotated_plaquettes
+    checks = [(axis, cells) for axis, _, cells in rotated_plaquettes(d)]
     anc = {i: n + i for i in range(len(checks))}
     total = n + len(checks)
     data_prep, data_meas = ("R", "M") if basis == "z" else ("RX", "MX")
