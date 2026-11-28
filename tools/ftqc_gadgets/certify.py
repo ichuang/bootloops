@@ -30,18 +30,20 @@ def _clean(d):
 
 
 def build(gadget, checks=(), close=None, refines=(), sector=False, cap=3_000_000, analysis=None,
-          local=None, tables=True, tree=None):
+          local=None, tables=True, tree=None, coherent=(), malignant=None):
     """tree: True or dict(strict=, wmin=) adds the factory certificate of a purification tree
     (factories.certificate).
     local: True, an integer radius or {decoder: radius} adds the coordinate-locality
     certificate (props.local).  tables=False skips decoder tables (large codes; only the
     locality certificate is then available).
-    checks: [(kind, t)] or [(kind, t, sector)].  close: s or None.  refines: [(spec gadget, order, input weight)]."""
+    checks: [(kind, t)] or [(kind, t, sector)].  close: s or None.  refines: [(spec gadget, order, input weight)].
+    coherent: [(kind, t, close_s)] adds props.coherent_channel.
+    malignant: None, True, int bound, or dict(bound=, pair_slice=) adds props.malignant_pairs."""
     light = bool(tree) and isinstance(tree, dict) and tree.get("light")
     if light:
         # the factory certificate reads the circuit and its leaves only; a large tree need
         # not have every fault propagated through it
-        if checks or close is not None or refines or local:
+        if checks or close is not None or refines or local or coherent or malignant is not None:
             raise GadgetError("a light receipt carries the factory certificate only")
         an = None
     else:
@@ -71,6 +73,24 @@ def build(gadget, checks=(), close=None, refines=(), sector=False, cap=3_000_000
         opt = tree if isinstance(tree, dict) else {}
         r = factories.certificate(gadget, bool(opt.get("strict")), opt.get("wmin"), cap)
         r["lemma"] = factories.LEMMA
+        results.append(r)
+    for item in coherent:
+        kind, t = item[0], item[1]
+        cs = item[2] if len(item) > 2 else None
+        sec = item[3] if len(item) > 3 else sector
+        r = props.coherent_channel(an, kind, int(t), close_s=cs, sector=sec)
+        r["lemma"] = props.COHERENT_LEMMA
+        results.append(r)
+    if malignant is not None and malignant is not False:
+        if isinstance(malignant, dict):
+            bnd = int(malignant.get("bound", 1))
+            psl = malignant.get("pair_slice")
+            sec = malignant.get("sector", sector)
+        else:
+            bnd = 1 if malignant is True else int(malignant)
+            psl = None
+            sec = sector
+        r = props.malignant_pairs(an, bound=bnd, sector=sec, pair_slice=psl)
         results.append(r)
     stats = dict(gadget.counts(), light=True) if light else an.stats()
     return _clean(dict(schema=SCHEMA, tool="ftqc_gadgets", tool_version=VERSION,
@@ -192,6 +212,44 @@ def verify(receipt, full=False, cap=3_000_000):
                 if again != r:
                     raise Refusal(f"{tag}: the factory certificate does not recompute")
                 done.append(f"{tag}: circuit parsed again, leaf classes, detectors and minimum weights recomputed")
+            elif typ == "coherent":
+                if r.get("lemma") != props.COHERENT_LEMMA:
+                    raise Refusal(f"{tag}: coherent lemma text does not match")
+                if full or r.get("coherent"):
+                    again = _clean(props.coherent_channel(an, r["kind"], r["t"], close_s=r.get("close_s"), sector=sector))
+                    again["lemma"] = props.COHERENT_LEMMA
+                    if again != r:
+                        raise Refusal(f"{tag}: the coherent channel certificate does not recompute")
+                    done.append(f"{tag}: coherent channel and off-diagonal pairs re-enumerated")
+                else:
+                    again = _clean(props.coherent_channel(an, r["kind"], r["t"], close_s=r.get("close_s"), sector=sector))
+                    if again.get("coherent"):
+                        raise Refusal(f"{tag}: claimed failure does not reproduce")
+                    done.append(f"{tag}: failure reproduced")
+            elif typ == "malignant_pairs":
+                bnd = int(r["bound"])
+                if not r.get("t1_holds"):
+                    if v is None:
+                        raise Refusal(f"{tag}: t1 failure missing witness")
+                    sg = an.replay([(int(f[0]), f[1]) for f in v["faults"]])
+                    if an.weigher(sector).weight(an.effect(sg), bnd) is not None:
+                        raise Refusal(f"{tag}: claimed t1 witness is within bound")
+                    done.append(f"{tag}: t1 witness replayed")
+                else:
+                    fw = r.get("first_malignant_pair")
+                    ms = int(r["malignant_support_pairs"])
+                    if ms > 0:
+                        if fw is None or not props.judge_malignant_pair(an, fw, bound=bnd, sector=sector):
+                            raise Refusal(f"{tag}: first_malignant_pair is missing or not malignant")
+                        done.append(f"{tag}: malignant-pair witness replayed")
+                    elif fw is not None:
+                        raise Refusal(f"{tag}: zero malignant pairs claimed alongside a witness")
+                    if full:
+                        again = _clean(props.malignant_pairs(an, bound=bnd, sector=sector,
+                                                             pair_slice=r.get("pair_slice")))
+                        if again != r:
+                            raise Refusal(f"{tag}: malignant-pair census does not recompute")
+                        done.append(f"{tag}: malignant-pair census re-enumerated")
             else:
                 raise Refusal(f"{tag}: unknown result type")
         except (KeyError, TypeError, ValueError, IndexError) as e:
@@ -359,6 +417,18 @@ def summary(receipt):
             line = f"  close to the code space for any input, s <= {r['s']}: holds through {r['holds_through']}"
             if r.get("method"):
                 line += f" ({r['method']})"
+        elif r["type"] == "coherent":
+            status = "coherent" if r.get("coherent") else f"NOT coherent ({r.get('reason')})"
+            line = (f"  {status} ({r['kind']}, {r['weight']} weight, t <= {r['t']}"
+                    + (f", close <= {r['close_s']}" if r.get("close_s") is not None else "")
+                    + f"): {r.get('mode_pairs_checked', 0)} mode pairs checked")
+        elif r["type"] == "malignant_pairs":
+            if not r.get("t1_holds"):
+                line = f"  malignant_pairs ({r['weight']} weight, bound {r['bound']}): fails at order <= 1 ({r['violation']})"
+            else:
+                line = (f"  malignant_pairs ({r['weight']} weight, bound {r['bound']}): "
+                        f"{r['malignant_support_pairs']}/{r['total_location_pairs']} support pairs, "
+                        f"depolarizing coeff {r['depolarizing_pair_coeff']}")
         else:
             line = (f"  refines {r['spec']['name']} (input weight <= {r['input_weight']}), order <= "
                     f"{r['order']}: holds through {r['holds_through']}")

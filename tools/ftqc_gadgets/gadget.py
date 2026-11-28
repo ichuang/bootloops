@@ -126,34 +126,54 @@ class Decoder:
                  to be flipped (transversal measurement followed by classical decoding);
         X, Z     targets[p] is a qubit: a Pauli of that type is applied there as a frame."""
 
-    def __init__(self, name, checks, bits, kind, targets, rule=None):
+    def __init__(self, name, checks, bits, kind, targets, rule=None, at_tick=None):
         self.name, self.checks, self.kind = name, list(checks), kind
-        # rule: None for the lightest pattern with the observed check values, or
+        # rule: None for the lightest pattern with the observed check values,
         # dict(type="hier", sector, outer=code json, inner=code json) for hierarchical
-        # decoding of a concatenated code (ftqc_codes.hier), whose checks these must be
+        # decoding of a concatenated code (ftqc_codes.hier), dict(type="ftqc_decoders", ...),
+        # or dict(type="table", entries={syndrome_str: target_mask_int}) for an explicit
+        # lookup table.  at_tick (int or None) places a causal X/Z Pauli-frame injection
+        # at that circuit tick so later gadgets in an extended rectangle see it.
         self.rule = rule
+        self.at_tick = None if at_tick is None else int(at_tick)
         self.bits = [sorted(int(i) for i in b) for b in bits]
         self.targets = [int(t) for t in targets]
         self.npos = len(self.targets)
         if kind not in ("record", "X", "Z"):
             raise GadgetError(f"decoder {name}: unknown kind {kind!r}")
+        if self.at_tick is not None and kind not in ("X", "Z"):
+            raise GadgetError(f"decoder {name}: at_tick requires kind X or Z")
         if len(self.bits) != len(self.checks):
             raise GadgetError(f"decoder {name}: one set of measurements per check")
         for r in self.checks:
             if r >> self.npos:
                 raise GadgetError(f"decoder {name}: a check refers to a missing position")
+        if rule is not None and rule.get("type") == "table":
+            entries = rule.get("entries")
+            if not isinstance(entries, dict):
+                raise GadgetError(f"decoder {name}: table rule needs an entries dict")
+            lim = 1 << len(self.checks)
+            for k, v in entries.items():
+                sk = int(k)
+                sv = int(v)
+                if sk < 0 or sk >= lim or sv < 0 or (sv >> self.npos):
+                    raise GadgetError(f"decoder {name}: table entry out of range")
+            if int(entries.get("0", entries.get(0, 0))) != 0:
+                raise GadgetError(f"decoder {name}: noiseless syndrome 0 must map to 0")
 
     def to_json(self):
         d = dict(name=self.name, checks=[gf2.supp(r) for r in self.checks], bits=self.bits,
                  kind=self.kind, targets=self.targets)
         if self.rule is not None:
             d["rule"] = self.rule
+        if self.at_tick is not None:
+            d["at_tick"] = self.at_tick
         return d
 
     @staticmethod
     def from_json(d):
         return Decoder(d["name"], [gf2.from_supp(r) for r in d["checks"]], d["bits"],
-                       d["kind"], d["targets"], d.get("rule"))
+                       d["kind"], d["targets"], d.get("rule"), d.get("at_tick"))
 
 
 class Gadget:
@@ -177,12 +197,25 @@ class Gadget:
                     raise GadgetError(f"input block {b.name}: location {i} is not the input-error "
                                       f"idle of qubit {q}")
         nm = len(circuit.meas)
+        nticks = len(circuit.ticks)
+        last_eff_tick = 0
         for d in decoders:
             used = [i for b in d.bits for i in b] + (d.targets if d.kind == "record" else [])
             if any(i < 0 or i >= nm for i in used):
                 raise GadgetError(f"decoder {d.name} refers to a missing measurement")
             if d.kind != "record" and any(q < 0 or q >= circuit.n for q in d.targets):
                 raise GadgetError(f"decoder {d.name} refers to a missing qubit")
+            eff_tick = nticks if d.at_tick is None else d.at_tick
+            if d.at_tick is not None:
+                if d.at_tick < 0 or d.at_tick > nticks:
+                    raise GadgetError(f"decoder {d.name}: at_tick {d.at_tick} outside [0, {nticks}]")
+                for b in d.bits:
+                    for i in b:
+                        if circuit.meas[i][0] >= d.at_tick:
+                            raise GadgetError(f"decoder {d.name}: measurement {i} is not before at_tick {d.at_tick}")
+            if eff_tick < last_eff_tick:
+                raise GadgetError(f"decoder {d.name}: decoders must be ordered by non-decreasing at_tick")
+            last_eff_tick = eff_tick
 
     def shape(self):
         """What must agree for two gadgets to be comparable."""
@@ -352,22 +385,34 @@ class Builder:
         for m in masks:
             self.detector([records[p] for p in gf2.supp(m)])
 
-    def decoder(self, name, records, checks, kind="record", targets=()):
+    def decoder(self, name, records, checks, kind="record", targets=(), rule=None, at_tick=None):
         """Decoder for a transversal measurement: position p is records[p]; check i is
         the parity of the records on its support.  kind 'record' corrects the record
         itself; 'X' or 'Z' puts the decoded Pauli on targets[p]."""
         self.no_detectors()
         bits = [[records[p] for p in gf2.supp(r)] for r in checks]
         self.decoders.append((name, list(checks), bits, kind,
-                              list(records) if kind == "record" else list(targets)))
+                              list(records) if kind == "record" else list(targets), rule, at_tick))
 
-    def syndrome_decoder(self, name, bit_records, checks, kind, targets):
+    def syndrome_decoder(self, name, bit_records, checks, kind, targets, rule=None, at_tick=None):
         """Decoder fed by syndrome bits: bit_records[i] are the measurements whose
         parity is check i (rows of `checks` are masks over the positions of `targets`)."""
         if kind == "record":
             raise GadgetError("a syndrome decoder applies a Pauli frame (kind X or Z)")
         self.no_detectors()
-        self.decoders.append((name, list(checks), [list(b) for b in bit_records], kind, list(targets)))
+        self.decoders.append((name, list(checks), [list(b) for b in bit_records], kind,
+                              list(targets), rule, at_tick))
+
+    def table_decoder(self, name, bit_records, kind, targets, entries, at_tick=None):
+        """Explicit lookup-table decoder mapping packed syndrome value -> target bitmask."""
+        if kind == "record":
+            bits = [list(b) for b in bit_records]
+            self.no_detectors()
+            rule = {"type": "table", "entries": {str(int(k)): int(v) for k, v in sorted(entries.items()) if int(v)}}
+            self.decoders.append((name, [0] * len(bits), bits, kind, list(targets), rule, at_tick))
+            return
+        rule = {"type": "table", "entries": {str(int(k)): int(v) for k, v in sorted(entries.items()) if int(v)}}
+        self.syndrome_decoder(name, bit_records, [0] * len(bit_records), kind, targets, rule=rule, at_tick=at_tick)
 
     def output(self, qubits, code=None, name=None):
         self.outputs.append(Block(name or f"out{len(self.outputs)}", qubits, code))
@@ -407,7 +452,17 @@ class Builder:
             raise GadgetError(str(e)) from None
         for blk, ops in zip(self.inputs, self._in_ops):
             blk.in_locs = [loc_of[id(op)] for op in ops]
+        norm_decs = []
+        nt = len(ticks)
+        for item in self.decoders:
+            if len(item) == 5:
+                nm, chk, bits, kind, tg = item
+                rule, at_tick = None, None
+            else:
+                nm, chk, bits, kind, tg, rule, at_tick = item
+            norm_decs.append((nt if at_tick is None else int(at_tick), nm, chk, bits, kind, tg, rule, at_tick))
+        norm_decs.sort(key=lambda r: r[0])
         decs = [Decoder(nm, chk, [[meas_of[id(r)] for r in b] for b in bits], kind,
-                        [meas_of[id(t)] for t in tg] if kind == "record" else tg)
-                for nm, chk, bits, kind, tg in self.decoders]
+                        [meas_of[id(t)] for t in tg] if kind == "record" else tg, rule, at_tick)
+                for _, nm, chk, bits, kind, tg, rule, at_tick in norm_decs]
         return Gadget(circ, self.inputs, self.outputs, decs, self.body_start or 0, self.name, self.parts)

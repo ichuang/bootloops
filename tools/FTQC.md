@@ -318,9 +318,9 @@ are handled separately (see the next section but one).
 | [`ftqc_codes`](ftqc_codes/GUIDE.md) | For a CSS code given by check matrices or a named family: what are n, k, d_X, d_Z and the lightest stabilizers, how was it constructed, which logical basis is in use, and what does a physical Clifford word do to that basis? | distance intervals from seven proof legs; construction, basis and signed-action receipts |
 | [`ftqc_faults`](ftqc_faults/GUIDE.md) | In a scheduled Clifford circuit, which fault sets escape the detectors and what do they leave? Is one circuit fault-equivalent to another? | the fault model, circuit and fault distance, strict fault tolerance at low order and a location census (audit engine); fault equivalence, ZX rewrite proofs, flag decoders and stochastic gadget contracts (ZX engine) |
 | [`ftqc_extractors`](ftqc_extractors/GUIDE.md) | What logical measurement, logical T or injected state does an apparatus attached to a memory produce, and what distance does it keep? | static, phenomenological and circuit-level receipts for HGP, bivariate bicycle and general CSS memories |
-| [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) | What does a gadget with its decoder do to an arbitrary encoded input carrying incoming errors, under internal faults? | the gate and error-correction properties of Aliferis, Gottesman and Preskill at low order; refinement and composition; coordinate locality for large codes; two-level and purification-tree certificates; fault cones of whole schedules; signed surgery instruments; staged switched-T and pieceable-CCZ gates |
+| [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) | What does a gadget with its decoder do to an arbitrary encoded input carrying incoming errors, under internal faults? | the gate and error-correction properties of Aliferis, Gottesman and Preskill at low order; zero-postselection Steane gadgets, coherent channel certificates and extended-rectangle malignant-pair enumerators; refinement and composition; coordinate locality for large codes; two-level and purification-tree certificates; fault cones of whole schedules; signed surgery instruments; staged switched-T and pieceable-CCZ gates |
 | [`ftqc_decoders`](ftqc_decoders/GUIDE.md) | Does a given polynomial-time decoder correct every pattern up to radius t, and where does it fail? | exact-arithmetic decoders, radius certificates, trapping-set witnesses, logical-error enclosures (union, connected-cluster and two-sided linked-cluster), audited runs of external decoders |
-| [`ftqc_compose`](ftqc_compose/GUIDE.md) | Does one operation's output meet the next one's input requirements, and what failure probability follows under a stated noise law? | typed joins, level reduction, local-stochastic and cone tail bounds, purification-tree contracts under independent or local-stochastic noise, the closure of a two-level program, regions of several noise rates, schedule volumes, distillation-to-logical-T bounds |
+| [`ftqc_compose`](ftqc_compose/GUIDE.md) | Does one operation's output meet the next one's input requirements, and what failure probability follows under a stated noise law? | typed joins, level reduction (including `verified-gadget` discharge), multivariate extended-rectangle renormalization and threshold lower bounds, local-stochastic and cone tail bounds, purification-tree contracts under independent or local-stochastic noise, the closure of a two-level program, regions of several noise rates, schedule volumes, distillation-to-logical-T bounds |
 | [`ftqc_magic`](ftqc_magic/GUIDE.md) | What output quality, acceptance and active qubit count does a magic-state factory or cultivation pipeline have, and may its outputs be used as independent? | exact distillation algebra, recycled check schedules, Clifford-hook cultivation distances, correlation rules for multi-stage pipelines |
 | [`ftqc_uncompute`](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup in a logical reversible circuit preserve its quantum action? Is a pebbling schedule or a superposition mask valid? | exact symbolic checks of Hadamard-measure-reset (HMR) cleanup, block proofs for wide arithmetic, pebbling and mask validators, a rewrite advisor |
 
@@ -969,6 +969,26 @@ Stim, with optional BP+OSD sampling. The two-output S consumer study of
 batch acceptance. Sampled histograms reproduce published figures but do not
 certify a noisy T source. [Injection study](ftqc_extractors/INJECTION.md) ·
 [Batch contract](ftqc_compose/GUIDE.md#simultaneous-y-source-and-ideal-consumers)
+
+## Certify zero-postselection extended rectangles and renormalization contraction
+
+Flagged Goto preparation paired with four-tick parallel dual checks and causal
+table decoders gives a complete Steane Clifford set without postselection.
+`ftqc_gadgets` certifies unconditional channel simulation and enumerates
+two-location malignant pairs; `ftqc_compose` discharges Definition 4.8 in
+`level` studies and proves rational threshold lower bounds in `renormalize`
+studies:
+
+```sh
+python3 -m ftqc_gadgets analyze prep:steane,zero,goto,idles --sector --coherent prep:1:1 -o "$out/prep0.json"
+python3 -m ftqc_gadgets analyze phase_s:steane,anc=goto,idles --sector --coherent ec:1:1 -o "$out/phase_s.json"
+python3 -m ftqc_gadgets analyze exrec:steane,cnot --sector --malignant-pairs 1 -o "$out/exrec_cnot.json"
+python3 -m ftqc_gadgets verify "$out/exrec_cnot.json" --full
+python3 -m unittest ftqc_gadgets.test_exrec ftqc_compose.test_renorm
+```
+
+[Gadget guide](ftqc_gadgets/GUIDE.md#unconditional-coherent-channels-and-extended-rectangle-malignant-pairs) ·
+[Composition guide](ftqc_compose/GUIDE.md#discharged-level-reduction-and-multivariate-renormalization)
 
 ## Run all FTQC batteries
 

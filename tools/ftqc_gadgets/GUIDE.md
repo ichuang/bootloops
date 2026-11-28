@@ -487,6 +487,35 @@ or a pieceable CCZ on three Steane blocks, on every basis column with a common
 phase and through one fault. See [STAGED.md](STAGED.md) for the protocols,
 the fault model and the ideal services they assume.
 
+## Unconditional coherent channels and extended-rectangle malignant pairs
+
+`analyze SPEC --coherent KIND:T[:CLOSE_S]` checks that a zero-postselection
+Clifford gadget defines an unconditional trace-preserving channel (`detectors == 0`,
+pure Choi state when output blocks are present, `check(KIND, T)` and optional
+`close(CLOSE_S)` passing, and identical post-decoder interface effects on every
+pair of single-location Pauli modes that share classical measurement flips and
+output code syndrome). Reach for it when discharging Definition 4.8 of He,
+Nguyen and Pattison without postselection, using `prep:steane,zero,goto`,
+`prep:steane,plus,goto`, `knill:steane,anc=goto`, `steane_ec:steane,anc=goto`,
+`phase_s:steane,anc=goto` or `h:steane`. A receipt with `coherent: false` names
+the failing check, closeness witness or off-diagonal mode pair and exits 1.
+Believe it when `verify RECEIPT.json --full` re-enumerates every syndrome and
+mode pair cleanly and when bare transversal `SDG` on Steane fails `sector`
+coherence at order 1 as a negative control.
+
+`analyze SPEC --malignant-pairs [BOUND] [--pair-slice K/M]` and
+`props.exrec_malignant_pairs(code, role, ...)` compute the exact two-location
+malignant support count (`malignant_support_pairs`) and exact rational
+depolarizing pair coefficient (`depolarizing_pair_coeff`, broken down by
+operation role) for zero-postselection extended rectangles (`exrec:steane,ROLE`).
+Reach for it when feeding exact level-1 pair polynomials into `ftqc_compose`
+`renormalize`; use `cones` and `closure` instead when bounding two-level
+transversal schedules with postselected purification trees. If single-fault
+tolerance fails on clean inputs, `t1_holds` is `false` with a single-fault
+witness and the CLI exits 1. Believe it when slice sums match the unsliced run
+and agree with direct `an.replay` propagation over all location pairs on a
+reference gadget.
+
 ## License
 
 MIT License. Copyright (c) 2026 Anthropic, PBC. Created by Matthew D. Schwartz;

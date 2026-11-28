@@ -368,6 +368,30 @@ distinct locations is jointly faulty with probability at most p². The banked
 `examples/switched-t.json` gives 44431/10¹² at p = 10⁻⁶. See the
 [staged logical gate guide](../ftqc_gadgets/STAGED.md).
 
+## Discharged level reduction and multivariate renormalization
+
+In a `level` study, a vertex with `"op": "verified-gadget"` takes a
+`ftqc_gadgets-receipt-1` carrying a passing `coherent` certificate, replays its
+hash and evidence, and emits zero undischarged premises so `require_closed: true`
+returns `status: "proved"`. Reach for it when replacing an `assume-4.8`
+hypothesis by a checked zero-postselection gadget; use `contract` instead when
+working on postselected diagonal-Pauli branches.
+
+A `renormalize` study certifies all-level concatenation contraction and workload
+compilation from exact extended-rectangle malignant-pair tables under
+`"noise": "local-stochastic"` or `"noise": "depolarizing"`, coupled to recursive
+15-to-1 Reed–Muller distillation (`"scheme": "rm15-distill"`) or staged
+non-Clifford gates (`"scheme": "staged-gadget"`), with optional `ftqc_uncompute`
+HMR receipt binding under `workload.uncompute`. Reach for it when proving an
+explicit positive rational threshold lower bound (`threshold_lower`) and
+selecting a concatenation depth `chosen_level` with certified output variation
+`tv_upper <= target_eps`; use `closure` instead for fixed two-level transversal
+Clifford schedules with purification trees. When a staged non-Clifford component
+carries a positive `linear_floor_coeff`, `threshold_lower` is `"0"` and
+requesting `target_eps` below the floor returns `status: "counterexample"`.
+Believe it when `verify SPEC.json RECEIPT.json` reproduces every rational field
+and a positive linear-floor control is rejected.
+
 CREDIT: Zhiyang He, Quynh T. Nguyen and Christopher A. Pattison, *Composable
 Quantum Fault-Tolerance* (arXiv:2508.08246), §§2 and 4, Theorem 4.11,
 Propositions 4.9, 5.2 and 7.9. The cone and filter studies use the cone and

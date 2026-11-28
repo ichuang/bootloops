@@ -140,6 +140,10 @@ def evaluate(spec):
         from .level import level_result
 
         return level_result(spec)
+    if spec["kind"] == "renormalize":
+        from .renorm import renormalize_result
+
+        return renormalize_result(spec)
     if spec["kind"] == "hgp-repeat":
         from .hgp import repeated_result
 

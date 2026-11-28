@@ -131,13 +131,15 @@ def close(an, s_max, sector=False, span_cap=1 << 16):
     # a code syndrome that is linear in its check values when (as for syndrome
     # extraction) the checks are the block's own stabilizers; then the whole thing is a
     # linear function of the signature and can be tested on the input columns alone.
-    linear, units = True, []
+    linear, units = (not an.has_causal_dec), []
     for off, mask, eff in an.dec:
+        if not linear:
+            break
         if not isinstance(eff, dict):
             linear = False                     # a decoder without a plain table
             break
         width = mask.bit_length()
-        unit = [code_part(eff.get(1 << i, 0)) if (1 << i) in eff else None for i in range(width)]
+        unit = [code_part(eff.get(1 << i, 0) >> an.shift) if (1 << i) in eff else None for i in range(width)]
         if any(u is None for u in unit):
             linear = False
             break
@@ -146,7 +148,7 @@ def close(an, s_max, sector=False, span_cap=1 << 16):
             for i in range(width):
                 if (sy >> i) & 1:
                     acc = [a ^ b for a, b in zip(acc, unit[i])]
-            if tuple(acc) != code_part(e):
+            if tuple(acc) != code_part(e >> an.shift):
                 linear = False
                 break
         units.append((off, unit))
@@ -491,4 +493,598 @@ def independent_of_input(an, names=None):
                     if hit is None and sg & mask:
                         hit = [b, p, t]
         out[d.name] = dict(independent=hit is None, input_error=None if hit is None else [hit])
+    return out
+
+
+# ---------------------------------------------------------------------- coherent channels and malignant pairs
+COHERENT_LEMMA = (
+    "A Clifford gadget with zero postselected detectors defines a trace-preserving quantum "
+    "instrument whose classical outcomes select deterministic Pauli-frame corrections.  When "
+    "its noiseless Choi state on references and outputs is pure, the ideal map is unitary; when "
+    "there are no output blocks, the ideal map is a destructive measurement channel.  If check "
+    "holds through order t (and close holds through order s when output blocks carry a code), "
+    "and for every fault location any two elementary Pauli fault modes producing the same "
+    "classical measurement flips and the same output code syndrome also produce the exact same "
+    "post-decoder interface effect, then any coherent linear combination of elementary Pauli "
+    "faults at at most t locations acts on every in-filter input with residual error inside the "
+    "declared filter and zero off-diagonal logical phase discrepancy (He, Nguyen and Pattison, "
+    "Definition 4.8 and Lemma 4.14)."
+)
+
+OP_ROLE = {
+    "R": "prep_zero",
+    "RX": "prep_plus",
+    "I": "idle",
+    "H": "h",
+    "S": "s",
+    "SDG": "s",
+    "CX": "cnot",
+    "M": "measure_z",
+    "MX": "measure_x",
+}
+
+
+def coherent_channel(an, kind, t, close_s=None, sector=False):
+    """Verify unconditional (zero-postselection) channel simulation and off-diagonal coherence."""
+    g = an.g
+    if an.nd:
+        return dict(
+            type="coherent",
+            coherent=False,
+            kind=kind,
+            t=int(t),
+            weight="sector" if sector else "pauli",
+            reason=f"gadget has {an.nd} postselected detectors",
+        )
+    if g.outputs and not an.pure:
+        return dict(
+            type="coherent",
+            coherent=False,
+            kind=kind,
+            t=int(t),
+            weight="sector" if sector else "pauli",
+            reason="noiseless Choi state on references and outputs is not pure",
+        )
+    chk = check(an, kind, int(t), sector=sector)
+    cls = None
+    if close_s is not None and g.outputs:
+        cls = close(an, int(close_s), sector=sector)
+    W = an.weigher(sector=sector)
+    code_funcs = [f for b in W.blocks for tp in "XZ" for f in b["keys"][tp]] if W.blocks and all(
+        b["keys"] is not None for b in W.blocks
+    ) else []
+
+    def out_code_syn(eff_syn):
+        return tuple((eff_syn & f).bit_count() & 1 for f in code_funcs)
+
+    in_locs = {i for b in g.inputs for i in b.in_locs}
+    mode_pairs = 0
+    same_sector_pairs = 0
+    coh_violation = None
+    for loc in an.model.locations:
+        if loc.index in in_locs:
+            continue
+        items = list(loc.faults.items())
+        for (l1, ef1), (l2, ef2) in combinations(items, 2):
+            mode_pairs += 1
+            if ef1[2] == ef2[2]:
+                e1 = an.effect(an.sig(*ef1))
+                e2 = an.effect(an.sig(*ef2))
+                if e1 < 0 or e2 < 0 or out_code_syn(e1) == out_code_syn(e2):
+                    same_sector_pairs += 1
+                    if e1 != e2 and coh_violation is None:
+                        coh_violation = dict(location=loc.index, labels=[l1, l2])
+    ok = (
+        chk["holds_through"] >= int(t)
+        and (cls is None or cls["holds_through"] >= int(close_s))
+        and coh_violation is None
+    )
+    out = dict(
+        type="coherent",
+        coherent=bool(ok),
+        kind=kind,
+        t=int(t),
+        close_s=None if cls is None else int(close_s),
+        weight="sector" if sector else "pauli",
+        detectors=an.nd,
+        pure_choi=bool(an.pure),
+        holds_through=chk["holds_through"],
+        close_holds_through=None if cls is None else cls["holds_through"],
+        close_method=None if cls is None else cls["method"],
+        mode_pairs_checked=mode_pairs,
+        same_branch_same_syndrome_pairs=same_sector_pairs,
+        violation=chk["violation"] or (cls["violation"] if cls else None) or coh_violation,
+    )
+    if not ok:
+        if chk["holds_through"] < int(t):
+            out["reason"] = f"check({kind}) holds only through {chk['holds_through']} < {int(t)}"
+        elif cls is not None and cls["holds_through"] < int(close_s):
+            out["reason"] = f"close holds only through {cls['holds_through']} < {int(close_s)}"
+        else:
+            out["reason"] = "coherent Pauli modes on the same branch and syndrome differ logically"
+    return out
+
+
+def malignant_pairs(an, bound=1, sector=False, pair_slice=None):
+    """Exact 2-location malignant support and rational depolarizing pair enumerator."""
+    from fractions import Fraction
+
+    g = an.g
+    if an.nd:
+        raise GadgetError("malignant_pairs requires a zero-postselection gadget (detectors == 0)")
+    W = an.weigher(sector=sector)
+    bound = int(bound)
+    in_locs = {i for b in g.inputs for i in b.in_locs}
+    body_locs = [loc for loc in an.model.locations if loc.index not in in_locs]
+    L = len(body_locs)
+    if pair_slice is not None:
+        sk, sm = int(pair_slice[0]), int(pair_slice[1])
+        if sm < 1 or sk < 0 or sk >= sm:
+            raise GadgetError(f"invalid pair_slice {pair_slice!r}")
+    else:
+        sk, sm = 0, 1
+
+    if W.weight(an.effect(0), bound) is None:
+        return dict(
+            type="malignant_pairs",
+            t1_holds=False,
+            bound=bound,
+            weight="sector" if sector else "pauli",
+            violation=dict(faults=[]),
+        )
+
+    sig_to_id = {0: 0}
+    sigs = [0]
+    first_mode_for_loc_sig = []
+    loc_counts = []
+    loc_nmodes = []
+    loc_roles = []
+    role_loc_counts = {}
+    for loc in body_locs:
+        role = OP_ROLE.get(loc.op.name, loc.op.name.lower())
+        loc_roles.append(role)
+        role_loc_counts[role] = role_loc_counts.get(role, 0) + 1
+        cnt = {}
+        fmode = {}
+        nmodes = len(loc.faults)
+        for label, eff in sorted(loc.faults.items()):
+            s = an.sig(*eff)
+            if W.weight(an.effect(s), bound) is None:
+                return dict(
+                    type="malignant_pairs",
+                    t1_holds=False,
+                    bound=bound,
+                    weight="sector" if sector else "pauli",
+                    violation=dict(faults=[[loc.index, label]]),
+                )
+            uid = sig_to_id.get(s)
+            if uid is None:
+                uid = len(sigs)
+                sig_to_id[s] = uid
+                sigs.append(s)
+            cnt[uid] = cnt.get(uid, 0) + 1
+            fmode.setdefault(uid, label)
+        loc_counts.append(cnt)
+        loc_nmodes.append(nmodes)
+        first_mode_for_loc_sig.append(fmode)
+
+    U = len(sigs)
+    bad_mask = [0] * U
+    for u in range(U):
+        su = sigs[u]
+        for v in range(u + 1, U):
+            if W.weight(an.effect(su ^ sigs[v]), bound) is None:
+                bad_mask[u] |= 1 << v
+                bad_mask[v] |= 1 << u
+
+    loc_sig_mask = [sum(1 << uid for uid in cnt) for cnt in loc_counts]
+    bad_for_loc = []
+    for cnt in loc_counts:
+        bm = 0
+        for uid in cnt:
+            bm |= bad_mask[uid]
+        bad_for_loc.append(bm)
+
+    total_pairs = 0
+    malignant_supp = 0
+    supp_by_role = {}
+    first_witness = None
+
+    for i in range(sk, L, sm):
+        bi = bad_for_loc[i]
+        ri = loc_roles[i]
+        total_pairs += L - 1 - i
+        if not bi:
+            continue
+        for j in range(i + 1, L):
+            overlap = bi & loc_sig_mask[j]
+            if overlap:
+                malignant_supp += 1
+                rj = loc_roles[j]
+                rkey = f"{ri},{rj}" if ri <= rj else f"{rj},{ri}"
+                supp_by_role[rkey] = supp_by_role.get(rkey, 0) + 1
+                if first_witness is None:
+                    vj = (overlap & -overlap).bit_length() - 1
+                    ui = next(u for u in loc_counts[i] if (bad_mask[u] >> vj) & 1)
+                    first_witness = [
+                        [body_locs[i].index, first_mode_for_loc_sig[i][ui]],
+                        [body_locs[j].index, first_mode_for_loc_sig[j][vj]],
+                    ]
+
+    dep_by_role = {}
+    if sm == 1:
+        roles_sorted = sorted(role_loc_counts)
+        W_role = {r: [Fraction(0)] * U for r in roles_sorted}
+        diag_role = {r: Fraction(0) for r in roles_sorted}
+        for i in range(L):
+            r = loc_roles[i]
+            nm = loc_nmodes[i]
+            cnt = loc_counts[i]
+            wr = W_role[r]
+            for u, mu in cnt.items():
+                wr[u] += Fraction(mu, nm)
+            d_sum = 0
+            for u, mu in cnt.items():
+                bu = bad_mask[u]
+                if not bu:
+                    continue
+                for v, mv in cnt.items():
+                    if (bu >> v) & 1:
+                        d_sum += mu * mv
+            if d_sum:
+                diag_role[r] += Fraction(d_sum, nm * nm)
+        dep_total = Fraction(0)
+        for ia, ra in enumerate(roles_sorted):
+            wa = W_role[ra]
+            quad_aa = Fraction(0)
+            for u in range(U):
+                if not wa[u] or not bad_mask[u]:
+                    continue
+                bu = bad_mask[u]
+                s_v = Fraction(0)
+                for v in range(U):
+                    if (bu >> v) & 1 and wa[v]:
+                        s_v += wa[v]
+                quad_aa += wa[u] * s_v
+            val_aa = (quad_aa - diag_role[ra]) / 2
+            if val_aa:
+                dep_by_role[f"{ra},{ra}"] = str(val_aa)
+                dep_total += val_aa
+            for rb in roles_sorted[ia + 1:]:
+                wb = W_role[rb]
+                quad_ab = Fraction(0)
+                for u in range(U):
+                    if not wa[u] or not bad_mask[u]:
+                        continue
+                    bu = bad_mask[u]
+                    s_v = Fraction(0)
+                    for v in range(U):
+                        if (bu >> v) & 1 and wb[v]:
+                            s_v += wb[v]
+                    quad_ab += wa[u] * s_v
+                if quad_ab:
+                    dep_by_role[f"{ra},{rb}"] = str(quad_ab)
+                    dep_total += quad_ab
+    else:
+        dep_total = Fraction(0)
+        for i in range(sk, L, sm):
+            bi = bad_for_loc[i]
+            if not bi:
+                continue
+            ri = loc_roles[i]
+            nmi = loc_nmodes[i]
+            cnti = loc_counts[i]
+            for j in range(i + 1, L):
+                if not (bi & loc_sig_mask[j]):
+                    continue
+                rj = loc_roles[j]
+                nmj = loc_nmodes[j]
+                cntj = loc_counts[j]
+                bij = 0
+                for u, mu in cnti.items():
+                    bu = bad_mask[u]
+                    if not bu:
+                        continue
+                    for v, mv in cntj.items():
+                        if (bu >> v) & 1:
+                            bij += mu * mv
+                term = Fraction(bij, nmi * nmj)
+                dep_total += term
+                rkey = f"{ri},{rj}" if ri <= rj else f"{rj},{ri}"
+                dep_by_role[rkey] = dep_by_role.get(rkey, Fraction(0)) + term
+        dep_by_role = {k: str(v) for k, v in sorted(dep_by_role.items()) if v}
+
+    out = dict(
+        type="malignant_pairs",
+        t1_holds=True,
+        bound=bound,
+        weight="sector" if sector else "pauli",
+        fault_locations=L,
+        distinct_signatures=U,
+        role_locations=dict(sorted(role_loc_counts.items())),
+        total_location_pairs=total_pairs,
+        malignant_support_pairs=malignant_supp,
+        support_pairs_by_role=dict(sorted(supp_by_role.items())),
+        depolarizing_pair_coeff=str(dep_total),
+        depolarizing_pairs_by_role=dict(sorted(dep_by_role.items())),
+        first_malignant_pair=first_witness,
+    )
+    if pair_slice is not None:
+        out["pair_slice"] = [sk, sm]
+    return out
+
+
+def judge_malignant_pair(an, witness, bound=1, sector=False):
+    """Re-evaluate a claimed 2-location malignant pair [(i, lab_i), (j, lab_j)] by direct replay."""
+    if len(witness) != 2 or witness[0][0] == witness[1][0]:
+        return False
+    sg = an.replay([(int(f[0]), f[1]) for f in witness])
+    if sg & an.DET:
+        return False
+    return an.weigher(sector=sector).weight(an.effect(sg), int(bound)) is None
+
+
+def exrec_malignant_pairs(code, role, ec="knill", anc="goto", bound=1, sector=True, pair_slice=None):
+    """Exact union malignant-pair census across all outgoing-wire truncations T of ExRec(role)."""
+    from fractions import Fraction
+    from . import library
+    from .effects import Analysis
+
+    truncs_for_role = {
+        "prep_zero": [(), (0,)],
+        "prep_plus": [(), (0,)],
+        "idle": [(), (0,)],
+        "h": [(), (0,)],
+        "s": [(), (0,)],
+        "cnot": [(), (0,), (1,), (0, 1)],
+        "measure_z": [()],
+        "measure_x": [()],
+    }
+    if role not in truncs_for_role:
+        raise GadgetError(f"unknown exrec role {role!r}")
+    trunc_list = truncs_for_role[role]
+    analyses = []
+    weighers = []
+    loc_maps = []
+    for tr in trunc_list:
+        gt = library.exrec(code, role, ec=ec, anc=anc, trunc=tr, idles=True)
+        ant = Analysis(gt)
+        if ant.nd:
+            raise GadgetError("exrec_malignant_pairs requires zero-postselection gadgets")
+        wt = ant.weigher(sector=sector)
+        in_set = {i for b in gt.inputs for i in b.in_locs}
+        lmap = {(loc.tick, loc.op.name, loc.op.qs): loc for loc in ant.model.locations if loc.index not in in_set}
+        analyses.append(ant)
+        weighers.append(wt)
+        loc_maps.append(lmap)
+
+    an0 = analyses[0]
+    in0 = {i for b in an0.g.inputs for i in b.in_locs}
+    body_locs = [loc for loc in an0.model.locations if loc.index not in in0]
+    L = len(body_locs)
+    bound = int(bound)
+    if pair_slice is not None:
+        sk, sm = int(pair_slice[0]), int(pair_slice[1])
+        if sm < 1 or sk < 0 or sk >= sm:
+            raise GadgetError(f"invalid pair_slice {pair_slice!r}")
+    else:
+        sk, sm = 0, 1
+
+    # Verify every truncation subset T <= Out(role) maps into ExRec_empty(role) and satisfies t=1.
+    for t_idx, (tr, ant, wt, lmap) in enumerate(zip(trunc_list, analyses, weighers, loc_maps)):
+        if not set(lmap) <= {(loc.tick, loc.op.name, loc.op.qs) for loc in body_locs}:
+            raise GadgetError(f"truncation {tr} contains locations outside full ExRec({role})")
+        if wt.weight(ant.effect(0), bound) is None:
+            return dict(type="exrec_malignant_pairs", role=role, t1_holds=False,
+                        truncation=list(tr), violation=dict(faults=[]))
+
+    zero_tup = (0,) * len(trunc_list)
+    sig_to_id = {zero_tup: 0}
+    sigs = [zero_tup]
+    first_mode_for_loc_sig = []
+    loc_counts = []
+    loc_nmodes = []
+    loc_roles = []
+    role_loc_counts = {}
+
+    for loc in body_locs:
+        key = (loc.tick, loc.op.name, loc.op.qs)
+        rname = OP_ROLE.get(loc.op.name, loc.op.name.lower())
+        loc_roles.append(rname)
+        role_loc_counts[rname] = role_loc_counts.get(rname, 0) + 1
+        cnt = {}
+        fmode = {}
+        nmodes = len(loc.faults)
+        for label in sorted(loc.faults):
+            tup = []
+            for tr, ant, wt, lmap in zip(trunc_list, analyses, weighers, loc_maps):
+                tloc = lmap.get(key)
+                if tloc is None:
+                    tup.append(0)
+                else:
+                    s_val = ant.sig(*tloc.faults[label])
+                    if wt.weight(ant.effect(s_val), bound) is None:
+                        return dict(
+                            type="exrec_malignant_pairs",
+                            role=role,
+                            t1_holds=False,
+                            truncation=list(tr),
+                            violation=dict(faults=[[tloc.index, label]]),
+                        )
+                    tup.append(s_val)
+            tup = tuple(tup)
+            uid = sig_to_id.get(tup)
+            if uid is None:
+                uid = len(sigs)
+                sig_to_id[tup] = uid
+                sigs.append(tup)
+            cnt[uid] = cnt.get(uid, 0) + 1
+            fmode.setdefault(uid, label)
+        loc_counts.append(cnt)
+        loc_nmodes.append(nmodes)
+        first_mode_for_loc_sig.append(fmode)
+
+    U = len(sigs)
+    bad_mask = [0] * U
+    n_trunc = len(trunc_list)
+    for u in range(U):
+        tu = sigs[u]
+        for v in range(u + 1, U):
+            tv = sigs[v]
+            is_bad = False
+            for k in range(n_trunc):
+                if weighers[k].weight(analyses[k].effect(tu[k] ^ tv[k]), bound) is None:
+                    is_bad = True
+                    break
+            if is_bad:
+                bad_mask[u] |= 1 << v
+                bad_mask[v] |= 1 << u
+
+    loc_sig_mask = [sum(1 << uid for uid in cnt) for cnt in loc_counts]
+    bad_for_loc = []
+    for cnt in loc_counts:
+        bm = 0
+        for uid in cnt:
+            bm |= bad_mask[uid]
+        bad_for_loc.append(bm)
+
+    total_pairs = 0
+    malignant_supp = 0
+    supp_by_role = {}
+    first_witness = None
+    first_witness_trunc = None
+
+    for i in range(sk, L, sm):
+        bi = bad_for_loc[i]
+        ri = loc_roles[i]
+        total_pairs += L - 1 - i
+        if not bi:
+            continue
+        for j in range(i + 1, L):
+            overlap = bi & loc_sig_mask[j]
+            if overlap:
+                malignant_supp += 1
+                rj = loc_roles[j]
+                rkey = f"{ri},{rj}" if ri <= rj else f"{rj},{ri}"
+                supp_by_role[rkey] = supp_by_role.get(rkey, 0) + 1
+                if first_witness is None:
+                    vj = (overlap & -overlap).bit_length() - 1
+                    ui = next(u for u in loc_counts[i] if (bad_mask[u] >> vj) & 1)
+                    tu, tv = sigs[ui], sigs[vj]
+                    win_k = next(k for k in range(n_trunc)
+                                 if weighers[k].weight(analyses[k].effect(tu[k] ^ tv[k]), bound) is None)
+                    ki = (body_locs[i].tick, body_locs[i].op.name, body_locs[i].op.qs)
+                    kj = (body_locs[j].tick, body_locs[j].op.name, body_locs[j].op.qs)
+                    first_witness = [
+                        [loc_maps[win_k][ki].index, first_mode_for_loc_sig[i][ui]],
+                        [loc_maps[win_k][kj].index, first_mode_for_loc_sig[j][vj]],
+                    ]
+                    first_witness_trunc = list(trunc_list[win_k])
+
+    dep_by_role = {}
+    if sm == 1:
+        roles_sorted = sorted(role_loc_counts)
+        W_role = {r: [Fraction(0)] * U for r in roles_sorted}
+        diag_role = {r: Fraction(0) for r in roles_sorted}
+        for i in range(L):
+            r = loc_roles[i]
+            nm = loc_nmodes[i]
+            cnt = loc_counts[i]
+            wr = W_role[r]
+            for u, mu in cnt.items():
+                wr[u] += Fraction(mu, nm)
+            d_sum = 0
+            for u, mu in cnt.items():
+                bu = bad_mask[u]
+                if not bu:
+                    continue
+                for v, mv in cnt.items():
+                    if (bu >> v) & 1:
+                        d_sum += mu * mv
+            if d_sum:
+                diag_role[r] += Fraction(d_sum, nm * nm)
+        dep_total = Fraction(0)
+        for ia, ra in enumerate(roles_sorted):
+            wa = W_role[ra]
+            quad_aa = Fraction(0)
+            for u in range(U):
+                if not wa[u] or not bad_mask[u]:
+                    continue
+                bu = bad_mask[u]
+                s_v = Fraction(0)
+                for v in range(U):
+                    if (bu >> v) & 1 and wa[v]:
+                        s_v += wa[v]
+                quad_aa += wa[u] * s_v
+            val_aa = (quad_aa - diag_role[ra]) / 2
+            if val_aa:
+                dep_by_role[f"{ra},{ra}"] = str(val_aa)
+                dep_total += val_aa
+            for rb in roles_sorted[ia + 1:]:
+                wb = W_role[rb]
+                quad_ab = Fraction(0)
+                for u in range(U):
+                    if not wa[u] or not bad_mask[u]:
+                        continue
+                    bu = bad_mask[u]
+                    s_v = Fraction(0)
+                    for v in range(U):
+                        if (bu >> v) & 1 and wb[v]:
+                            s_v += wb[v]
+                    quad_ab += wa[u] * s_v
+                if quad_ab:
+                    dep_by_role[f"{ra},{rb}"] = str(quad_ab)
+                    dep_total += quad_ab
+    else:
+        dep_total = Fraction(0)
+        for i in range(sk, L, sm):
+            bi = bad_for_loc[i]
+            if not bi:
+                continue
+            ri = loc_roles[i]
+            nmi = loc_nmodes[i]
+            cnti = loc_counts[i]
+            for j in range(i + 1, L):
+                if not (bi & loc_sig_mask[j]):
+                    continue
+                rj = loc_roles[j]
+                nmj = loc_nmodes[j]
+                cntj = loc_counts[j]
+                bij = 0
+                for u, mu in cnti.items():
+                    bu = bad_mask[u]
+                    if not bu:
+                        continue
+                    for v, mv in cntj.items():
+                        if (bu >> v) & 1:
+                            bij += mu * mv
+                term = Fraction(bij, nmi * nmj)
+                dep_total += term
+                rkey = f"{ri},{rj}" if ri <= rj else f"{rj},{ri}"
+                dep_by_role[rkey] = dep_by_role.get(rkey, Fraction(0)) + term
+        dep_by_role = {k: str(v) for k, v in sorted(dep_by_role.items()) if v}
+
+    out = dict(
+        type="exrec_malignant_pairs",
+        role=role,
+        ec=ec,
+        anc=anc,
+        truncations=[list(t) for t in trunc_list],
+        t1_holds=True,
+        bound=bound,
+        weight="sector" if sector else "pauli",
+        qubits=an0.g.circuit.n,
+        fault_locations=L,
+        distinct_tuple_signatures=U,
+        role_locations=dict(sorted(role_loc_counts.items())),
+        total_location_pairs=total_pairs,
+        malignant_support_pairs=malignant_supp,
+        support_pairs_by_role=dict(sorted(supp_by_role.items())),
+        depolarizing_pair_coeff=str(dep_total),
+        depolarizing_pairs_by_role=dict(sorted(dep_by_role.items())),
+        first_malignant_pair=first_witness,
+        first_malignant_truncation=first_witness_trunc,
+    )
+    if pair_slice is not None:
+        out["pair_slice"] = [sk, sm]
     return out

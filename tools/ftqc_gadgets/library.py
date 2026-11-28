@@ -4,6 +4,9 @@ Gadget specs (CODE is a ftqc_codes spec without commas, e.g. steane, golay, or r
 
   prep:CODE,STATE[,METHOD]     STATE zero | plus.  METHOD:
                                  raw        information-set preparation, not fault tolerant
+                                 goto       zero-postselection flagged Goto preparation with
+                                            4-tick parallel dual checks and conditional hook
+                                            table decoder (Steane [[7,1,3]])
                                  tree=SEQ   2^len(SEQ) raw copies purified pairwise; SEQ is a
                                             word in X and Z (X: CX kept->checked, measure the
                                             checked copy in Z; Z: CX checked->kept, measure in X)
@@ -12,6 +15,8 @@ Gadget specs (CODE is a ftqc_codes spec without commas, e.g. steane, golay, or r
                                `,rounds=K` adds K ticks of idles after every raw preparation
   cnot:CODE[,leaky]            transversal CX between two input blocks; `leaky` adds a pair
                                of cancelling CX inside the control block (negative control)
+  h:CODE                       transversal H on an input block
+  phase_s:steane[,anc=goto]    zero-postselection cross-sector-compensated logical S on Steane
   idle:CODE                    one noisy wire per qubit on an input block
   knill:CODE[,anc=METHOD]      teleportation error correction: |+_L>,|0_L> ancillas by METHOD,
                                CX to make the encoded Bell pair, Bell measurement of the input
@@ -21,6 +26,10 @@ Gadget specs (CODE is a ftqc_codes spec without commas, e.g. steane, golay, or r
                                Pauli-frame decoders on the data block
   measure:CODE[,x|z]           destructive transversal measurement with a record decoder (no
                                output block: correct means the decoded outcome is right)
+  exrec:CODE,ROLE[,ec=knill|steane_ec][,anc=METHOD][,trunc=0|1|0+1]
+                               extended rectangle (leading ECs + role gadget + un-truncated
+                               trailing ECs) for ROLE in prep_zero, prep_plus, idle, h, s,
+                               cnot, measure_z, measure_x
   seq_syndrome:CODE            the Z checks measured one after another, each with one bare
                                ancilla, and a Pauli-frame decoder for X errors (negative
                                control: an X fault between two checks is miscorrected)
@@ -50,10 +59,173 @@ def code_of(spec):
 
 
 # ---------------------------------------------------------------------- fragments
+_GOTO_CACHE = {}
+
+
+def _konig_color_4(edges):
+    n_edges = len(edges)
+    colors = [-1] * n_edges
+    used_u, used_v = {}, {}
+
+    def dfs(idx):
+        if idx == n_edges:
+            return True
+        u, v = edges[idx]
+        for c in range(4):
+            if not used_u.get((u, c), False) and not used_v.get((v, c), False):
+                colors[idx] = c
+                used_u[(u, c)] = used_v[(v, c)] = True
+                if dfs(idx + 1):
+                    return True
+                used_u[(u, c)] = used_v[(v, c)] = False
+        return False
+
+    if not dfs(0):
+        raise GadgetError("bipartite 4-coloring of Steane checks failed")
+    layers = [[] for _ in range(4)]
+    for (u, v), c in zip(edges, colors):
+        layers[c].append((u, v))
+    return layers
+
+
+def _min_coset_rep(mask, stab_rows, n=7):
+    space = [0]
+    for r in stab_rows:
+        space += [x ^ r for x in space]
+    best = (n + 1, mask)
+    for s in space:
+        c = mask ^ s
+        cand = (c.bit_count(), c)
+        if cand < best:
+            best = cand
+    return best[1]
+
+
+def _goto_steane_spec(code, state):
+    from itertools import permutations
+    from ftqc_faults.audit.model import Model
+    from ftqc_faults.zx import make_steane_7_1_3
+    from ftqc_faults.zx.synthesize import synth_steane_goto_prep
+
+    key = (code.n, tuple(code.hx), tuple(code.hz), state)
+    cached = _GOTO_CACHE.get(key)
+    if cached is not None:
+        return cached
+    if code.n != 7 or len(code.hx) != 3 or len(code.hz) != 3:
+        raise GadgetError("method 'goto' requires the [[7,1,3]] Steane code")
+    zxcode = make_steane_7_1_3()
+    want = gf2.Echelon(code.hx)
+    perm = None
+    for cand in permutations(range(7)):
+        mapped = [sum(1 << cand[q] for q in range(7) if (r >> q) & 1) for r in zxcode.hx_rows]
+        if all(v in want for v in mapped) and gf2.rank(mapped) == 3:
+            perm = cand
+            break
+    if perm is None:
+        raise GadgetError("code is not coordinate-isomorphic to Steane [[7,1,3]]")
+
+    def map_q(q):
+        return perm[q] if q < 7 else 7
+
+    goto = synth_steane_goto_prep()
+    prep_ops = []
+    cx_pairs = []
+    meas_info = None
+    for op in goto.ops:
+        if op.kind in ("PREP_0", "PREP_PLUS"):
+            mq = map_q(op.qubits[0])
+            nm = (("R" if op.kind == "PREP_0" else "RX") if state == "zero"
+                  else ("RX" if op.kind == "PREP_0" else "R"))
+            prep_ops.append((nm, mq))
+        elif op.kind == "CX":
+            c, t = map_q(op.qubits[0]), map_q(op.qubits[1])
+            if state == "plus":
+                c, t = t, c
+            cx_pairs.append((c, t))
+        elif op.kind == "MEAS_Z":
+            meas_info = ("M" if state == "zero" else "MX", map_q(op.qubits[0]))
+    ticks_cx, last_t = [], {}
+    for c, t in cx_pairs:
+        earliest = max(last_t.get(c, -1), last_t.get(t, -1)) + 1
+        while len(ticks_cx) <= earliest:
+            ticks_cx.append([])
+        ticks_cx[earliest].append((c, t))
+        last_t[c] = last_t[t] = earliest
+
+    rows_dual = list(code.hz) if state == "zero" else list(code.hx)
+    rows_same = list(code.hx) if state == "zero" else list(code.hz)
+    check_layers = _konig_color_4([(p, a_idx) for a_idx, r in enumerate(rows_dual) for p in gf2.supp(r)])
+
+    # Probe the 8-qubit Goto core to extract the exact conditional hook table on flag==1.
+    pb = Builder(f"probe_goto_{state}")
+    pb.no_detectors()
+    pqs = pb.alloc(8)
+    pb.tick([(nm, pqs[mq]) for nm, mq in prep_ops])
+    for layer in ticks_cx:
+        pb.tick([("CX", pqs[c], pqs[t]) for c, t in layer])
+    pb.tick([(meas_info[0], pqs[meas_info[1]])])
+    pb.output(pqs[:7], code, "out")
+    pg = pb.build(idles=True)
+    pm = Model(pg.circuit)
+    htab = {0: 0}
+    for loc in pm.locations:
+        for _lbl, (fx, fz, ff) in loc.faults.items():
+            if not (ff & 1):
+                continue
+            src = fx if state == "zero" else fz
+            raw_err = sum((1 << p) for p, q in enumerate(pqs[:7]) if (src >> q) & 1)
+            crep = _min_coset_rep(raw_err, rows_same, 7)
+            syn = sum(((crep & r).bit_count() & 1) << i for i, r in enumerate(rows_dual))
+            if syn in htab and htab[syn] != crep:
+                raise GadgetError(f"Goto hook table collision at syndrome {syn}")
+            htab[syn] = crep
+    for q in range(7):
+        syn = sum((((1 << q) & r).bit_count() & 1) << i for i, r in enumerate(rows_dual))
+        htab.setdefault(syn, 1 << q)
+
+    spec = (prep_ops, ticks_cx, meas_info, check_layers, htab)
+    _GOTO_CACHE[key] = spec
+    return spec
+
+
+def _emit_goto_prep_raw(b, code, state):
+    if state not in ("zero", "plus"):
+        raise GadgetError(f"unknown state {state!r} (zero or plus)")
+    prep_ops, ticks_cx, meas_info, check_layers, htab = _goto_steane_spec(code, state)
+    qs = b.alloc(8)
+    b.tick([(nm, qs[mq]) for nm, mq in prep_ops])
+    for layer in ticks_cx:
+        b.tick([("CX", qs[c], qs[t]) for c, t in layer])
+    flag_rec = b.tick([(meas_info[0], qs[meas_info[1]])])[0]
+    data_qs = qs[:7]
+    ancs = b.alloc(3)
+    b.tick([("R" if state == "zero" else "RX", a) for a in ancs])
+    for layer in check_layers:
+        if state == "zero":
+            b.tick([("CX", data_qs[p], ancs[a_idx]) for p, a_idx in layer])
+        else:
+            b.tick([("CX", ancs[a_idx], data_qs[p]) for p, a_idx in layer])
+    syn_recs = b.tick([("M" if state == "zero" else "MX", a) for a in ancs])
+    return data_qs, flag_rec, syn_recs, htab
+
+
 def frag_prep(b, code, state, method="raw", rounds=0):
     """Emit a preparation of |0_L> or |+_L> at the builder's cursor; returns its qubits.
     rounds: noisy idle ticks on every qubit after each raw preparation (one level up, an
     idle is an inner error correction: a raw outer preparation ends with such rounds)."""
+    if method == "goto":
+        if rounds:
+            raise GadgetError("rounds is for raw outer preparations, not goto")
+        b.no_detectors()
+        data_qs, flag_rec, syn_recs, htab = _emit_goto_prep_raw(b, code, state)
+        kind_main = "X" if state == "zero" else "Z"
+        entries = {(1 | (s << 1)): htab[s] for s in range(8) if htab[s]}
+        tag = len(b.decoders)
+        b.table_decoder(f"goto_hook_{kind_main.lower()}_{tag}",
+                        [[flag_rec], [syn_recs[0]], [syn_recs[1]], [syn_recs[2]]],
+                        kind_main, data_qs, entries, at_tick=b.cursor)
+        b.parts.append(dict(role=state, code=code.name, method=method))
+        return data_qs
     qs = b.alloc(code.n)
     if method == "raw":
         b.layers(prep_layers(code, state, qs))
@@ -181,7 +353,7 @@ def steane_ec(code, anc="raw", ideal=False, idles=False, rounds=1):
     return b.build(idles)
 
 
-def measure(code, basis="Z"):
+def measure(code, basis="Z", idles=False):
     """Destructive transversal measurement of an input block, decoded.  No output block:
     the effect is zero exactly when the decoded logical outcomes are the right ones."""
     code = code_of(code)
@@ -193,7 +365,191 @@ def measure(code, basis="Z"):
     b.no_detectors()
     recs = b.measure(A, basis)
     b.decoder("outcomes", recs, code.hz if basis == "Z" else code.hx, "record")
-    return b.build()
+    return b.build(idles)
+
+
+def h_gate(code, ideal=False, idles=False):
+    code = code_of(code)
+    b = Builder(f"h({code.name}" + (",ideal" if ideal else "") + ")", ideal)
+    A = b.input(code, "data")
+    b.no_detectors()
+    b.tick([("H", q) for q in A])
+    if ideal:
+        b.wires(A)
+    b.output(A, code, "data")
+    return b.build(idles)
+
+
+def frag_phase_s(b, code, A, anc="goto", causal=False):
+    if anc != "goto":
+        raise GadgetError("phase_s requires anc='goto' on Steane [[7,1,3]]")
+    lead_hx, lead_hz = {0: 0}, {0: 0}
+    for q in range(7):
+        shx = sum((((1 << q) & r).bit_count() & 1) << i for i, r in enumerate(code.hx))
+        shz = sum((((1 << q) & r).bit_count() & 1) << i for i, r in enumerate(code.hz))
+        lead_hx[shx] = 1 << q
+        lead_hz[shz] = 1 << q
+
+    def syn_hx(mask):
+        return sum((((mask & r).bit_count() & 1) << i) for i, r in enumerate(code.hx))
+
+    def syn_hz(mask):
+        return sum((((mask & r).bit_count() & 1) << i) for i, r in enumerate(code.hz))
+
+    (B1, fp1, sp1, htab_p1), (C1, fz1, sz1, htab_z1), (B2, fp2, sp2, htab_p2) = b.par(
+        lambda: _emit_goto_prep_raw(b, code, "plus"),
+        lambda: _emit_goto_prep_raw(b, code, "zero"),
+        lambda: _emit_goto_prep_raw(b, code, "plus"),
+    )
+    b.tick([("CX", a, x) for a, x in zip(A, B1)])
+    rz1 = b.measure(B1, "Z", extra=[("I", q) for q in A + C1 + B2])
+    b.tick([("CX", x, a) for x, a in zip(C1, A)])
+    rx1 = b.measure(C1, "X", extra=[("SDG", q) for q in A] + [("I", q) for q in B2])
+    b.tick([("CX", a, x) for a, x in zip(A, B2)])
+    rz2 = b.measure(B2, "Z", extra=[("I", q) for q in A])
+
+    hz1_bits = [[rz1[p] for p in gf2.supp(r)] for r in code.hz]
+    hx1_bits = [[rx1[p] for p in gf2.supp(r)] for r in code.hx]
+    hz2_bits = [[rz2[p] for p in gf2.supp(r)] for r in code.hz]
+    at = b.cursor if causal else None
+    pfx = f"s{len(b.decoders)}_"
+
+    tab_x = {}
+    for val in range(128):
+        xh = htab_z1[(val >> 1) & 7] if (val & 1) else 0
+        tab_x[val] = xh ^ lead_hz[((val >> 4) & 7) ^ syn_hz(xh)]
+    b.table_decoder(pfx + "x_post_sdg",
+                    [[fz1], [sz1[0]], [sz1[1]], [sz1[2]], hz2_bits[0], hz2_bits[1], hz2_bits[2]],
+                    "X", A, tab_x, at_tick=at)
+
+    tab_z1 = {}
+    for val in range(128):
+        zp = htab_p1[(val >> 1) & 7] if (val & 1) else 0
+        tab_z1[val] = zp ^ lead_hx[((val >> 4) & 7) ^ syn_hx(zp)]
+    b.table_decoder(pfx + "z_pre_sdg",
+                    [[fp1], [sp1[0]], [sp1[1]], [sp1[2]], hx1_bits[0], hx1_bits[1], hx1_bits[2]],
+                    "Z", A, tab_z1, at_tick=at)
+
+    tab_b2h = {(1 | (s << 1)): htab_p2[s] for s in range(8) if htab_p2[s]}
+    b.table_decoder(pfx + "b2_hook_z", [[fp2], [sp2[0]], [sp2[1]], [sp2[2]]],
+                    "Z", A, tab_b2h, at_tick=at)
+
+    tab_xz = {}
+    for val in range(1 << 13):
+        fz_b = val & 1
+        sz_v = (val >> 1) & 7
+        hz1_v = (val >> 4) & 7
+        hx1_v = (val >> 7) & 7
+        hz2_v = (val >> 10) & 7
+        if fz_b:
+            tab_xz[val] = htab_z1[sz_v]
+        elif hz1_v or hx1_v:
+            tab_xz[val] = lead_hz[hz2_v]
+    b.table_decoder(pfx + "z_from_x_across_sdg",
+                    [[fz1], [sz1[0]], [sz1[1]], [sz1[2]],
+                     hz1_bits[0], hz1_bits[1], hz1_bits[2],
+                     hx1_bits[0], hx1_bits[1], hx1_bits[2],
+                     hz2_bits[0], hz2_bits[1], hz2_bits[2]],
+                    "Z", A, tab_xz, at_tick=at)
+    return A
+
+
+def phase_s(code, anc="goto", ideal=False, idles=False):
+    code = code_of(code)
+    if ideal:
+        b = Builder(f"phase_s({code.name},ideal)", True)
+        A = b.input(code, "data")
+        b.no_detectors()
+        b.tick([("SDG", q) for q in A])
+        b.wires(A)
+        b.output(A, code, "data")
+        return b.build(idles)
+    b = Builder(f"phase_s({code.name},anc={anc})")
+    A = b.input(code, "data")
+    b.no_detectors()
+    frag_phase_s(b, code, A, anc=anc, causal=False)
+    b.output(A, code, "data")
+    return b.build(idles)
+
+
+def frag_ec(b, code, A, ec="knill", anc="goto"):
+    n = code.n
+    tag = len(b.decoders)
+    if ec == "knill":
+        Bq, Cq = b.par(lambda: frag_prep(b, code, "plus", anc),
+                       lambda: frag_prep(b, code, "zero", anc))
+        b.tick([("CX", x, y) for x, y in zip(Bq, Cq)])
+        b.tick([("CX", x, y) for x, y in zip(A, Bq)])
+        recs = b.tick([("MX", q) for q in A] + [("M", q) for q in Bq])
+        b.decoder(f"knill_ax_{tag}", recs[:n], code.hx, "record")
+        b.decoder(f"knill_bz_{tag}", recs[n:], code.hz, "record")
+        return Cq
+    if ec == "steane_ec":
+        P, Z = b.par(lambda: frag_prep(b, code, "plus", anc),
+                     lambda: frag_prep(b, code, "zero", anc))
+        b.tick([("CX", a, p) for a, p in zip(A, P)])
+        r1 = b.tick([("M", p) for p in P] + [("CX", z, a) for z, a in zip(Z, A)])[:n]
+        r2 = b.tick([("MX", z) for z in Z])
+        b.decoder(f"steane_x_{tag}", r1, code.hz, "X", A, at_tick=b.cursor)
+        b.decoder(f"steane_z_{tag}", r2, code.hx, "Z", A, at_tick=b.cursor)
+        return A
+    raise GadgetError(f"unknown ec method {ec!r} (knill or steane_ec)")
+
+
+def exrec(code, role, ec="knill", anc="goto", trunc=(), idles=True):
+    """Extended rectangle ExRec_T(role) with leading ECs and un-truncated trailing ECs."""
+    code = code_of(code)
+    tset = {int(x) for x in trunc}
+    valid_outs = {
+        "prep_zero": {0}, "prep_plus": {0}, "idle": {0}, "h": {0}, "s": {0},
+        "cnot": {0, 1}, "measure_z": set(), "measure_x": set(),
+    }
+    if role not in valid_outs:
+        raise GadgetError(f"unknown exrec role {role!r}")
+    if not (tset <= valid_outs[role]):
+        raise GadgetError(f"invalid truncation indices {sorted(tset)} for role {role!r}")
+    tsuf = f",trunc={'+'.join(str(x) for x in sorted(tset))}" if tset else ""
+    b = Builder(f"exrec({code.name},{role},ec={ec},anc={anc}{tsuf})")
+    b.no_detectors()
+    if role in ("prep_zero", "prep_plus"):
+        qs = frag_prep(b, code, "zero" if role == "prep_zero" else "plus", anc)
+        if 0 not in tset:
+            qs = frag_ec(b, code, qs, ec, anc)
+        b.output(qs, code, "out")
+    elif role in ("idle", "h", "s"):
+        A = b.input(code, "data")
+        A = frag_ec(b, code, A, ec, anc)
+        if role == "idle":
+            b.wires(A)
+        elif role == "h":
+            b.tick([("H", q) for q in A])
+        else:
+            A = frag_phase_s(b, code, A, anc=anc, causal=(0 not in tset))
+        if 0 not in tset:
+            A = frag_ec(b, code, A, ec, anc)
+        b.output(A, code, "data")
+    elif role == "cnot":
+        A, B = b.input(code, "control"), b.input(code, "target")
+        A, B = b.par(lambda: frag_ec(b, code, A, ec, anc),
+                     lambda: frag_ec(b, code, B, ec, anc))
+        b.tick([("CX", a, c) for a, c in zip(A, B)])
+        if 0 not in tset and 1 not in tset:
+            A, B = b.par(lambda: frag_ec(b, code, A, ec, anc),
+                         lambda: frag_ec(b, code, B, ec, anc))
+        elif 0 not in tset:
+            A = frag_ec(b, code, A, ec, anc)
+        elif 1 not in tset:
+            ec_q = (2 * (code.n + 4)) if anc == "goto" else (2 * code.n)
+            _, B = b.par(lambda: b.alloc(ec_q), lambda: frag_ec(b, code, B, ec, anc))
+        b.output(A, code, "control")
+        b.output(B, code, "target")
+    else:
+        A = b.input(code, "data")
+        A = frag_ec(b, code, A, ec, anc)
+        basis = "Z" if role == "measure_z" else "X"
+        recs = b.measure(A, basis)
+        b.decoder("outcomes", recs, code.hz if basis == "Z" else code.hx, "record")
+    return b.build(idles)
 
 
 def radii(gadget, code_receipt):
@@ -286,6 +642,9 @@ def load(spec):
         raise GadgetError(f"rounds takes a number in {spec!r}")
     rounds = None if rounds is None else int(rounds)
     flags = {f for f in flags if not f.startswith("anc=") and not f.startswith("rounds=")}
+    ec_opt = next((f[3:] for f in flags if f.startswith("ec=")), "knill")
+    trunc_opt = next((f[6:] for f in flags if f.startswith("trunc=")), None)
+    flags = {f for f in flags if not f.startswith("ec=") and not f.startswith("trunc=")}
     try:
         if fam == "prep":
             rest = [p for p in parts[1:] if p not in ("idles", "ideal") and not p.startswith("rounds=")]
@@ -294,6 +653,10 @@ def load(spec):
             return prep(parts[0], state, method, idles, rounds or 0)
         if fam == "cnot" and flags <= {"leaky"}:
             return cnot(parts[0], "leaky" in flags, ideal, idles)
+        if fam == "h" and not flags:
+            return h_gate(parts[0], ideal, idles)
+        if fam == "phase_s" and not flags:
+            return phase_s(parts[0], anc if anc != "raw" else "goto", ideal, idles)
         if fam == "idle" and not flags:
             return idle(parts[0], idles)
         if fam == "knill" and not flags:
@@ -303,7 +666,16 @@ def load(spec):
         if fam == "steane_ec" and not flags:
             return steane_ec(parts[0], anc, ideal, idles, 1 if rounds is None else rounds)
         if fam == "measure" and flags <= {"x", "z", "X", "Z"}:
-            return measure(parts[0], (sorted(flags) or ["Z"])[0])
+            return measure(parts[0], (sorted(flags) or ["Z"])[0], idles)
+        if fam == "exrec":
+            rest = [p for p in parts[1:] if p not in ("idles", "ideal")
+                    and not p.startswith("anc=") and not p.startswith("ec=") and not p.startswith("trunc=")]
+            if len(rest) != 1:
+                raise GadgetError(f"exrec takes CODE,ROLE[,ec=...][,anc=...][,trunc=...], got {spec!r}")
+            tr = () if not trunc_opt else tuple(int(x) for x in trunc_opt.split("+") if x != "")
+            use_idles = True if "noidles" not in flags else False
+            return exrec(parts[0], rest[0], ec=ec_opt, anc=(anc if anc != "raw" else "goto"),
+                         trunc=tr, idles=use_idles)
     except IndexError:
         raise GadgetError(f"missing arguments in {spec!r}") from None
     raise GadgetError(f"unknown gadget {spec!r}; see ftqc_gadgets.library")

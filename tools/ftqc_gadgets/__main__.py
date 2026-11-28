@@ -60,6 +60,11 @@ def main(argv=None):
     a.add_argument("spec")
     a.add_argument("--check", action="append", default=[])
     a.add_argument("--close", type=int)
+    a.add_argument("--coherent", action="append", default=[],
+                   help="KIND:T[:CLOSE_S] unconditional channel + off-diagonal coherence certificate")
+    a.add_argument("--malignant-pairs", type=int, nargs="?", const=1, default=None,
+                   help="enumerate 2-location malignant pairs up to output bound (default 1)")
+    a.add_argument("--pair-slice", help="K/M slice index for --malignant-pairs")
     a.add_argument("--refines", action="append", default=[])
     a.add_argument("--sector", action="store_true")
     a.add_argument("--local", action="store_true", help="coordinate-locality certificate")
@@ -222,6 +227,21 @@ def main(argv=None):
             if not t.isdigit():
                 raise GadgetError(f"--check takes KIND:T, got {item!r}")
             checks.append((kind, int(t)))
+        coh = []
+        for item in args.coherent:
+            cparts = item.split(":")
+            if len(cparts) not in (2, 3) or not cparts[1].isdigit() or (len(cparts) == 3 and not cparts[2].isdigit()):
+                raise GadgetError(f"--coherent takes KIND:T[:CLOSE_S], got {item!r}")
+            coh.append((cparts[0], int(cparts[1]), int(cparts[2]) if len(cparts) == 3 else None))
+        mal = None
+        if args.malignant_pairs is not None:
+            psl = None
+            if args.pair_slice:
+                sk_s, _, sm_s = args.pair_slice.partition("/")
+                if not sk_s.isdigit() or not sm_s.isdigit():
+                    raise GadgetError(f"--pair-slice takes K/M, got {args.pair_slice!r}")
+                psl = (int(sk_s), int(sm_s))
+            mal = dict(bound=args.malignant_pairs, pair_slice=psl, sector=args.sector)
         refs = [(library.load(s), o, r) for s, o, r in map(_split_ref, args.refines)]
         loc = None
         if args.local:
@@ -231,10 +251,11 @@ def main(argv=None):
                     loc = library.radii(g, json.load(f))
         tree = dict(strict=args.strict, wmin=args.wmin, light=args.light) if args.tree else None
         rec = certify.build(g, checks, args.close, refs, args.sector, args.cap, local=loc,
-                            tables=not args.no_tables, tree=tree)
+                            tables=not args.no_tables, tree=tree, coherent=coh, malignant=mal)
         emit(rec, args.out)
         print(certify.summary(rec))
         failed = any(r.get("violation") or r.get("local") is False or r.get("tree") is False
+                     or r.get("coherent") is False or r.get("t1_holds") is False
                      for r in rec["results"])
         return 1 if failed else 0
     except (certify.Refusal, CodeRefusal) as e:

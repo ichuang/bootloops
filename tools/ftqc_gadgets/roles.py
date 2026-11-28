@@ -1,13 +1,13 @@
 """Bind an inner gadget's signed logical instrument to an outer operation."""
 
 from ftqc_faults.audit.circuit import Circuit
-from ftqc_faults.audit.stab import Sim
+from ftqc_faults.audit.stab import Sim, _g_sum
 from ftqc_codes import gf2
 
 from .certify import Refusal
 from .gadget import logical_x, logical_z
 
-ARITY = {"cnot": (2, 2), "idle": (1, 1), "ec": (1, 1), "h": (1, 1),
+ARITY = {"cnot": (2, 2), "idle": (1, 1), "ec": (1, 1), "h": (1, 1), "s": (1, 1),
          "measure_z": (1, 0), "measure_x": (1, 0), "prep_zero": (0, 1), "prep_plus": (0, 1)}
 
 
@@ -85,6 +85,15 @@ def logical_action(g, role, code):
             if role == "h":
                 relation(r, zs[i], "input X")
                 relation(xs[i], r, "input Z")
+            elif role == "s":
+                want_y_sign = ((_g_sum(lx, 0, 0, lz) + 1) // 2) & 1
+                val = sign(sim, r ^ xs[i], zs[i], "input X")
+                if (val & 1) != want_y_sign:
+                    raise Refusal(f"{role}: wrong sign for input X")
+                recs = gf2.supp(sim.frame_mask(val))
+                if recs:
+                    frames["input X"] = recs
+                relation(0, r ^ zs[i], "input Z")
             else:
                 relation(r ^ xs[i], 0, f"input {i} X")
                 relation(0, r ^ zs[i], f"input {i} Z")

@@ -157,6 +157,7 @@ class Analysis:
         self.dec = []
         self.dec_info = []
         self.dec_cols, self.dec_per = [], []           # per decoder: check column and effect of each position
+        self.has_causal_dec = any(d.at_tick is not None for d in g.decoders)
         for d, (off, width) in zip(g.decoders, self.dec_layout):
             tab = uniq = None
             if tables and d.rule is None:
@@ -165,24 +166,47 @@ class Analysis:
                 except Budget:
                     pass
             per = []
+            per_sig = []
             for p in range(d.npos):
                 if d.kind == "record":
-                    per.append(self._canon(m.syndrome(0, 0, 1 << d.targets[p])))
-                elif d.kind == "X":
-                    per.append(self._canon(m.syndrome(1 << d.targets[p], 0)))
+                    syn_p = self._canon(m.syndrome(0, 0, 1 << d.targets[p]))
+                    per.append(syn_p)
+                    per_sig.append(syn_p << self.shift)
+                elif d.at_tick is None:
+                    syn_p = (self._canon(m.syndrome(1 << d.targets[p], 0))
+                             if d.kind == "X" else self._canon(m.syndrome(0, 1 << d.targets[p])))
+                    per.append(syn_p)
+                    per_sig.append(syn_p << self.shift)
                 else:
-                    per.append(self._canon(m.syndrome(0, 1 << d.targets[p])))
+                    px = (1 << d.targets[p]) if d.kind == "X" else 0
+                    pz = 0 if d.kind == "X" else (1 << d.targets[p])
+                    fx, fz, ff = propagate(c, d.at_tick - 1, px, pz)
+                    full_s = self.sig(fx, fz, ff)
+                    if full_s & self.DET:
+                        raise GadgetError(f"decoder {d.name}: causal frame flips a postselected detector")
+                    per.append(full_s >> self.shift)
+                    per_sig.append(full_s)
             self.dec_per.append(per)
             self.dec_cols.append([sum(1 << i for i, r in enumerate(d.checks) if (r >> p) & 1)
                                   for p in range(d.npos)])
             eff = None
+            rule_label = None
             if d.rule is not None:
                 rtype = d.rule.get("type")
                 if rtype == "hier":
-                    eff = _HierTable(d.rule, d.checks, per)
+                    eff = _HierTable(d.rule, d.checks, per_sig)
+                    rule_label = "hierarchical"
                 elif rtype == "ftqc_decoders":
                     from ftqc_decoders.bridges import GadgetDecoderRuleTable
-                    eff = GadgetDecoderRuleTable(d.rule, d.checks, d.npos, per)
+                    eff = GadgetDecoderRuleTable(d.rule, d.checks, d.npos, per_sig)
+                    rule_label = f"ftqc_decoders:{d.rule.get('algorithm', 'bp_osd')}"
+                elif rtype == "table":
+                    raw_entries = d.rule.get("entries", {})
+                    tab = {s: 0 for s in range(1 << width)}
+                    for k, v in raw_entries.items():
+                        tab[int(k)] = int(v)
+                    uniq = None
+                    rule_label = "table"
                 else:
                     raise GadgetError(f"decoder {d.name}: unknown rule")
             if tab is not None:
@@ -190,13 +214,17 @@ class Analysis:
                 for s, lead in tab.items():
                     e = 0
                     for p in gf2.supp(lead):
-                        e ^= per[p]
+                        e ^= per_sig[p]
                     eff[s] = e
             self.dec.append((off, (1 << width) - 1, eff))
-            self.dec_info.append(dict(name=d.name, kind=d.kind, positions=d.npos,
-                                      checks=width, syndromes=None if tab is None else len(tab),
-                                      unique_through=uniq, table=tab,
-                                      **({"rule": "hierarchical" if d.rule.get("type") == "hier" else f"ftqc_decoders:{d.rule.get('algorithm', 'bp_osd')}"} if d.rule is not None else {})))
+            info = dict(name=d.name, kind=d.kind, positions=d.npos,
+                        checks=width, syndromes=None if tab is None else len(tab),
+                        unique_through=uniq, table=tab)
+            if rule_label is not None:
+                info["rule"] = rule_label
+            if d.at_tick is not None:
+                info["at_tick"] = d.at_tick
+            self.dec_info.append(info)
         self._effect_cache = {}
         self._sum_cache = {}
 
@@ -264,17 +292,18 @@ class Analysis:
         """Syndrome after the decoders have acted; -1 if a decoder has no entry."""
         e = self._effect_cache.get(sig)
         if e is None:
-            e = sig >> self.shift
-            d = sig >> self.nd
+            cur = sig
+            bad = False
             for off, mask, eff in self.dec:
                 if eff is None:
                     raise Budget("a decoder has no lookup table (too many syndromes): enumeration "
                                  "is not available for this gadget, use the locality leg")
-                c = eff.get((d >> off) & mask)
+                c = eff.get((cur >> (self.nd + off)) & mask)
                 if c is None:
-                    e = -1
+                    bad = True
                     break
-                e ^= c
+                cur ^= c
+            e = -1 if bad else (cur >> self.shift)
             if len(self._effect_cache) < 2_000_000:
                 self._effect_cache[sig] = e
         return e

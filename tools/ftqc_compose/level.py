@@ -16,6 +16,40 @@ SCOPE = "unconditional-level-reduction"
 
 def local(g):
     op = g["op"]
+    if op == "verified-gadget":
+        from ftqc_gadgets import certify as gcert
+        from ftqc_gadgets.gadget import Gadget as GGadget
+
+        fields(g, "op", "receipt", "ideal", "faults")
+        rec = g["receipt"]
+        try:
+            gcert.verify(rec, full=False)
+        except gcert.Refusal as err:
+            raise ValueError(f"verified-gadget receipt refused: {err}") from err
+        coh_list = [r for r in rec.get("results", []) if r.get("type") == "coherent"]
+        if len(coh_list) != 1 or not coh_list[0].get("coherent"):
+            raise ValueError("verified-gadget requires a passing coherent channel certificate")
+        coh = coh_list[0]
+        if int(coh.get("holds_through", -1)) < 1:
+            raise ValueError("verified-gadget requires fault-tolerance order >= 1")
+        gad = GGadget.from_json(rec["gadget"])
+        if gad.outputs and coh["kind"] in ("prep", "ec"):
+            if coh.get("close_holds_through") is None or int(coh["close_holds_through"]) < 1:
+                raise ValueError("verified-gadget prep/ec requires close_holds_through >= 1")
+        fam = leaf(g["faults"])
+        if gad.outputs and any(len(t) == 0 for t in fam.terms):
+            raise ValueError("verified-gadget fault family cannot contain the empty support")
+        filt = f"code-ball-{coh['weight']}-{coh['t']}"
+        rsha = gcert.receipt_sha(rec)
+        return theorem(
+            [QBIT] * len(gad.inputs),
+            [QBIT] * len(gad.outputs),
+            str(g["ideal"]),
+            fam,
+            [filt] * len(gad.inputs),
+            f"discharged Def. 4.8 via ftqc_gadgets receipt {rsha[:16]} ({gad.name})",
+            [],
+        )
     if op == "assume-4.8":
         fields(g, "op", "contract")
         h = g["contract"]
