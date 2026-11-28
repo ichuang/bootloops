@@ -141,6 +141,33 @@ four-core Linux virtual machine.
 - Static-code studies decode one sector under independent flips; they are
   code-capacity statements, not circuit-level ones, unless the input is a
   circuit detector error model.
+- **A localized decoder gives up distance.** `{"algorithm": "localized", "base": ..., "detector_range": r}`
+  decodes every group of fired detectors on its own, so two faults whose detectors are
+  farther apart than r are never corrected together. At a range well below the code
+  distance it fails on low-weight sets that the base decoder corrects (`rep7` with
+  range 1 fails on two faults). The `enclose_linked_cluster` receipt reports the size
+  through which every connected set is corrected; read it before the bounds.
+- **The linked-cluster radius is small.** The enclosure holds for activities below
+  1 / (e (D + 1) + e² D) with D the degree of the mechanism graph at range r + 1, and a
+  nonzero lower bound needs rates far below that (`toric3`: p = 10⁻⁷).
+
+## Linked-cluster enclosure
+
+The study kind `enclose_linked_cluster` (module `linked_cluster.py`) bounds the
+probability that an observable parity is flipped from both sides, for a base decoder
+localized at `detector_range`. A localized decoder acts independently on fault sets that
+are separate at mechanism range r + 1; the module proves this. The flip probability is
+then (1 − λ)/2 with log λ a convergent sum over connected clusters of fault sets, whose
+first term is −2 times the sum of x^|C| over failing connected sets C. The receipt
+enumerates and decodes every connected set through `max_cluster_size`, reports the
+failing ones by size and the size through which all are corrected, and gives `ler_lo`
+and `ler_hi` from that sum and the remainder 2 M θ^min(m+1, t+2). Nothing about the
+decoder is assumed. Faults are independent with one probability on every mechanism.
+
+```json
+{"study": "enclose_linked_cluster", "problem": {"kind": "bb72"}, "base_decoder": "bp_osd",
+ "detector_range": 2, "max_cluster_size": 2, "physical_p": "1/100000000"}
+```
 
 ## KNOWN GAPS
 

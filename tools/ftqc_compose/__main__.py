@@ -57,6 +57,14 @@ def evaluate(spec):
         from .stochastic import stochastic_result
 
         return stochastic_result(spec)
+    if spec["kind"] == "closure":
+        from .closure import closure_result
+
+        return closure_result(spec)
+    if spec["kind"] == "regions":
+        from .regions import regions_result
+
+        return regions_result(spec)
     if spec["kind"] == "cone-bound":
         from .tails import cone_bound_result
 

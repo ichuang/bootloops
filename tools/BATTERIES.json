@@ -93,7 +93,7 @@
   "cwd": "root"
  },
  "ftqc_decoders": {
-  "cmd": "python3 tools/ftqc_decoders/selftest.py && python3 -m unittest ftqc_decoders.test_automorphisms",
+  "cmd": "python3 tools/ftqc_decoders/selftest.py && python3 -m unittest ftqc_decoders.test_automorphisms ftqc_decoders.test_linked_cluster",
   "cwd": "root"
  },
  "ftqc_extractors": {

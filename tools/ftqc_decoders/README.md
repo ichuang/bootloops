@@ -6,7 +6,8 @@ code from `ftqc_codes`, a circuit record model from `ftqc_faults` or
 `ftqc_extractors`, a surgery cone with metachecks, or a Stim `.dem` file, it
 runs decoders in exact arithmetic, certifies that every pattern up to a small
 radius is corrected or returns the pattern that is not, finds trapping-set
-witnesses, computes logical-error bounds under printed assumptions, and audits
+witnesses, computes logical-error bounds under printed assumptions and a
+two-sided linked-cluster enclosure for localized decoders, and audits
 the output of external decoders such as Tesseract. Results are
 `ftqc_decoders-receipt-1` receipts.
 

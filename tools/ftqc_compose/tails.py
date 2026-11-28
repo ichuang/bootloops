@@ -21,8 +21,15 @@ contract is a number of location equivalents per coordinate, added to L.  Either
 contract is a hypothesis of the result, not something this module derives.
 
 With an outer level a column is dirty when one of the inner events of the outer cone fails
-(a union bound inside the column), columns are independent, and the outer event fails
-with the same kind of tail over the N2 columns.
+(a union bound inside the column), and the outer event fails with the same kind of tail over
+the N2 columns.  Under `independent` the columns are taken to be independent.  Under
+`local-stochastic` no independence is used: a set of faulty sources that makes a column dirty
+lies in that column, sources of different columns are disjoint, and the probability that all
+sources of a set are faulty is at most the product of their weights, so t2 + 1 dirty columns
+have probability at most the product of the columns' union weights W, and the event fails
+with probability at most C(N2, t2+1) W^(t2+1).  An outer ancilla then needs a contract
+{"column_weight": w, "junk": j}: apart from an event of probability j, the columns of a set A
+are all dirty with probability at most w^|A|, jointly with the other sources.
 
 Arithmetic is exact in rationals except where the result says otherwise: values are rounded
 upward to SIG significant digits to keep denominators bounded.  Every rounding is upward
@@ -197,12 +204,54 @@ def sci(x, digits=4):
     return (s[0] + "." + s[1:] + f"e{e}") if digits > 1 else f"{s}e{e}"
 
 
-def _contract(c, where, noise):
+def _moment_modes(modes, where):
+    if not isinstance(modes, list) or not modes:
+        raise ValueError(f"{where}: a contract needs at least one mode")
+    out = []
+    for m in modes:
+        if not isinstance(m, list) or len(m) != 2:
+            raise ValueError(f"{where}: a mode is [weight, rate]")
+        w = Fraction(str(m[0])) if type(m[0]) in (str, int) else None
+        if w is None or w < 0:
+            raise ValueError(f"{where}: a mode weight must be an exact nonnegative number")
+        out.append((w, probability(m[1])))
+    return out
+
+
+def ls_tail(n, t, base, lists):
+    """Weight of a cover of "more than t of n coordinates dirty" when a coordinate is dirty
+    through sources of total weight `base` or through one of several dirt processes on disjoint
+    sources, each with moment modes [(w, q)]: the weight of "all coordinates of A dirty" is
+    at most sum over one mode of each process of prod w * (base + sum q)^|A|, a list being
+    padded with (1 - W, 0) when its weights sum to W < 1."""
+    from .filters import prune
+
+    if t >= n:
+        return Fraction(0)
+    acc = [(Fraction(1), min(Fraction(1), Fraction(base)))]
+    for modes in lists:
+        w_sum = sum((w for w, _ in modes), Fraction(0))
+        padded = list(modes) + ([(1 - w_sum, Fraction(0))] if w_sum < 1 else [])
+        acc = prune([(wa * wb, min(Fraction(1), qa + qb)) for wa, qa in acc for wb, qb in padded if wa * wb > 0],
+                    MAX_TERMS, t + 1)
+    return min(Fraction(1), comb(n, t + 1) * sum((w * q ** (t + 1) for w, q in acc), Fraction(0)))
+
+
+def _contract(c, where, noise, p=None):
     if noise == "local-stochastic":
+        # every form is a junk weight and moment modes of the dirt (see ls_tail)
+        if isinstance(c, dict) and "column_weight" in c:            # an outer ancilla, per column
+            fields(c, "column_weight", "junk")
+            return dict(column_weight=probability(c["column_weight"]), junk=probability(c["junk"]),
+                        modes=[(Fraction(1), probability(c["column_weight"]))])
+        if isinstance(c, dict) and "modes" in c:
+            fields(c, "junk", "modes")
+            return dict(junk=probability(c["junk"]), modes=_moment_modes(c["modes"], where))
         fields(c, "equivalents")
         if type(c["equivalents"]) is not int or c["equivalents"] < 0:
             raise ValueError(f"{where}: location equivalents must be a nonnegative integer")
-        return dict(equivalents=c["equivalents"])
+        return dict(equivalents=c["equivalents"], junk=Fraction(0),
+                    modes=[(Fraction(1), min(Fraction(1), c["equivalents"] * Fraction(p)))])
     fields(c, "pi", "modes")
     modes = c["modes"]
     if not isinstance(modes, list) or not modes:
@@ -247,8 +296,6 @@ def _compute(spec):
         raise ValueError("linear propagation leaves a cone of this program")
     if flow.two and "outer" not in levels:
         raise ValueError("a two-level program needs the outer code's n and t")
-    if flow.two and noise != "independent":
-        raise ValueError("two levels are bounded under independent noise only")
     if not isinstance(spec["contracts"], dict):
         raise ValueError("contracts: {kind: {X: ..., Z: ...}} or {kind: {fail: ...}}")
     contracts = {}
@@ -257,7 +304,7 @@ def _compute(spec):
             contracts[kind] = dict(fail=probability(c["fail"]))
             continue
         fields(c, "X", "Z")
-        contracts[kind] = {s: _contract(c[s], f"{kind} {s}", noise) for s in "XZ"}
+        contracts[kind] = {s: _contract(c[s], f"{kind} {s}", noise, p) for s in "XZ"}
 
     def need(kind, sector=None):
         if kind not in contracts or (sector and sector not in contracts[kind]):
@@ -278,15 +325,22 @@ def _compute(spec):
                 b, _, did = mixture_tail(n1, t1, up(base), lists)
                 coarse += did
             else:
-                weight = L + sum(need(k, s)["equivalents"] * m for (k, s), m in atoms.items())
-                b = local_stochastic_tail(n1, t1, weight, p)
+                for k, s in atoms:
+                    if "column_weight" in need(k, s):
+                        raise ValueError(f"inner ancilla kind {k!r} needs location equivalents or junk and modes")
+                if all("equivalents" in need(k, s) for k, s in atoms):
+                    weight = L + sum(need(k, s)["equivalents"] * m for (k, s), m in atoms.items())
+                    b = local_stochastic_tail(n1, t1, weight, p)
+                else:
+                    lists = [need(k, s)["modes"] for (k, s), m in sorted(atoms.items()) for _ in range(m)]
+                    b = ls_tail(n1, t1, L * p, lists)
             cache[key] = b
         shapes[key] = shapes.get(key, 0) + 1
         return cache[key]
 
     def junk(kind):
         if noise != "independent":
-            return Fraction(0)
+            return sum((need(kind, s).get("junk", Fraction(0)) for s in "XZ"), Fraction(0))
         return need(kind, "X")["pi"] + need(kind, "Z")["pi"]
 
     probs, by_tag = [], {}
@@ -298,9 +352,10 @@ def _compute(spec):
                 pr = junk(ev["tag"].split(":", 1)[1])
         else:
             pr = inner_bound(flow.cone(ev))
-            if ev["kind"] == "ec" and noise == "independent":
+            if ev["kind"] == "ec":
                 s = ev["sector"]
-                pr += need("plus", s)["pi"] + need("zero", s)["pi"]
+                key = "pi" if noise == "independent" else "junk"
+                pr += need("plus", s)[key] + need("zero", s)[key]
         probs.append(min(Fraction(1), up(pr)))
     terms = []                                                  # (tag, probability)
     if not flow.two:
@@ -314,10 +369,19 @@ def _compute(spec):
                 s = flow.sources[i]
                 if i in ev_of:
                     base += probs[ev_of[i]]
-                elif s["kind"] == "atom":
+                elif s["kind"] == "atom" and noise == "independent":
                     lists.append(need(s["what"], s["sector"])["modes"])
-            b, _, did = mixture_tail(n2, t2, min(Fraction(1), up(base)), lists)
-            coarse += did
+                elif s["kind"] == "atom":
+                    c = need(s["what"], s["sector"])
+                    if "equivalents" in c:
+                        raise ValueError(f"outer ancilla kind {s['what']!r} needs a column_weight and junk, "
+                                         f"or junk and modes")
+                    lists.append(c["modes"])
+            if noise == "independent":
+                b, _, did = mixture_tail(n2, t2, min(Fraction(1), up(base)), lists)
+                coarse += did
+            else:                                                   # union weights of disjoint columns multiply
+                b = up(ls_tail(n2, t2, min(Fraction(1), up(base)), lists))
             terms.append((o["tag"], b))
         for tm in flow.terms:
             terms.append((tm["tag"], junk(tm["tag"].split(":", 1)[1])))
@@ -332,8 +396,12 @@ def _compute(spec):
     if contracts:
         premises.append("the declared ancilla contracts hold" + (
             " and ancillas are independent of the program's locations and of one another" if noise == "independent" else ""))
-    if flow.two:
+    if flow.two and noise == "independent":
         premises.append("failures of inner events in different columns are independent")
+    elif flow.two:
+        premises.append("the sources of different columns are disjoint: every location class and inner ancilla "
+                        "acts within one column, and an outer ancilla's columns obey its column contract jointly "
+                        "with the physical locations")
     premises.append("faults at different locations are independent, each with probability at most p"
                     if noise == "independent" else
                     "Pr[all locations of S faulty] <= p^|S| for every set S of physical locations")

@@ -216,7 +216,7 @@ def check(A, B, s, n, wmin, step, carry_last=False, independent=True, cap=MAX_MO
     return {s: given(pi_s, modes_s, last_s), o: given(pi_o, modes_o, last_o)}, alpha
 
 
-def fold(n, wmin, leaves, nodes, root, carry_last=False, independent=True, cap=MAX_MODES):
+def fold(n, wmin, leaves, nodes, root, carry_last=False, independent=True, cap=MAX_MODES, check_fn=None):
     """Contract at the root of a tree.  leaves: {id: dict(X=sector, Z=sector, cost=)};
     nodes: [dict(sector=, A=("leaf"|"node", id), B=..., step=dict(fresh, partner, clean, cost))]
     in an order where children come first.  Identical subtrees are computed once.  Returns
@@ -241,7 +241,7 @@ def fold(n, wmin, leaves, nodes, root, carry_last=False, independent=True, cap=M
         if ca is None or cb is None:
             memo[key] = (None, None)
             continue
-        c, alpha = check(ca, cb, nd["sector"], n, wmin[nd["sector"]], st, carry_last, independent, cap)
+        c, alpha = (check_fn or check)(ca, cb, nd["sector"], n, wmin[nd["sector"]], st, carry_last, independent, cap)
         accs.append(alpha)
         if c is None:
             memo[key] = (None, None)
@@ -655,6 +655,12 @@ def encoded_result(spec):
 def filter_contract_result(spec):
     """Study kind `filter-contract`: the contract of an accepted purification tree."""
     level = spec.get("level")
+    if "noise" in spec:
+        if spec["noise"] != "local-stochastic":
+            raise ValueError("noise, when given, is local-stochastic; the default is independent faults")
+        from . import filters_ls
+
+        return filters_ls.filter_contract_result(spec)
     if level == "physical":
         return physical_result(spec)
     if level == "encoded":

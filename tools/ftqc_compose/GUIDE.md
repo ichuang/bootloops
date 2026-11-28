@@ -127,7 +127,9 @@ evidence, stale digests and failed joins.
 ## KNOWN GAPS
 
 - No end-to-end theorem: the quoted theorems and the cone and filter
-  arguments are not proved here.
+  arguments are not proved here. The `closure` study removes the declared
+  contracts and the independence premises from a two-level bound; the
+  deterministic statements it lists are still quoted.
 - The bundle filter for arbitrary damaged quantum inputs is open for the HGP
   leaves, so friendliness cannot be required of them.
 - A general noncommuting adaptive surgery contract and automatic use of
@@ -207,6 +209,19 @@ The result is `conditional`. Its premises are the cone theorem for the program, 
 
 The tests compare the binomial tail with enumeration, the threshold count with an explicit bad-support family of this package, mixtures with their exact expansion, every inner and outer term with the formula written out, and sampled failures of a physical circuit (through `ftqc_gadgets.cones.Direct`) with the bound. Seventeen planted defects each fail them; one needed a new check first.
 
+Two levels can also be bounded under `local-stochastic` noise, without independence of columns. A set of faulty sources that makes a column dirty lies in that column, and different columns have disjoint sources, so the probability that t₂ + 1 given columns are all dirty is at most the product of their union weights W. The outer event then fails with probability at most C(n₂, t₂+1)·W^(t₂+1). Inner ancillas keep their contract in location equivalents. An outer ancilla needs `{"column_weight": w, "junk": j}` per sector: apart from an event of probability j, charged where it is delivered, the columns of any set A are all dirty with probability at most w^|A|, jointly with the physical locations. The premise list names the disjointness of column sources in place of the independence of columns. The tests compare every term with the formula written out and with the independent-noise result for the same model.
+
+## Regions of several noise rates
+
+A `regions` study takes a checked `source` (as for `local-stochastic`) and `kinds`, a map from every non-ideal physical site to a named kind of location. When a location of kind k is faulty with probability c_k·ε^(w_k), the union bound over the minimal bad supports has leading power ε^τ with τ(w) the minimum of w·n over the vectors n of fault counts by kind. The result lists these vectors with their multiplicities, the componentwise-minimal ones, and for two kinds the vertices of the lower hull with the exponent ratios at which the dominant vertex changes. Each entry of the optional `exponents` list gets its τ, the dominant vectors and the number of minimal supports behind them. With independent faults the bad-support probability has the same exponent and leading coefficient; the tests check this against exact enumeration.
+
+```json
+{"kind": "regions", "source": {"kind": "family", "expression": {"op": "family",
+   "sites": ["d1", "d2", "m1"], "minimal": [["d1", "d2"], ["d1", "m1"]]}},
+ "kinds": {"d1": "data", "d2": "data", "m1": "meas"},
+ "exponents": [{"data": "1", "meas": "1/2"}]}
+```
+
 ## Filter calculus for purification trees
 
 A `filter-contract` study derives the contract that a `cone-bound` study takes as a hypothesis: what an accepted purification tree delivers, given that every check on the way accepted. A contract of one sector is a junk probability `pi` and modes `[[w, q], ...]`. Apart from the junk event, the block's error is equivalent to one supported on a random set of dirty coordinates, and every increasing event of that set is at most the sum over modes of w times its probability under independent dirt of rate q.
@@ -230,6 +245,18 @@ Decoding events of one column can share sources, so two things change. Rates are
 The result is `conditional`, or `no bound` when the acceptance bound of some check is not positive. It lists the contract in the form `cone-bound` reads, the acceptance bound of every level, the expected cost counting repetitions, and the premises: the filter rule for the tree, the noise condition, and for an encoded tree the cone theorem, the inner contracts and that dirt indicators are increasing functions of independent sources. The calculus itself is quoted, not proved here. `modes` (default 4) and `order` set how the final mixture is summarised: merging is upward and loses least for events that need `order` dirty coordinates. Bounds are rounded upward and acceptance downward at 50 significant digits.
 
 The tests compare the calculus with two exact computations. One follows the filter rule on two coordinates and sums over everything, for three acceptance rules, including one that accepts exactly the harmful outcomes; with shared sources it shows that multiplying the latest dirt gives bounds that are too small by a factor of two, and that carrying it is sound. The other is the exact law of the accepted output of Steane trees under independent faults (`ftqc_gadgets.factories.accepted_law`), for uniform and one-sided fault labels. Forty-two planted defects each fail the tests; six needed a new check first.
+
+### Local-stochastic noise
+
+Add `"noise": "local-stochastic"` to a `filter-contract` study of either level. The premise on the noise is then only that the probability of all locations of a set S being faulty is at most p^|S|; faults need not be independent. Every number is the total weight of a family of fault sets that covers an event of the filter rule. Weights of covers on disjoint sources multiply, weights of alternatives add (rates unite as a + b), and the tail of "at least w dirty coordinates" is C(n, w) times a moment. Nothing is conditioned on acceptance: a rejected check is repeated with fresh inputs, the delivered block is the first accepted attempt, and its weights are those of one attempt divided by one minus the weight of rejection. The contract is `{"junk": j, "modes": [[w, q], ...]}` per sector: junk is covered with weight j, and "not junk, and every coordinate of a set A dirty" with weight Σ w·q^|A|. `cone-bound` reads this form under `local-stochastic` noise for inner and outer ancillas; `{"equivalents": k}` and `{"column_weight", "junk"}` are its one-mode special cases. For an encoded tree the inner `contracts` must be in this form. Module `filters_ls.py` states the calculus and the argument for each line.
+
+The tests compare junk, every moment and the acceptance bound with exact laws of the small models, for independent sources, for shared sources, and for two leaf laws that satisfy the noise condition without independence. One of those laws violates the acceptance bound of the calculus for independent faults. On the Golay example the junk weights are within three percent of the independent-noise values.
+
+## Closure of a two-level program
+
+A `closure` study chains the local-stochastic studies so that no contract is declared: the contracts of the inner ancillas from their physical trees, the contracts of the outer ancillas from their trees of encoded blocks, and the tail bound over the cones of the two-level `program`. Give `p`, `inner` and `outer` (n and t), the `program`, and under `inner_ancillas` and `outer_ancillas` one tree per ancilla kind in the fields of a `filter-contract` study (`tree` and `leaf`, or `factory`; for an outer ancilla `tree` or `factory`, and `raw`).
+
+The result is `conditional`. `upper` bounds the probability that a delivered ancilla is junk or that some decoding event of the program has more than its radius of dirty coordinates. `noise_premise` is the single probabilistic premise. `deterministic_premises` lists the quoted statements that the other studies check on the instance: the cone theorem, the filter rule, the acceptance rule with repetition, and that distinct ancillas, attempts and columns occupy distinct locations. `no_longer_premises` lists what the chain replaces: declared contracts, independence, conditioning. The [banked example](examples/closure-two-level-steane.json) has two Steane levels and gives 5.121e-13 at p = 10⁻⁶, scaling as p⁴.
 
 ## Volume of a schedule
 
