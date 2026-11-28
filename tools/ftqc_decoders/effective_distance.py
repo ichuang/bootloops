@@ -35,6 +35,9 @@ def run_decoder(
         raise RefusalError("INVALID-DECODER-SPEC", f"Decoder spec must be str or dict, got {type(spec).__name__}")
 
     alg = str(cfg.get("algorithm", "bp_osd")).strip()
+    if alg == "automorphism_ensemble":
+        from .automorphisms import decode
+        return decode(problem, syndrome, cfg)
     if alg.startswith("external:"):
         from .adapters.external_decoders import decode_external
 

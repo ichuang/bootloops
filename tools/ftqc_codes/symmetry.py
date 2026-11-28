@@ -533,7 +533,11 @@ def induced_logical_action(code, basis_receipt, perm_q):
     """Compute and verify the symplectic logical transformation induced by `perm_q` on `basis_receipt`."""
     verify_code_automorphism(code, perm_q)
     basis.verify_basis_receipt(code, basis_receipt)
-    perm = list(perm_q)
+    return logical_action(code, basis_receipt, lambda p: _transport_signed_pauli(p, perm_q))
+
+
+def logical_action(code, basis_receipt, transport):
+    """Project already verified physical Clifford images into a verified logical basis."""
     n = code.n
     k = basis_receipt["k"]
     slots = basis_receipt["slots"]
@@ -561,8 +565,8 @@ def induced_logical_action(code, basis_receipt, perm_q):
             raise certify.Refusal("automorphism image did not reduce into stabilizer group")
         return {"x_mask": xm, "z_mask": zm, "sign": rs}
 
-    lx_action = [decompose(_transport_signed_pauli(parsed_x[i], perm)) for i in range(k)]
-    lz_action = [decompose(_transport_signed_pauli(parsed_z[i], perm)) for i in range(k)]
+    lx_action = [decompose(transport(parsed_x[i])) for i in range(k)]
+    lz_action = [decompose(transport(parsed_z[i])) for i in range(k)]
 
     # Verify symplectic preservation directly
     for i in range(k):

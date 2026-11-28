@@ -193,6 +193,6 @@
   "kind": "qldpc",
   "optimality_gap": null,
   "schema": "ftqc_magic-receipt-1",
-  "source_sha256": "5c26352ae4ad40a5f905dac8815d00f709ef43ace96489fd0f390bf687cb19de",
+  "source_sha256": "d3577ad8afa60300a67b51e717505a46ad9236f323854c5830f5353c67322d62",
   "spec_sha256": "86ab2314824591378e2f75f4e867372efba340ec6ec926675ddcdafd9675cf05"
 }

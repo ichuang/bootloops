@@ -89,7 +89,7 @@
   "cwd": "root"
  },
  "ftqc_codes": {
-  "cmd": "python3 tools/ftqc_codes/selftest.py",
+  "cmd": "python3 tools/ftqc_codes/selftest.py && python3 -m unittest ftqc_codes.test_discovered_actions",
   "cwd": "root"
  },
  "ftqc_compose": {
@@ -97,11 +97,11 @@
   "cwd": "root"
  },
  "ftqc_decoders": {
-  "cmd": "python3 tools/ftqc_decoders/selftest.py",
+  "cmd": "python3 tools/ftqc_decoders/selftest.py && python3 -m unittest ftqc_decoders.test_automorphisms",
   "cwd": "root"
  },
  "ftqc_extractors": {
-  "cmd": "python3 -m unittest ftqc_extractors.test_algebra ftqc_extractors.test_extractor ftqc_extractors.test_receipts ftqc_extractors.test_magic ftqc_extractors.test_audit ftqc_extractors.test_gross ftqc_extractors.test_architecture ftqc_extractors.test_pbc ftqc_extractors.test_injection ftqc_extractors.test_installed_surgery ftqc_extractors.test_surgery_products ftqc_extractors.test_surgery_layout ftqc_extractors.test_magic_delivery ftqc_extractors.test_injection_export ftqc_extractors.test_bicycle",
+  "cmd": "python3 -m unittest ftqc_extractors.test_algebra ftqc_extractors.test_extractor ftqc_extractors.test_receipts ftqc_extractors.test_magic ftqc_extractors.test_audit ftqc_extractors.test_gross ftqc_extractors.test_architecture ftqc_extractors.test_pbc ftqc_extractors.test_injection ftqc_extractors.test_installed_surgery ftqc_extractors.test_surgery_products ftqc_extractors.test_surgery_layout ftqc_extractors.test_magic_delivery ftqc_extractors.test_injection_export ftqc_extractors.test_bicycle ftqc_extractors.test_highrate_qec.HighRateQECTests.test_translated_seed_substitution_on_lp8_4",
   "cwd": "root"
  },
  "ftqc_faults": {
@@ -113,7 +113,7 @@
   "cwd": "root"
  },
  "ftqc_magic": {
-  "cmd": "python3 tools/ftqc_magic/selftest.py",
+  "cmd": "python3 tools/ftqc_magic/selftest.py && python3 -m unittest ftqc_magic.test_action_program",
   "cwd": "root"
  },
  "ftqc_uncompute": {

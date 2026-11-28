@@ -18,6 +18,7 @@ import argparse
 import json
 import sys
 
+from ftqc_codes.certify import Refusal as CodeRefusal
 from . import certify, library, props
 from .effects import Analysis
 from .gadget import GadgetError
@@ -37,6 +38,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="ftqc_gadgets", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    installed = sub.add_parser("installed-action", help="verify and audit a physical Clifford route")
+    installed.add_argument("spec")
+    installed.add_argument("-o", "--out")
     build = sub.add_parser("build-surgery", help="compile a finite constructor to a standalone instrument")
     build.add_argument("spec")
     build.add_argument("-o","--out")
@@ -97,6 +101,14 @@ def main(argv=None):
         return txt
 
     try:
+        if args.cmd == "installed-action":
+            from .installed_action import analyze
+            with open(args.spec) as stream:
+                result = analyze(json.load(stream))
+            txt = emit(result, args.out)
+            if not args.out:
+                print(txt)
+            return 0
         if args.cmd == "magic-transfer":
             from .magic_transfer import transfer_receipt
             with open(args.spec) as f:
@@ -209,7 +221,7 @@ def main(argv=None):
         failed = any(r.get("violation") or r.get("local") is False or r.get("tree") is False
                      for r in rec["results"])
         return 1 if failed else 0
-    except certify.Refusal as e:
+    except (certify.Refusal, CodeRefusal) as e:
         print("REFUSED:", e, file=sys.stderr)
         return 1
     except (ValueError, KeyError, TypeError, IndexError, OSError) as e:

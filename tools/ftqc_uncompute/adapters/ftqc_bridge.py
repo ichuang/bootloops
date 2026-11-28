@@ -239,6 +239,7 @@ def estimate_reaction_decoder_latency(
     *,
     decoder_stall_ticks_per_reaction: int | Fraction | str = 0,
     shuttle_ticks_per_reaction: int = 0,
+    installed_action_per_reaction: dict[str, Any] | None = None,
     surviving_logicals: int = 1,
     bare_code_k: int | None = None,
     layout_name: str = "planar_local",
@@ -289,6 +290,17 @@ def estimate_reaction_decoder_latency(
 
     if stall_per_rx < 0:
         raise ValueError("decoder_stall_ticks_per_reaction must be nonnegative")
+
+    if installed_action_per_reaction is not None:
+        from ftqc_gadgets.installed_action import analyze
+        route = analyze(installed_action_per_reaction)
+        if route["n_data"] != n_data or route["width"] > n_data + n_anc:
+            raise ValueError("installed action exceeds the reaction allocation")
+        if shuttle_ticks_per_reaction:
+            raise ValueError("supply the installed route or manual shuttle ticks")
+        if route["installed_couplers"] > couplers:
+            raise ValueError("installed action exceeds the reaction coupler budget")
+        shuttle_ticks_per_reaction = route["ticks"]
 
     ctx = Context(prec=28, rounding=ROUND_CEILING)
     peak_total = n_data + n_anc

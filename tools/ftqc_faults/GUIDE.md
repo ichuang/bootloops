@@ -23,3 +23,7 @@ The physical claim covers single faults with the stated boundaries and frame. A 
 ## Existing clients and receipts
 
 The canonical imports are `ftqc_faults.audit` and `ftqc_faults.zx`. Existing `ftqc_audit` and `ftqc_zx` imports and command lines continue to work. Circuit receipts and stochastic contracts retain their original schemas and independent verifiers. Published injection cases and decoder sampling belong to `ftqc_extractors`. Run `python3 -m ftqc_extractors injection bb-uniform` for the closed Y experiment. The old audit injection and sampling commands forward to the same implementation. [Injection guide](../ftqc_extractors/INJECTION.md)
+
+## Code automorphisms
+
+The installed-action verifier uses `ftqc_faults.action` to propagate each signed data X and Z generator through physical Clifford ticks. Its single-fault model inserts each nonidentity Pauli after a gate and X, Y or Z on every idle site per tick. The report counts the resulting data weights, including faults that propagate from spectators. Circuit distance requires a specified detection or recovery protocol. See the [installation workflow](../FTQC.md#code-automorphisms).

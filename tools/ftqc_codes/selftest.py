@@ -1342,6 +1342,31 @@ def t_lean(enabled):
           evs and all(e["status"] != "proved" for e in evs))
 
 
+def t_code_actions():
+    from ftqc_codes import automorphisms as aut
+    code = codes.load("steane")
+    paired = basis.derive_paired_basis(code)
+    steps = [{"layer": [["H", q] for q in range(7)]}]
+    receipt = aut.build(code, paired, steps)
+    check("transversal H logical Z image", receipt["logical_z"][0]["x_mask"] == 1)
+    check("logical H reverses Y sign", aut.logical_image(receipt, (1, 1, 0)) == (1, 1, 1))
+    changed = copy.deepcopy(receipt)
+    changed["logical_z"][0]["sign"] ^= 1
+    refuses("altered logical sign", lambda: aut.verify(code, changed))
+    refuses("wrong physical sign", lambda: aut.build(code, paired, [{"layer": [["X", 0]]}]))
+    spec_err_or_refuses("fold collision", lambda: aut.build(code, paired, [{"layer": [["CZ", 0, 1], ["S", 1]]}]))
+    code = codes.load("bb18")
+    paired = basis.derive_paired_basis(code)
+    from ftqc_codes.orbit_minweight import infer_default_automorphisms
+    perm = infer_default_automorphisms(code)[0]
+    action = aut.build(code, paired, [{"perm": perm}])
+    reference = symmetry.induced_logical_action(code, paired, perm)
+    check("pure permutation agrees with original verifier", all(action[k] == v for k,v in reference.items()))
+    inverse = [perm.index(q) for q in range(code.n)]
+    identity = aut.build(code, paired, [{"perm": perm}, {"perm": inverse}])
+    check("composition with inverse", all(row["x_mask"] == 1 << j for j, row in enumerate(identity["logical_x"])))
+
+
 def main():
     heavy, lean = "--heavy" in sys.argv, "--lean" in sys.argv
     t0 = time.monotonic()
@@ -1358,6 +1383,7 @@ def main():
         (t_hier, ()),
         (t_interchange_and_constructions, ()),
         (t_basis_and_symmetry, ()),
+        (t_code_actions, ()),
         (t_highrate_families_and_orbit_leg, ()),
         (t_sat, (heavy,)),
         (t_cli, ()),

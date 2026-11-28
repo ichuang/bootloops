@@ -5,6 +5,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
+from ftqc_codes.certify import Refusal as CodeRefusal
 from .algebra import Limit, seed, hgp_parameters, distance_below
 from .extractor import canonical, check_column
 from .audit import audit_canonical, audit_hgp
@@ -21,6 +22,7 @@ from .gross_distance import gross_certificate
 
 FIELDS = {
     "installed_surgery": ("n checks targets couplers batches idles terminal_syndrome target", "transport basis surface_distance"),
+    "action_orbit": ("code basis actions seed targets", ""),
     "bicycle_rm15_map": ("", "candidate"),
     "injection_export": ("attempt block model", ""),
     "injection_circuit": ("case", ""),
@@ -92,6 +94,9 @@ def evaluate(s, backend, budget, seconds, reverse=False):
     try:
         if kind == "installed_surgery":
             from .installed_surgery import analyze
+            return analyze(s, budget)
+        if kind == "action_orbit":
+            from .action_orbit import analyze
             return analyze(s, budget)
         if kind == "bicycle_rm15_map":
             from .bicycle import analyze as bicycle_map
@@ -362,7 +367,7 @@ def main():
         return {"proved": 0, "counterexample": 1, "inconclusive": 3}[
             r["result"]["status"]
         ]
-    except (OSError, ValueError, KeyError, TypeError, IndexError, OverflowError) as err:
+    except (OSError, ValueError, CodeRefusal, KeyError, TypeError, IndexError, OverflowError) as err:
         print(f"ftqc_extractors refusal: {err}", file=sys.stderr)
         return 2
 

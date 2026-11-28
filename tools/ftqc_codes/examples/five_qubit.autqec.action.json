@@ -1,0 +1,152 @@
+{
+  "schema": "ftqc_codes-action-1",
+  "basis": {
+    "schema": "ftqc_codes-basis-1",
+    "code_name": "five-qubit perfect code",
+    "code_sha256": "c2f5330cf2e47ebc593a27204dadc4d80b97ddfc47b9192fdf06c554450df3e7",
+    "n": 5,
+    "k": 1,
+    "coordinate_order": "0..n-1",
+    "source": "supplied",
+    "provenance": {},
+    "slots": [
+      {
+        "name": "q0",
+        "x": "+XXXXX",
+        "z": "+ZZZZZ"
+      }
+    ],
+    "basis_sha256": "00242d30e38953427d7ce5c3d2166a5e400ae02527183503a407023fe7da361f"
+  },
+  "steps": [
+    {
+      "layer": [
+        [
+          "Z",
+          0
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "SDG",
+          0
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          0
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "SDG",
+          0
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "Z",
+          1
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "SDG",
+          1
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          1
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "SDG",
+          1
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "Z",
+          2
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          2
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "S",
+          3
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "Z",
+          4
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          4
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "SWAP",
+          2,
+          4
+        ]
+      ]
+    }
+  ],
+  "code_sha256": "c2f5330cf2e47ebc593a27204dadc4d80b97ddfc47b9192fdf06c554450df3e7",
+  "basis_sha256": "00242d30e38953427d7ce5c3d2166a5e400ae02527183503a407023fe7da361f",
+  "logical_x": [
+    {
+      "x_mask": 1,
+      "z_mask": 1,
+      "sign": 0
+    }
+  ],
+  "logical_z": [
+    {
+      "x_mask": 0,
+      "z_mask": 1,
+      "sign": 0
+    }
+  ]
+}

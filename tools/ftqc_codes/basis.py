@@ -139,6 +139,8 @@ class _SignedStabilizerGroup:
 def _code_signed_checks(code):
     if not code.commutes():
         raise certify.Refusal("H_X and H_Z do not commute")
+    if hasattr(code, "signed_checks"):
+        return list(code.signed_checks)
     return [(r, 0, 0) for r in code.hx] + [(0, r, 0) for r in code.hz]
 
 
@@ -272,8 +274,9 @@ def verify_basis_receipt(code, basis_receipt):
     if basis_receipt.get("n") != code.n:
         raise certify.Refusal("basis n does not match code.n")
 
-    ex, ez = gf2.Echelon(code.hx), gf2.Echelon(code.hz)
-    k = code.n - ex.rank - ez.rank
+    checks = _code_signed_checks(code)
+    stab_symp = gf2.Echelon([x | (z << code.n) for x, z, _ in checks])
+    k = code.n - stab_symp.rank
     slots = basis_receipt.get("slots")
     if not isinstance(slots, list) or basis_receipt.get("k") != k or len(slots) != k:
         raise certify.Refusal(f"basis has {len(slots) if isinstance(slots, list) else None} slots; code has k={k}")
@@ -289,8 +292,6 @@ def verify_basis_receipt(code, basis_receipt):
     if basis_receipt.get("basis_sha256") != want_bsha:
         raise certify.Refusal("basis_sha256 does not match canonical slot payload")
 
-    checks = _code_signed_checks(code)
-    stab_symp = gf2.Echelon([x | (z << code.n) for x, z, _ in checks])
     # Also verify checks themselves generate a consistent signed group
     _SignedStabilizerGroup(code.n, checks)
 

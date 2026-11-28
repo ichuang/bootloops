@@ -228,3 +228,7 @@ literature below; external decoders are invoked out-of-tree via optional Python 
   S. Bravyi and A. Vargo, *Phys. Rev. A* **88**, 062308 (2013),
   [arXiv:1308.6270](https://arxiv.org/abs/1308.6270); B. M. Terhal, *Rev. Mod. Phys.*
   **87**, 307 (2015), [arXiv:1302.3428](https://arxiv.org/abs/1302.3428).
+
+## Code automorphisms
+
+Select `{"algorithm":"automorphism_ensemble","base":"bp_osd","permutations":[...]}` in a decoder study or pass it with `decode --decoder-spec FILE`. Permutations push original mechanism indices to new indices. A static CSS study can supply `actions` containing verified code-action receipts in place of `permutations`. Each action must preserve single-qubit errors in the selected sector. For DEMs, provide explicit mechanism maps. The verifier checks priors, weights, check row space and the joint check/observable row space. It inverse-transports each candidate, tests its original syndrome, and selects a valid minimum-soft-weight candidate including the identity member. See [reference results](../FTQC.md#code-automorphisms).

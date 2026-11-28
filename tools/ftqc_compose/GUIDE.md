@@ -189,3 +189,7 @@ factory-to-memory distance require a separate circuit audit.
 The [in-situ BB144 factory guide](../ftqc_extractors/BICYCLE_FACTORY.md)
 covers injection batch replay, RM15 input assignment, signed native pivot
 measurements, physical scheduling and full-attempt pricing.
+
+## Code automorphisms
+
+The `installed-action` study binds physical couplers, ticks and fault propagation to a verified signed code action. Use the ordinary `check` and `verify` commands. The `rm15-action` study transports the 15 rotation axes into a verified frame. The existing `bb144-rm15` installation checks the signed Gross orbit and replays physical return routes. See [code automorphisms](../FTQC.md#code-automorphisms) for examples and an optional Qiskit comparison.

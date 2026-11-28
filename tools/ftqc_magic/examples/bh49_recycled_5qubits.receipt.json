@@ -224,6 +224,6 @@
     "tight_known": false
   },
   "schema": "ftqc_magic-receipt-1",
-  "source_sha256": "5c26352ae4ad40a5f905dac8815d00f709ef43ace96489fd0f390bf687cb19de",
+  "source_sha256": "d3577ad8afa60300a67b51e717505a46ad9236f323854c5830f5353c67322d62",
   "spec_sha256": "db41b66bafddd7d97e0ede61ecad63df496d6e41046fc37a25e3f7bbd8e2ab6e"
 }

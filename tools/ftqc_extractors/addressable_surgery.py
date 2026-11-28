@@ -716,6 +716,22 @@ def compare_translated_seed_vs_ordinary_surgery():
 
     # 1. Translated-seed schedule (equivariant cyclic port translation of one seed!)
     t_designs = translated_settings(lp8.n, lp8.hx, lp8.hz, 4, chosen_seed, [0, 1], 2)
+    from ftqc_codes import automorphisms as aut
+    shift = fc_symmetry.cyclic_cell_shift_perm(lp8.n, 4)
+    generator = aut.build(lp8, basis_rec, [{"perm": shift}])
+    logical = (0, orbit_cert["orbits"][0]["translates"][0]["logical_mask"], 0)
+    group = fc_basis._SignedStabilizerGroup(lp8.n, fc_basis._code_signed_checks(lp8))
+    target_slots = []
+    for design in t_designs:
+        if logical[0] or logical[1].bit_count() != 1 or logical[2]:
+            raise ValueError("LP comparison requires a positive single-slot Z setting")
+        target_slots.append(basis_rec["slots"][logical[1].bit_length() - 1]["name"])
+        physical = fc_basis.parse_pauli(design["targets"][0], lp8.n)
+        expected = fc_basis.parse_pauli(fc_basis.embed_logical_pauli(basis_rec, *logical), lp8.n)
+        delta = fc_basis.mul_pauli(physical, expected)
+        if delta[2] % 2 or not group.contains_exact((delta[0], delta[1], delta[2] // 2)):
+            raise ValueError("translated LP instrument measures the wrong signed logical")
+        logical = aut.logical_image(generator, logical)
     t_parts = [build_surgery_design(d)["spec"] for d in t_designs]
     t_batches = []
     t_couplers = set()
@@ -742,11 +758,6 @@ def compare_translated_seed_vs_ordinary_surgery():
     t_res = analyze_installed(t_sched, 200_000)
 
     # 2. Ordinary surgery on 2 slots using stabilizer-dressed basis representatives
-    target_slots = (
-        orbit_cert["covered_unit_slots"][:2]
-        if len(orbit_cert["covered_unit_slots"]) >= 2
-        else [basis_rec["slots"][0]["name"], basis_rec["slots"][1]["name"]]
-    )
     dz_dress = [[i % len(lp8.hz)] for i in range(k)]
     dressed_b, _ = fc_basis.dress_basis(lp8, basis_rec, dress_z_hz=dz_dress)
     ord_bundle = install_addressable_program(
@@ -766,6 +777,7 @@ def compare_translated_seed_vs_ordinary_surgery():
         "code": {"name": lp8.name, "n": lp8.n, "k": k, "d": static_rec["facts"]["d"], "sha256": lp8.sha256()},
         "seed_orbit_certificate": {
             "seed_support": fc_gf2.supp(chosen_seed),
+            "signed_z_slots_in_order": target_slots,
             "seed_weight": chosen_seed.bit_count(),
             "covered_rank": orbit_cert["covered_rank"],
             "full_coverage": orbit_cert["full_coverage"],

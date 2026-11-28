@@ -17,6 +17,66 @@ The arrows show what one tool supplies to another in selected studies.
 | [ftqc_uncompute](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup preserve the logical quantum action? Is a pebbling schedule legal, and what error does a declared mask allow? | Exact symbolic HMR checks, sampled trajectory bounds, mask and schedule checks, and source-bound replay of `ftqc_uncompute-receipt-1`. |
 | [ftqc_magic](ftqc_magic/GUIDE.md) | What output quality, yield, and active-qubit footprint can a magic-state factory or cultivation pipeline deliver, and are its output correlations safe to compose? | Exact $\mathbb{Z}[\omega_8]$ / $\mathbb{Q}(\sqrt{2})$ / rational distillation & stabilizer-collapse proofs, recycled check schedules, $O(n^3)$ Clifford-hook cultivation distances, Caliper open-boundary escape gaps, single-shot qLDPC `CCZ` contracts, and `ftqc_magic-receipt-1` exports. |
 
+## Code automorphisms
+
+An action receipt identifies a memory, an ordered logical basis, a physical Clifford word, and the images of every logical X and Z including its sign. A push permutation sends old site `q` to site `perm[q]`. Layers execute in list order. Each physically installed pair needs a coupler. A virtual coordinate or logical frame change supplies no timing or distance evidence.
+
+From the BootLoops root, replay two externally discovered examples and the Table 4 phase fold.
+
+```sh
+export PYTHONPATH="$PWD/tools"
+ex=tools/ftqc_codes/examples
+out=$(mktemp -d)
+python3 -m ftqc_codes verify "$ex/steane.qldpc-h.action.json" --code steane
+python3 -m ftqc_codes verify "$ex/five_qubit.autqec.action.json" --code "$ex/five_qubit.stabilizer.json"
+gb='bb:9,1,x0+x1,x1+x2+x3+x5+x7+x8'
+python3 -m ftqc_codes action "$gb" "$ex/gb18-fold.steps.json" -o "$out/fold.json"
+python3 -m ftqc_codes verify "$out/fold.json" --code "$gb"
+```
+
+A phase fold takes an involution, applies CZ on each two-cycle and S on each fixed point. List fixed sites under `sdg` to use the inverse phase there. The 18-qubit GB example uses the first Table 4 polynomial pair. Nine CZs and a second layer of Z on sites 1, 3, 4 and 7 preserve the signed checks. In the derived basis the two X generators map to +XZ and −ZX. The CZ layer alone fails signed replay. [GBAutomorphisms Table 4 input](https://github.com/ajdav136/GBAutomorphisms/blob/4fc6b77ec17bb9f43de381384a9228f83fde52ce/Examples_table4.ipynb)
+
+Use `{"actions":[...],"word":[0,{"inverse":0}]}` as the steps file to compose checked generators. Indices start at zero. The result is one replayable action. A non-CSS code specification uses schema `ftqc_codes-stabilizer-1`, an integer `n`, signed Pauli `checks`, and ordered `slots` with `name`, `x`, and `z`. The verifier checks commutation, rank, independence, pairing and signs. The existing CSS distance commands retain their CSS inputs.
+
+The following example distinguishes reachability from physical installation. Logical H sends +Y to −Y. Seven parallel Hadamards implement the action in one tick.
+
+```sh
+python3 - "$ex/steane.qldpc-h.action.json" "$out" <<'PY'
+import json, sys
+from pathlib import Path
+a = json.loads(Path(sys.argv[1]).read_text())
+out = Path(sys.argv[2])
+orbit = dict(schema=1, kind="action_orbit", code="steane", basis=a["basis"],
+             actions=[a], seed="+Y", targets=["-Y", "+X"])
+install = dict(kind="installed-action", code="steane", action=a, width=7,
+               ticks=[[["H", q] for q in range(7)]], couplers=[])
+for name, spec in [("orbit", orbit), ("route", install)]:
+    (out / (name + ".json")).write_text(json.dumps(spec))
+PY
+python3 -m ftqc_extractors check "$out/orbit.json" -o "$out/orbit-proof.json"
+python3 -m ftqc_extractors verify "$out/orbit.json" "$out/orbit-proof.json"
+python3 -m ftqc_gadgets installed-action "$out/route.json"
+python3 -m ftqc_compose check "$out/route.json" -o "$out/route-proof.json"
+python3 -m ftqc_compose verify "$out/route.json" "$out/route-proof.json"
+```
+
+On LP(8,4) the translated seed and ordinary surgery measure positive Z on q2 then q3. In the installed model the translated implementation uses 42 couplers and admits a single fault leaving a residual on the data. Ordinary surgery uses six couplers and passes the distance-two lower-bound check. On BB144, both physical translation words and their signed logical images are checked against the 15 RM15 settings. The 12-by-6 physical translations induce 36 distinct signed logical actions, with each generator of order six, as in the Qiskit compiler's shift group. [Gross shift group](https://github.com/qiskit-community/bicycle-architecture-compiler/blob/ad97e823fc4077a9ee3d5fe57cabc25b6d9201d6/crates/bicycle_common/src/lib.rs)
+
+### Optional discovery and comparisons
+
+Native verification uses the Python standard library. Run optional producers in separate environments with `PYTHONPATH` unset so BootLoops' `galois` package does not shadow the PyPI dependency. Examples below assume the named Python executables point to those environments.
+
+```sh
+env -u PYTHONPATH "$QEC_PYTHON" tools/ftqc_codes/producers/discover_actions.py qldpc steane "$out/qldpc" --gates H
+env -u PYTHONPATH "$QEC_PYTHON" tools/ftqc_codes/producers/discover_actions.py autqec "$ex/five_qubit.stabilizer.json" "$out/autqec"
+env -u PYTHONPATH "$QEC_PYTHON" tools/ftqc_compose/compare_autdec.py
+env -u PYTHONPATH "$BICYCLE_PYTHON" tools/ftqc_compose/compare_bicycle_compiler.py --table "$out/table_gross.dat"
+```
+
+- qLDPC 0.2.9 with GAP 4.15.1 and GUAVA 3.20 found one transversal H generator and five generators in a separate SWAP-only search on Steane. Restrict the gate set for larger searches. AutQEC 1.0.1 with igraph/Bliss found five candidates on the five-qubit code. Stim checked every physical X and Z generator against each exported circuit. For up to six independent checks the Bliss adapter uses all unsigned stabilizers. Above that size it searches symmetries of the supplied independent generating set. These outputs make no claim of group completeness. [qLDPC](https://github.com/qLDPCOrg/qLDPC) · [AutQEC](https://github.com/hsayginel/autqec/tree/db614a9bfc91f384d324a647557aa9213c6cdc3b) · [Stim](https://github.com/quantumlib/Stim)
+- The AutDEC comparison fixes all 22 Steane weight-zero and single-qubit Pauli inputs, one order-three mechanism permutation and its identity control. The native BP+OSD ensemble had zero logical failures. Upstream BPOSD and its ensemble each had three, using LDPC 2.1.2, ten iterations and OSD order zero. These are finite control counts for the stated implementations. [AutDEC reference implementation](https://github.com/hsayginel/autdec/tree/00746ced028ebc6edca1b4e56ee6db3d9039d553)
+- Bicycle Architecture Compiler 0.1.0 with Qiskit 2.6.2 compiled the same 15 PPRs for Gross, with 15 T injections, 105 measurements and 112 automorphisms across its compiled program. The BootLoops installed factory uses 56 shift and return generators, or 336 CX ticks, for its Gross-port movement alone. Each count covers its own stated operations. [Bicycle Architecture Compiler](https://github.com/qiskit-community/bicycle-architecture-compiler)
+
 ## Where the tools connect
 
 - **From a code to a noisy circuit.** The audit, gadget and extractor packages reuse code constructions or binary linear algebra from `ftqc_codes`. A static distance counts data qubits supporting a logical Pauli. To count faulty circuit locations, the study also specifies preparations, gates, idles, measurements, detectors and protected outputs.
