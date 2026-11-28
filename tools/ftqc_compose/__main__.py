@@ -33,6 +33,9 @@ def receipt(spec):
 
 
 def evaluate(spec):
+    if spec["kind"] == "decoded-surgery":
+        from .surgery import decoded_channel
+        return decoded_channel(spec)
     if spec["kind"] == "surgery-channel":
         from .surgery import channel
         return channel(spec)

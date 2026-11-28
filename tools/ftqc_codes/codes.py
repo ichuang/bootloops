@@ -210,27 +210,35 @@ def planar(L):
     return c
 
 
+def rotated_plaquettes(d):
+    """Yield (basis, corner coordinate, occupied corners) in syndrome-record order."""
+    if d < 2:
+        raise SpecError("rotated_surface family needs d >= 2")
+    for i in range(d + 1):
+        for j in range(d + 1):
+            corners = {"NW": (i-1, j-1), "NE": (i-1, j), "SW": (i, j-1), "SE": (i, j)}
+            cells = {k: r*d+c for k, (r,c) in corners.items() if 0 <= r < d and 0 <= c < d}
+            axis = "Z" if (i+j) % 2 else "X"
+            if len(cells) == 4 or len(cells) == 2 and ((i in (0, d)) == (axis == "X")):
+                yield axis, (i, j), cells
+
+
+def rotated_boundaries(d):
+    """Ordered data sites. Top/bottom carry logical Z, left/right logical X."""
+    if type(d) is not int or d < 2:
+        raise SpecError("expected integer distance >= 2")
+    return dict(top=list(range(d)), bottom=list(range(d*(d-1), d*d)),
+                left=list(range(0, d*d, d)), right=list(range(d-1, d*d, d)))
+
+
 def rotated_surface(d):
     """Rotated surface code [[d^2, 1, d]]: data qubits on a d x d grid, bulk
     plaquettes in a checkerboard, weight-2 X checks on the top and bottom
     edges and weight-2 Z checks on the left and right edges."""
     d = int(d)
-    if d < 2:
-        raise SpecError("rotated_surface family needs d >= 2")
     hx, hz = [], []
-    for i in range(d + 1):
-        for j in range(d + 1):
-            cells = [(r, c) for r in (i - 1, i) for c in (j - 1, j) if 0 <= r < d and 0 <= c < d]
-            v = gf2.from_supp(r * d + c for r, c in cells)
-            is_x = (i + j) % 2 == 0
-            if len(cells) == 4:
-                (hx if is_x else hz).append(v)
-            elif len(cells) == 2:
-                horizontal = i in (0, d)       # top or bottom edge
-                if horizontal and is_x:
-                    hx.append(v)
-                elif not horizontal and not is_x:
-                    hz.append(v)
+    for axis, _, cells in rotated_plaquettes(d):
+        (hx if axis == "X" else hz).append(gf2.from_supp(cells.values()))
     return CSSCode(f"RotatedSurface(d={d})", d * d, hx, hz,
                    dict(family="rotated_surface", d=d))
 
