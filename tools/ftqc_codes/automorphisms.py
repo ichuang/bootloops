@@ -1,4 +1,4 @@
-"""Signed Clifford actions on a specified CSS memory and ordered logical basis.
+"""Signed Clifford actions on a specified stabilizer memory and ordered logical basis.
 
 A step is either a push permutation (old site -> new site), or one disjoint
 layer of local or paired Clifford gates. Layers are applied in list order.
@@ -113,14 +113,56 @@ def build(code, paired, steps):
 def verify(code, receipt):
     if not isinstance(receipt, dict) or receipt.get("schema") != SCHEMA:
         raise certify.Refusal("expected a code action receipt")
-    if build(code, receipt.get("basis"), receipt.get("steps")) != receipt:
+    rebuilt = build(code, receipt.get("basis"), receipt.get("steps"))
+    if basis._canonical_sha256(rebuilt) != basis._canonical_sha256(receipt):
         raise certify.Refusal("signed code action replay mismatch")
     return receipt
+
+
+def inverse_steps(steps):
+    """Reverse canonical physical steps, including push permutations."""
+    out = []
+    for step in reversed(steps):
+        if "perm" in step:
+            inverse = [0] * len(step["perm"])
+            for q, t in enumerate(step["perm"]):
+                inverse[t] = q
+            out.append({"perm": inverse})
+        else:
+            out.append({"layer": [[{"S":"SDG", "SDG":"S"}.get(gate, gate), *sites]
+                                  for gate, *sites in step["layer"]]})
+    return out
+
+
+def from_spec(code, paired, spec):
+    """Build from elementary steps or compose verified generators in application order."""
+    if isinstance(spec, list):
+        return build(code, paired, spec)
+    if (not isinstance(spec, dict) or set(spec) != {"actions", "word"}
+            or not isinstance(spec["actions"], list) or not isinstance(spec["word"], list)):
+        raise codes.SpecError("expected physical steps or actions and a generator word")
+    actions = spec["actions"]
+    for action in actions:
+        verify(code, action)
+        if action["basis_sha256"] != paired["basis_sha256"]:
+            raise certify.Refusal("word uses a different logical basis")
+    steps = []
+    for element in spec["word"]:
+        reverse = isinstance(element, dict) and set(element) == {"inverse"}
+        index = element["inverse"] if reverse else element
+        if type(index) is not int or not 0 <= index < len(actions):
+            raise codes.SpecError("word must contain zero-based indices or inverse indices")
+        part = actions[index]["steps"]
+        steps.extend(inverse_steps(part) if reverse else part)
+    return build(code, paired, steps)
 
 
 def logical_image(action, pauli):
     """Conjugate a signed logical Pauli using the certified generator images."""
     x, z, sign = pauli
+    k = len(action["logical_x"])
+    if any(type(v) is not int or v < 0 or v >> k for v in (x, z)) or sign not in (0, 1):
+        raise codes.SpecError("logical Pauli exceeds the action basis")
     ops = []
     for mask, name in ((x, "logical_x"), (z, "logical_z")):
         for j, image in enumerate(action[name]):

@@ -6,6 +6,8 @@ from .algebra import Limit
 
 
 def orbit(actions, seed, budget):
+    if type(budget) is not int or budget < 1:
+        raise Limit("signed measurement orbit requires a positive state budget")
     words = {seed: ()}
     queue = deque([seed])
     while queue:

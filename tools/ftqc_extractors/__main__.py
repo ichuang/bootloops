@@ -5,6 +5,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
+from ftqc_codes.certify import Refusal as CodeRefusal
 from .algebra import Limit, seed, hgp_parameters, distance_below
 from .extractor import canonical, check_column
 from .audit import audit_canonical, audit_hgp
@@ -366,7 +367,7 @@ def main():
         return {"proved": 0, "counterexample": 1, "inconclusive": 3}[
             r["result"]["status"]
         ]
-    except (OSError, ValueError, KeyError, TypeError, IndexError, OverflowError) as err:
+    except (OSError, ValueError, CodeRefusal, KeyError, TypeError, IndexError, OverflowError) as err:
         print(f"ftqc_extractors refusal: {err}", file=sys.stderr)
         return 2
 

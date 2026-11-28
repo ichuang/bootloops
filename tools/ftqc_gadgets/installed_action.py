@@ -4,6 +4,9 @@ from ftqc_faults.action import check_data_action, single_fault_spread
 
 
 def analyze(spec):
+    if (set(spec) != {"kind", "code", "action", "width", "ticks", "couplers"}
+            or spec["kind"] != "installed-action"):
+        raise ValueError("expected an installed-action specification")
     code = action_domain.load(spec["code"])
     action = automorphisms.verify(code, spec["action"])
     width, ticks, edges = spec["width"], spec["ticks"], spec["couplers"]

@@ -101,6 +101,19 @@ def generators():
                         labels[a], labels[b] = labels[b], labels[a]
                 if any(labels[translated(q, delta)] != q for q in range(144)):
                     raise ValueError("shift permutation mismatch")
+                # Propagate all data X and Z generators through the emitted CXs.
+                # A bit in row i identifies an input Pauli with output on site i.
+                initial = [1 << q for q in range(144)] + [0] * 144
+                xs, zs = initial.copy(), initial.copy()
+                for tick in ticks:
+                    for _, control, target in tick:
+                        xs[target] ^= xs[control]
+                        zs[control] ^= zs[target]
+                expected = [0] * 288
+                for q in range(144):
+                    expected[translated(q, delta)] = 1 << q
+                if xs != expected or zs != expected:
+                    raise ValueError("emitted CX route changes the signed data action")
                 generators[delta] = ticks
     return generators
 

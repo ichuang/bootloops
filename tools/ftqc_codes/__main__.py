@@ -53,9 +53,9 @@ def main(argv=None):
     bs.add_argument("spec")
     bs.add_argument("-o", "--out")
     bs.add_argument("--method", choices=("binary", "candidate", "spectral"), default="binary")
-    ac = sub.add_parser("action", help="verify physical Clifford steps on a named CSS basis")
+    ac = sub.add_parser("action", help="verify Clifford steps on a signed stabilizer logical basis")
     ac.add_argument("spec")
-    ac.add_argument("steps", help="JSON list of push permutations and disjoint Clifford layers")
+    ac.add_argument("steps", help="JSON list of push permutations, phase folds and disjoint Clifford layers")
     ac.add_argument("--basis", help="paired basis receipt (default: derive from checks)")
     ac.add_argument("-o", "--out")
     v = sub.add_parser("verify")
@@ -90,7 +90,7 @@ def main(argv=None):
             else:
                 paired = action_domain.default_basis(code)
             with open(a.steps) as f:
-                rec = automorphisms.build(code, paired, json.load(f))
+                rec = automorphisms.from_spec(code, paired, json.load(f))
             if a.out:
                 with open(a.out, "w") as f:
                     json.dump(rec, f, indent=2)

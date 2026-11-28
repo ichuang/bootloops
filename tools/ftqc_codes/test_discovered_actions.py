@@ -20,14 +20,29 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(aut.logical_image(action, (1,0,0)), (1,2,0))
         self.assertEqual(aut.logical_image(action, (2,0,0)), (2,1,1))
 
+    def test_qldpc_hadamard_orbit(self):
+        from ftqc_extractors.__main__ import receipt, verify
+        code = action_domain.load("steane")
+        action = json.loads((EXAMPLES / "steane.qldpc-h.action.json").read_text())
+        aut.verify(code, action)
+        spec = dict(schema=1, kind="action_orbit", code="steane", basis=action["basis"],
+                    actions=[action], seed="+Y", targets=["-Y", "+X"])
+        rec = receipt(spec)
+        verify(spec, rec)
+        self.assertEqual(rec["result"]["settings"][0]["word"], [0])
+        self.assertFalse(rec["result"]["settings"][1]["reachable"])
+
     def test_discovered_noncss_and_signed_target(self):
         path = str(EXAMPLES / "five_qubit.stabilizer.json")
         code = action_domain.load(path)
         action = json.loads((EXAMPLES / "five_qubit.autqec.action.json").read_text())
         aut.verify(code, action)
         spec = dict(code=path, basis=action["basis"], actions=[action],
-                    seed="+X", targets=["+X", "-X"])
+                    seed="+X", targets=["+Y", "+Z"])
         result = action_orbit.analyze(spec, 6)
-        self.assertTrue(result["settings"][0]["reachable"])
+        self.assertEqual(result["settings"][0]["word"], [0])
+        identity = aut.from_spec(code, action["basis"], {"actions": [action], "word": [0, {"inverse": 0}]})
+        for p in ((1,0,0), (0,1,0), (1,1,1)):
+            self.assertEqual(aut.logical_image(identity, p), p)
         self.assertFalse(result["settings"][1]["reachable"])
 

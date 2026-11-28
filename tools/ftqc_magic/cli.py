@@ -79,18 +79,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.cmd in ("check", "verify"):
             spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
-            if spec.get("kind") == "insitu-rm15":
+            if spec.get("kind") in ("insitu-rm15", "rm15-action"):
                 # Native Extractors owns source replay; share the same joined
                 # receipt with Compose's logical gate and hardware consumers.
                 from ftqc_compose.__main__ import receipt as replay_inputs
                 from .certify import canonical_json_sha256
-                joined = replay_inputs(spec)
+                from ftqc_codes.certify import Refusal as CodeRefusal
+                try:
+                    joined = replay_inputs(spec)
+                except CodeRefusal as exc:
+                    raise ValueError(str(exc)) from exc
                 if args.cmd == "check":
                     _write_or_print(joined, args.output)
                 elif canonical_json_sha256(joined) != canonical_json_sha256(json.loads(Path(args.receipt).read_text())):
-                    raise ValueError("in-situ factory receipt differs from replay")
+                    raise ValueError("RM15 receipt differs from replay")
                 else:
-                    print("verified in-situ RM15 factory")
+                    print("verified", spec["kind"])
                 return 0
         if args.cmd in ("check", "pipeline"):
             spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))

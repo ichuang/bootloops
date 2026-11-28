@@ -6,6 +6,7 @@ import json
 import sys
 from pathlib import Path
 
+from ftqc_codes.certify import Refusal as CodeRefusal
 from .supports import family_result
 
 
@@ -33,6 +34,9 @@ def receipt(spec):
 
 
 def evaluate(spec):
+    if spec["kind"] == "rm15-action":
+        from ftqc_magic.action_program import transport
+        return transport(spec)
     if spec["kind"] == "installed-action":
         from ftqc_gadgets.installed_action import analyze
         return analyze(spec)
@@ -163,7 +167,7 @@ def main():
         else:
             print(content, end="")
         return int(result["result"]["status"] == "counterexample")
-    except (ValueError, TypeError, KeyError, AttributeError, OSError) as error:
+    except (ValueError, CodeRefusal, TypeError, KeyError, AttributeError, OSError) as error:
         print(f"ftqc_compose: {error}", file=sys.stderr)
         return 2
 

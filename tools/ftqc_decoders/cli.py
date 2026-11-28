@@ -63,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     p_dec.add_argument("--code", required=True, help="Code spec (steane, golay, qr:47, bb72, bb144, toric:5, FILE.dem)")
     p_dec.add_argument("--sector", default="X", choices=["X", "Z"])
     p_dec.add_argument("--decoder", default="bp_osd", help="Decoder (bp_osd, bp_lsd, relay_bp, union_find, mwpm, ssf, sat_mwd, external:tesseract, ...)")
+    p_dec.add_argument("--decoder-spec", type=Path, help="JSON decoder configuration, including ensemble permutations")
     p_dec.add_argument("--faults", default="", help="Comma-separated injected fault mechanism indices (e.g. 0,18,41)")
     p_dec.add_argument("--syndrome", type=int, default=None, help="Integer syndrome bitmask (if --faults omitted)")
     p_dec.add_argument("-o", "--output", type=Path, default=None)
@@ -167,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
             study_d: dict[str, Any] = {
                 "study": "decode",
                 "problem": _parse_code_shorthand(args.code, sector=args.sector),
-                "decoder": args.decoder,
+                "decoder": json.loads(args.decoder_spec.read_text()) if args.decoder_spec else args.decoder,
             }
             if args.faults.strip():
                 study_d["fault_mechanisms"] = [int(x.strip()) for x in args.faults.split(",") if x.strip()]
