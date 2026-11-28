@@ -1,4 +1,5 @@
 """Search the signed Pauli orbit under supplied code actions; retain a replayable word."""
+
 from collections import deque
 
 from ftqc_codes import action_domain, automorphisms as aut, basis
@@ -50,8 +51,18 @@ def analyze(spec, budget):
         x, z, phase = basis.mul_pauli(desired, image)
         if phase % 2 or not group.contains_exact((x, z, phase // 2)):
             raise ValueError("signed physical orbit disagrees with logical target")
-        settings.append(dict(target=requested, reachable=True, word=list(words[target]),
-                             physical=basis.pauli_from_xz(code.n, *image)))
-    return dict(status="proved", basis_sha256=paired["basis_sha256"],
-                orbit_size=len(words), settings=settings, scope="signed measurement settings")
-
+        settings.append(
+            dict(
+                target=requested,
+                reachable=True,
+                word=list(words[target]),
+                physical=basis.pauli_from_xz(code.n, *image),
+            )
+        )
+    return dict(
+        status="proved",
+        basis_sha256=paired["basis_sha256"],
+        orbit_size=len(words),
+        settings=settings,
+        scope="signed measurement settings",
+    )

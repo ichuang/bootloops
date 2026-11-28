@@ -1,4 +1,5 @@
 """Signed stabilizer inputs for code-action replay, including non-CSS codes."""
+
 import json
 from dataclasses import dataclass
 
@@ -13,11 +14,16 @@ class StabilizerCode:
     slots: list
 
     def commutes(self):
-        return all(basis.commute_pauli(a, b) for i, a in enumerate(self.signed_checks)
-                   for b in self.signed_checks[:i])
+        return all(
+            basis.commute_pauli(a, b)
+            for i, a in enumerate(self.signed_checks)
+            for b in self.signed_checks[:i]
+        )
 
     def sha256(self):
-        return basis._canonical_sha256({"n": self.n, "signed_checks": self.signed_checks})
+        return basis._canonical_sha256(
+            {"n": self.n, "signed_checks": self.signed_checks}
+        )
 
 
 def load(spec):
@@ -31,7 +37,9 @@ def load(spec):
             if not isinstance(data.get("slots"), list):
                 raise codes.SpecError("expected ordered logical slots")
             checks = tuple(basis.parse_pauli(p, n) for p in data["checks"])
-            return StabilizerCode(data.get("name", "stabilizer"), n, checks, data["slots"])
+            return StabilizerCode(
+                data.get("name", "stabilizer"), n, checks, data["slots"]
+            )
     return codes.load(spec)
 
 
@@ -39,4 +47,3 @@ def default_basis(code):
     if isinstance(code, StabilizerCode):
         return basis.build_basis_receipt(code, code.slots)
     return basis.derive_paired_basis(code)
-

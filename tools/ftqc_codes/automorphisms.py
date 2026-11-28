@@ -3,6 +3,7 @@
 A step is either a push permutation (old site -> new site), or one disjoint
 layer of local or paired Clifford gates. Layers are applied in list order.
 """
+
 from . import basis, certify, codes, interchange, symmetry
 
 SCHEMA = "ftqc_codes-action-1"
@@ -20,16 +21,24 @@ def validate(n, steps):
                 raise codes.SpecError("expected integer permutation")
             interchange.validate_permutation(p, n, "action")
             continue
-        if not isinstance(step, dict) or set(step) != {"layer"} or not isinstance(step["layer"], list):
+        if (
+            not isinstance(step, dict)
+            or set(step) != {"layer"}
+            or not isinstance(step["layer"], list)
+        ):
             raise codes.SpecError("expected perm or layer")
         used = set()
         for op in step["layer"]:
             if not isinstance(op, list) or not op or not isinstance(op[0], str):
                 raise codes.SpecError("invalid Clifford operation")
             gate, *sites = op
-            if (gate not in LOCAL | PAIRED or len(sites) != 1 + (gate in PAIRED)
-                    or any(type(q) is not int or not 0 <= q < n for q in sites)
-                    or len(set(sites)) != len(sites) or used.intersection(sites)):
+            if (
+                gate not in LOCAL | PAIRED
+                or len(sites) != 1 + (gate in PAIRED)
+                or any(type(q) is not int or not 0 <= q < n for q in sites)
+                or len(set(sites)) != len(sites)
+                or used.intersection(sites)
+            ):
                 raise codes.SpecError(f"invalid or overlapping operation {op!r}")
             used.update(sites)
 
@@ -52,7 +61,9 @@ def conjugate(pauli, steps):
                 sign ^= a & (b ^ (gate == "SDG"))
                 z ^= a << q
             elif gate in ("X", "Y", "Z"):
-                sign ^= (a if gate in ("Y", "Z") else 0) ^ (b if gate in ("X", "Y") else 0)
+                sign ^= (a if gate in ("Y", "Z") else 0) ^ (
+                    b if gate in ("X", "Y") else 0
+                )
             else:
                 t = rest[0]
                 c, d = (x >> t) & 1, (z >> t) & 1
@@ -86,11 +97,15 @@ def expand_folds(n, steps):
         perm = interchange.validate_permutation(step["fold"], n, "fold")
         fixed = {q for q in range(n) if perm[q] == q}
         negative = step.get("sdg", [])
-        if (any(perm[t] != q for q, t in enumerate(perm))
-                or not isinstance(negative, list)
-                or any(type(q) is not int or q not in fixed for q in negative)
-                or len(set(negative)) != len(negative)):
-            raise codes.SpecError("fold requires an involution and distinct SDG fixed points")
+        if (
+            any(perm[t] != q for q, t in enumerate(perm))
+            or not isinstance(negative, list)
+            or any(type(q) is not int or q not in fixed for q in negative)
+            or len(set(negative)) != len(negative)
+        ):
+            raise codes.SpecError(
+                "fold requires an involution and distinct SDG fixed points"
+            )
         layer = [["SDG" if q in negative else "S", q] for q in sorted(fixed)]
         layer.extend(["CZ", q, t] for q, t in enumerate(perm) if q < t)
         out.append({"layer": layer})
@@ -105,7 +120,9 @@ def build(code, paired, steps):
     group = basis._SignedStabilizerGroup(code.n, checks)
     for check in checks:
         if not group.contains_exact(conjugate(check, steps)):
-            raise certify.Refusal("physical Clifford does not preserve signed stabilizers")
+            raise certify.Refusal(
+                "physical Clifford does not preserve signed stabilizers"
+            )
     logical = symmetry.logical_action(code, paired, lambda p: conjugate(p, steps))
     return dict(schema=SCHEMA, basis=paired, steps=steps, **logical)
 
@@ -129,8 +146,14 @@ def inverse_steps(steps):
                 inverse[t] = q
             out.append({"perm": inverse})
         else:
-            out.append({"layer": [[{"S":"SDG", "SDG":"S"}.get(gate, gate), *sites]
-                                  for gate, *sites in step["layer"]]})
+            out.append(
+                {
+                    "layer": [
+                        [{"S": "SDG", "SDG": "S"}.get(gate, gate), *sites]
+                        for gate, *sites in step["layer"]
+                    ]
+                }
+            )
     return out
 
 
@@ -138,8 +161,12 @@ def from_spec(code, paired, spec):
     """Build from elementary steps or compose verified generators in application order."""
     if isinstance(spec, list):
         return build(code, paired, spec)
-    if (not isinstance(spec, dict) or set(spec) != {"actions", "word"}
-            or not isinstance(spec["actions"], list) or not isinstance(spec["word"], list)):
+    if (
+        not isinstance(spec, dict)
+        or set(spec) != {"actions", "word"}
+        or not isinstance(spec["actions"], list)
+        or not isinstance(spec["word"], list)
+    ):
         raise codes.SpecError("expected physical steps or actions and a generator word")
     actions = spec["actions"]
     for action in actions:
@@ -151,7 +178,9 @@ def from_spec(code, paired, spec):
         reverse = isinstance(element, dict) and set(element) == {"inverse"}
         index = element["inverse"] if reverse else element
         if type(index) is not int or not 0 <= index < len(actions):
-            raise codes.SpecError("word must contain zero-based indices or inverse indices")
+            raise codes.SpecError(
+                "word must contain zero-based indices or inverse indices"
+            )
         part = actions[index]["steps"]
         steps.extend(inverse_steps(part) if reverse else part)
     return build(code, paired, steps)
@@ -169,4 +198,3 @@ def logical_image(action, pauli):
             if mask >> j & 1:
                 ops.append((image["x_mask"], image["z_mask"], image["sign"]))
     return basis._mul_chain_signed(ops, sign, (x & z).bit_count())
-

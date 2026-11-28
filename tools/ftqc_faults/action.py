@@ -1,4 +1,5 @@
 """Single-location residual spread for disjoint physical Clifford ticks."""
+
 from itertools import product
 
 from ftqc_codes import automorphisms as aut
@@ -12,7 +13,9 @@ def single_fault_spread(width, n_data, ticks):
     histogram = {}
     for tick in reversed(ticks):
         used = {q for op in tick for q in op[1:]}
-        locations = [op[1:] for op in tick] + [[q] for q in range(width) if q not in used]
+        locations = [op[1:] for op in tick] + [
+            [q] for q in range(width) if q not in used
+        ]
         for loc in locations:
             for errors in product(range(4), repeat=len(loc)):
                 if not any(errors):
@@ -43,9 +46,11 @@ def single_fault_spread(width, n_data, ticks):
                 elif gate == "SWAP":
                     xs[q], xs[t] = xs[t], xs[q]
                     zs[q], zs[t] = zs[t], zs[q]
-    return {"post_gate_and_idle_faults": sum(histogram.values()),
-            "data_weight_histogram": {str(k): v for k, v in sorted(histogram.items())},
-            "max_data_weight": max(histogram, default=0)}
+    return {
+        "post_gate_and_idle_faults": sum(histogram.values()),
+        "data_weight_histogram": {str(k): v for k, v in sorted(histogram.items())},
+        "max_data_weight": max(histogram, default=0),
+    }
 
 
 def check_data_action(width, n, ticks, steps):
@@ -55,5 +60,6 @@ def check_data_action(width, n, ticks, steps):
     for q in range(n):
         for p in ((1 << q, 0, 0), (0, 1 << q, 0)):
             if aut.conjugate(p, layers) != aut.conjugate(p, steps):
-                raise ValueError(f"installed circuit changes signed data image at site {q}")
-
+                raise ValueError(
+                    f"installed circuit changes signed data image at site {q}"
+                )
