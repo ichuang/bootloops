@@ -86,3 +86,14 @@ class StagedTests(unittest.TestCase):
                 self.assertEqual(x, sum((error[i] in (1, 2)) << i for i in range(3)))
                 self.assertEqual(z, sum((error[i] in (2, 3)) << i for i in range(3)))
                 self.assertEqual(flip, int(error[3] in (2, 3)))
+
+    def test_supplied_recovery(self):
+        spec = staged_switch.example("rm15-phase")
+        rows = staged.analyze(spec)["result"]["faults"]["recovery"]
+        spec["terminal_recovery"] = rows
+        self.assertEqual(staged.analyze(spec)["result"]["status"], "proved")
+        rows[0][-1] ^= 32767
+        failed = staged.analyze(spec)
+        self.assertEqual(failed["result"]["status"], "counterexample")
+        self.assertIn("origin", failed["result"]["witness"])
+        staged.verify(failed)

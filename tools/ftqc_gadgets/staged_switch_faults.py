@@ -7,12 +7,12 @@ from ftqc_faults.staged import cat_faults
 from .staged import Counterexample
 
 
-def check_faults(spec, geometry):
+def check_faults(spec, geometry, rule):
     small, large, split, split_z, _ = geometry
     op = spec["operation"]
     up = op == "raise"
     hx, hz = (split, split_z) if op == "lower" else (large.hx, large.hz)
-    decoder = Recovery(hx, hz)
+    decoder = Recovery(hx, hz, rule)
     counts = Counter()
     locations = set()
 

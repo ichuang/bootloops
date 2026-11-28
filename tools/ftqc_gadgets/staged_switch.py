@@ -6,6 +6,7 @@ logical basis columns must carry the same amplitude and branch probability.
 
 from ftqc_codes.codes import steane, rm15
 from ftqc_codes.gf2 import dot, nullspace
+from ftqc_decoders.staged import syndrome
 from .staged import Counterexample, endpoint
 
 
@@ -14,10 +15,6 @@ def span(rows):
     for row in rows:
         words += [word ^ row for word in words]
     return words
-
-
-def syndrome(word, checks):
-    return sum(dot(word, check) << i for i, check in enumerate(checks))
 
 
 def geometry():
@@ -45,7 +42,7 @@ def example(operation):
     )
 
 
-def check(spec):
+def check(spec, rule=None):
     op = spec["operation"]
     base = example(op)
     if set(spec) != set(base) or len(spec["blocks"]) != 1:
@@ -125,5 +122,5 @@ def check(spec):
         )
     from .staged_switch_faults import check_faults
 
-    result["faults"] = check_faults(spec, (small, large, split, split_z, dual))
+    result["faults"] = check_faults(spec, (small, large, split, split_z, dual), rule)
     return result

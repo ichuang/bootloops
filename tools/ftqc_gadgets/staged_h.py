@@ -6,7 +6,7 @@ from ftqc_decoders.staged import Recovery
 from .staged import endpoint, Counterexample
 
 
-def check(spec):
+def check(spec, rule=None):
     if set(spec) != {"kind", "operation", "blocks"} or len(spec["blocks"]) != 3:
         raise ValueError("target H needs three ordered Steane blocks")
     code = steane()
@@ -18,8 +18,10 @@ def check(spec):
         raise ValueError("transversal H does not preserve the code")
     hx = [h << (7 * b) for b in range(3) for h in code.hx]
     hz = [h << (7 * b) for b in range(3) for h in code.hz]
-    decoder = Recovery(hx, hz)
-    decoder.observe([], 0, 0, "clean")
+    decoder = Recovery(hx, hz, rule)
+    clean_failure = decoder.observe([], 0, 0, "clean")
+    if clean_failure:
+        raise Counterexample("target-H clean recovery", **clean_failure)
     for q in range(21):
         for x, z in ((1, 0), (1, 1), (0, 1)):
             for timing in ("incoming", "internal"):

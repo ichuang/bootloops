@@ -41,7 +41,7 @@ def example():
     )
 
 
-def check(spec):
+def check(spec, rule=None):
     if (
         (set(spec) - {"record_history"})
         != {"kind", "operation", "blocks", "pieces", "cuts"}
@@ -87,7 +87,7 @@ def check(spec):
         ideal=dict(
             coset_words=(2 * len(words)) ** 3, piece_lengths=list(map(len, pieces))
         ),
-        faults=faults(pieces, small, keep_history),
+        faults=faults(pieces, small, keep_history, rule),
     )
 
 
@@ -116,10 +116,10 @@ def events(pieces, checks):
                     yield (i, r, j), mode, x, z, flip
 
 
-def faults(pieces, small, keep_history):
+def faults(pieces, small, keep_history, rule):
     checks = [h << (7 * b) for b in range(3) for h in small.hz]
     xchecks = [h << (7 * b) for b in range(3) for h in small.hx]
-    decoder = Recovery(xchecks, checks)
+    decoder = Recovery(xchecks, checks, rule)
     z_group = Echelon(checks)
     correction = {syndrome(1 << q, small.hz): 1 << q for q in range(7)}
     correction[0] = 0

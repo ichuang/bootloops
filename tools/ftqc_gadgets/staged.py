@@ -43,19 +43,23 @@ def analyze(spec):
         or len(set(names)) != len(names)
     ):
         raise ValueError("expected distinct ordered block names")
+    rule = spec.get("terminal_recovery")
+    if "terminal_recovery" in spec and not isinstance(rule, list):
+        raise ValueError("terminal_recovery must be a list of syndrome table rows")
+    protocol = {key: value for key, value in spec.items() if key != "terminal_recovery"}
     from . import staged_switch
 
     try:
         if spec["operation"] == "pieceable-ccz":
             from .staged_pieceable import check
 
-            result = check(spec)
+            result = check(protocol, rule)
         elif spec["operation"] == "target-h":
             from .staged_h import check
 
-            result = check(spec)
+            result = check(protocol, rule)
         else:
-            result = staged_switch.check(spec)
+            result = staged_switch.check(protocol, rule)
         from .staged_work import workload
 
         result["workload"] = workload(spec, result)

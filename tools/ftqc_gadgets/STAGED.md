@@ -74,7 +74,11 @@ A propagated X on a CCZ leg induces a CZ on the opposite pair. Faults
 retains the full quadratic phase until the terminal projection. The signed
 Pauli expansion is combined modulo Z stabilizers before testing for
 incompatible logical residuals at a common decoder record. Decoders exports
-the table indexed by history, X-error syndrome and Z-error syndrome. Gadgets
+the table indexed by history, X-error syndrome and Z-error syndrome. To
+test an installed decoder, supply its rows as `terminal_recovery` in the
+gadget input. Each row is `[history,sx,sz,x_correction,z_correction]`.
+Missing entries apply identity. Replay checks each admitted residual against
+the supplied correction modulo the two endpoint stabilizer groups. Gadgets
 returns a counterexample with the competing fault origins when these data
 cannot distinguish two residuals. Receipt replay recalculates the complete
 table, the ideal action and the location census.
