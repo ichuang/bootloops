@@ -35,8 +35,6 @@ from .rings import QSqrt2, parse_exact_fraction
 def _ensure_tools_on_syspath() -> None:
     for candidate in (
         Path(__file__).resolve().parents[1],
-        Path("/Volumes/t2/Documents/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
-        Path("/home/ike/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
     ):
         if (candidate / "ftqc_faults").is_dir() or (candidate / "ftqc_codes").is_dir():
             s = str(candidate)
@@ -1230,7 +1228,7 @@ def _crosscheck_s_proxy_with_faults_and_stim(schedule: dict[str, Any], native_d_
     """Cross-verify the Clifford `S`-cultivation proxy circuit on `[[7, 1, 3]]` using BOTH:
     1) `ftqc_faults.audit` (`from ftqc_faults import audit`) — verifying deterministic detectors &
        single-fault signatures!
-    2) `stim` (when installed, e.g. on `pleiades.local`) — building the full closed `stim.Circuit`,
+    2) `stim` (when installed) — building the full closed `stim.Circuit`,
        checking deterministic `DETECTOR` + `OBSERVABLE_INCLUDE`, and checking `shortest_graphlike_error` /
        `search_for_undetectable_logical_errors` agrees `d_S >= native_d_s`!
     """

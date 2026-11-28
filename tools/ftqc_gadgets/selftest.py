@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ftqc_gadgets battery.  Stdlib only (plus ftqc_audit and ftqc_codes from this repository).
+"""ftqc_gadgets battery.  Stdlib only (plus ftqc_faults.audit and ftqc_codes from this repository).
 
     python3 tools/ftqc_gadgets/selftest.py
     python3 tools/ftqc_gadgets/selftest.py --heavy    # adds the Golay gadgets at t = 3
@@ -500,14 +500,14 @@ def t_refine(heavy):
               f"{r['holds_through']} vs {want}")
         if r["violation"]:
             check(f"refine: the unmatched fault set of {s2} replays", props.judge_refine(a2, a1, r["violation"]))
-    # strict fault tolerance (ftqc_audit) is refinement of the idealized gadget
+    # strict fault tolerance (ftqc_faults.audit) is refinement of the idealized gadget
     for spec in ("cat:3", "cat:4", "cat:4,verify", "css_prep:steane", "cat:5,verify"):
         circ = fclib.load(spec)
         g = library.from_circuit(circ)
         an = Analysis(g)
         r = props.refine(an, Analysis(library.idealize(g)), 2)
         s = fca.strict_ft(an.model, 2)
-        check(f"refine: against the idealized gadget equals ftqc_audit strict_ft ({spec})",
+        check(f"refine: against the idealized gadget equals ftqc_faults.audit strict_ft ({spec})",
               max(r["holds_through"], 0) == s["holds_through"], f"{r['holds_through']} vs {s['holds_through']}")
     # with inputs
     a_c, a_i = Analysis(library.load("cnot:steane")), Analysis(library.load("cnot:steane,ideal"))

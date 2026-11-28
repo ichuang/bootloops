@@ -13,5 +13,5 @@ and checks that they agree on every single fault.
     python3 -m ftqc_faults zx equiv steane_5anc steane_spec --w 3 --noise-model circuit_css --code steane_7_1_3
     python3 -m ftqc_faults steane -o steane.json && python3 -m ftqc_faults steane --verify steane.json
 
-[Guide](GUIDE.md) · [Audit engine](../ftqc_audit/GUIDE.md) ·
-[ZX engine](../ftqc_zx/GUIDE.md) · [FTQC overview](../FTQC.md)
+[Guide](GUIDE.md) · [Audit engine](audit/GUIDE.md) ·
+[ZX engine](zx/GUIDE.md) · [FTQC overview](../FTQC.md)

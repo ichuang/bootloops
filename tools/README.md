@@ -31,7 +31,7 @@ lockpick; `thiele_gate.py`, `li2close.py`, `pathgrid.py` → ratfit;
 `quad_probe.py`, `ell_subst.py`, `oracle_registry.py` → gatekeeper;
 `numkin_harvest.py`, `numkin_sweep.sh`,
 `shift_opt.py` → numkin; `parallel_kira_gen*.py` → kira-stack; `maxcut_*.py`,
-`deriv_m2.py`, `sparse_cascade.py`, `pf_rank.jl` → maxcut/dipstick; `qeccert.py` → ftqc_codes).
+`deriv_m2.py`, `sparse_cascade.py`, `pf_rank.jl` → maxcut/dipstick).
 `fixtures/` is the shared fixture home.
 
 ## Verification classes
@@ -54,7 +54,7 @@ clone differs by package:
 
 ## Package index
 
-The [FTQC tool guide](FTQC.md) explains what the eight FTQC tools check, what they do not, how their receipts connect, worked examples, and the [command for running all ten batteries](FTQC.md#run-all-ftqc-batteries).
+The [FTQC tool guide](FTQC.md) explains what the eight FTQC tools check, what they do not, how their receipts connect, worked examples, and the [command for running all eight batteries](FTQC.md#run-all-ftqc-batteries).
 
 | package | what it is | battery |
 |---|---|---|
@@ -79,16 +79,14 @@ The [FTQC tool guide](FTQC.md) explains what the eight FTQC tools check, what th
 | `ffcapital/` | exact salvage of FireFly `ff_save` reconstruction state from dead or capped runs, fail-closed | data-gated |
 | `formglue/` | glue around FORM 5: traces, color, term-stream rewriting, MZV evaluation, GRACE integration | partial |
 | `frobenius-boundary/` | family-agnostic Frobenius-branch boundary machinery at var=∞ for non-analytic anchors | data-gated |
-| `ftqc_audit/` | engine of `ftqc_faults` (compatibility entry point): location faults in one scheduled Clifford circuit, with the fault model, circuit and fault distance as intervals with replayable witnesses, strict fault tolerance at low order and a location census, by exact enumeration and SAT with a re-checked LRAT proof, optionally cross-checked against Stim | partial (the SAT leg needs cadical, the Stim leg needs the stim package; both skip with a named line otherwise) |
 | `ftqc_codes/` | certified facts about CSS codes (`ftqc_codes-receipt-1`): n, k, d_X, d_Z, t and lightest stabilizers as intervals with witnesses and the proof leg behind each lower bound (enumeration, SAT with re-checked LRAT, Lean 4 on Lean-QEC (Ehatamm, Lee, Wu, Tao, arXiv:2605.16523), BCH, cuts, concatenation, symmetry orbits); construction and logical-basis receipts for high-rate families; signed code-action receipts | partial (the SAT leg needs cadical, the Lean leg needs lake and a built Lean-QEC; both skip with a named line otherwise) |
 | `ftqc_compose/` | [joins of certified operations](ftqc_compose/README.md): typed contracts and level reduction after He, Nguyen and Pattison, local-stochastic and [fault-cone tail bounds](ftqc_compose/GUIDE.md#tail-bounds-over-fault-cones), [purification-tree contracts](ftqc_compose/GUIDE.md#filter-calculus-for-purification-trees), [schedule volumes](ftqc_compose/GUIDE.md#volume-of-a-schedule), distillation carried into a logical T; results conditional on the premises they list | selftest |
 | `ftqc_decoders/` | checks of concrete decoders in exact arithmetic (BP+OSD, BP+LSD, Relay-BP, Union-Find, Blossom matching, SSF with metachecks, SAT minimum-weight): exhaustive radius certificates at small radius, trapping-set witnesses, logical-error bounds under printed assumptions, Stim `.dem` and sinter interchange, audited external decoders (Tesseract, PyMatching, ldpc) | selftest |
 | `ftqc_extractors/` | [logical measurements on encoded memory](ftqc_extractors/README.md): static, phenomenological and circuit-level receipts for HGP, BB144 and general CSS surgery and extractors, transversal block readings, Clifford+T compilation onto installed couplers, logical T with an ideal magic state, in-situ injection | selftest |
-| `ftqc_faults/` | physical faults in scheduled Clifford circuits: the audit engine (location faults in one circuit) and the ZX engine (fault equivalence between circuits), with a bridge that checks both on the five-ancilla Steane extractor. The audit and ZX rows are their compatibility entry points and batteries. [Guide](ftqc_faults/GUIDE.md) | selftest |
+| `ftqc_faults/` | physical faults in scheduled Clifford circuits: the audit engine (location faults in one circuit) and the ZX engine (fault equivalence between circuits), with a bridge that checks both on the five-ancilla Steane extractor. The audit engine gives the fault model, circuit and fault distance as intervals with replayable witnesses, strict fault tolerance at low order and a location census, by exact enumeration and SAT with a re-checked LRAT proof, optionally cross-checked against Stim; the ZX engine computes w-fault equivalence two independent ways, checks ZX rewrite proofs, synthesizes cat/Shor/Steane gadgets and flag decoders after Rodatz, Poór and Kissinger (arXiv:2506.17181v4), and writes exact-rational stochastic gadget contracts (`ftqc_faults-zx-contract-1`). [Guide](ftqc_faults/GUIDE.md) | partial (the SAT leg needs cadical, the Stim leg needs the stim package; both skip with a named line otherwise) |
 | `ftqc_gadgets/` | what a gadget with its decoder does to an arbitrary encoded input: the properties of Aliferis, Gottesman and Preskill at low order with replayable counterexamples, refinement and composition receipts, a coordinate-locality certificate for large codes, two-level receipts, purification-tree certificates, fault cones of whole correction schedules ([worked example](FTQC.md#trace-a-fault-through-a-correction-schedule)), signed surgery instruments and staged switched-T and pieceable-CCZ gates | selftest |
 | `ftqc_magic/` | exact statements about magic-state factories (binary, PPR, GF(2^s) trace and non-triorthogonal codes for T, CS, CCZ, CCCZ) under the standard input-error model, check-qubit recycling, Clifford-hook cultivation distances, open-boundary escape gaps, qLDPC CCZ factories, and pipeline contracts with correlation rules (`ftqc_magic-receipt-1`) | selftest |
 | `ftqc_uncompute/` | logical-level checks of measurement-based uncomputation (HMR with phase fix-ups, after Khattar et al.), spooky pebbling schedules and superposition masks, compositional proofs of [wide arithmetic bound to a correction schedule](ftqc_uncompute/GUIDE.md#wide-arithmetic-cuts-and-block-programs), and a rewrite advisor (R1–R7) whose results are re-checked | selftest |
-| `ftqc_zx/` | engine of `ftqc_faults` (compatibility entry point): w-fault equivalence of Clifford circuits computed two independent ways, ZX rewrite-proof checking, cat/Shor/Steane synthesis and flag decoders after Rodatz, Poór and Kissinger (arXiv:2506.17181v4), and exact-rational stochastic gadget contracts (`ftqc_zx-contract-v1`) | selftest |
 | `galois/` | motivic Galois coaction-cut engine + the exact MZV relation ring it reduces against | data-gated |
 | `gatekeeper/` | Gatekeeper — data-integrity + held-out-CV honesty layer that gates every closure | selftest |
 | `geotriage/` | GeoTriage — per-graph maximal-cut geometry and value-fittability triage with mandatory honesty gates | selftest |
@@ -119,8 +117,7 @@ The [FTQC tool guide](FTQC.md) explains what the eight FTQC tools check, what th
 | `wayfinder/` | Wayfinder — the eps-graded DE-transport pipeline: one evaluator contract, certified transport, Frobenius landings, the dlog-connection sampler wing, the engine-agnostic eps->0 limit extractor (epslimit: Laurent/Richardson extrapolation of an external engine's eps-grid) and the FLINT exact rational-function exporter (flintexport) | partial |
 | `winnow/` | upgraded-Laporta F_p eliminator library with native lambda-witness receipts — Seedling's exact elimination engine (`import ibplapper`) | partial |
 
-60 battery entries, including the two legacy engine names for `ftqc_faults`
-(`wayfinder` includes the sampler wing; `counterweight`
+58 battery entries (`wayfinder` includes the sampler wing; `counterweight`
 includes `canonical_form/`; `landau-alphabet` includes the Gröbner escalation
 backend and `LandauAlphabet.jl/`, the Julia engine `gpl-eval` builds on).
 The one operations package, Turnstile (admission control for long jobs on a

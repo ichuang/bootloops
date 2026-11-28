@@ -5,7 +5,7 @@ Provides a single exact, zero-float representation (`DecodingProblem`) unifying:
      carrying check rows `H`, logical observables `L`, and dual stabilizer generators `G`
      (used both for coset-equivalence verification and quantum split-stabilizer trapping
      set discovery: Poulin & Chung, QIC 8, 987, 2008; Raveendran & Vasic, Quantum 5, 562, 2021).
-  2. Circuit-level spacetime fault models from `ftqc_audit.RecordModel` and
+  2. Circuit-level spacetime fault models from `ftqc_faults.audit.RecordModel` and
      `ftqc_extractors` (`gross_circuit`, `reading_audit`, HGP schedules, and
      `surgery_sequence` mapping cones with metachecks: Cowtan, He, Williamson & Yoder,
      arXiv:2510.14895; Campbell, QST 4, 025006, 2019).
@@ -521,7 +521,7 @@ class DecodingProblem:
         location_prior: str | Fraction = "1/1000",
         scale: int = 1024,
     ) -> DecodingProblem:
-        """Convert an `ftqc_audit.RecordModel` into an exact spacetime `DecodingProblem`."""
+        """Convert an `ftqc_faults.audit.RecordModel` into an exact spacetime `DecodingProblem`."""
         p_loc = parse_exact_probability(location_prior, allow_zero=False, allow_one=False, max_half=True)
         nd = int(record_model.nd)
         det_mask_all = (1 << nd) - 1
@@ -575,7 +575,7 @@ class DecodingProblem:
             weights=weights_t,
             witness_map=w_map,
             source_meta={
-                "kind": "ftqc_audit_record_model",
+                "kind": "audit_record_model",
                 "circuit_sha256": record_model.circuit.sha256(),
                 "locations": len(record_model.groups),
                 "deduplicated_mechanisms": num_mechs,

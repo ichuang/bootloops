@@ -5,7 +5,7 @@ and forward spacetime fault signatures directly on `CliffordCircuit` via causal
 stabiliser-state evolution and forward Pauli propagation — with ZERO dependence on
 `ZXDiagram` or `pauliweb.py`.
 
-Used as the non-circular cross-verification oracle in every `ftqc_zx` battery leg.
+Used as the non-circular cross-verification oracle in every `ftqc_faults.zx` battery leg.
 Zero float literals appear anywhere in this module.
 """
 

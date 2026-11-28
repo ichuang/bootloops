@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-contained BootLoops acceptance battery entrypoint for `ftqc_zx` (`selftest` class).
+"""Self-contained BootLoops acceptance battery entrypoint for `ftqc_faults.zx` (`selftest` class).
 
 Runs all positive legs (L1-L5), planted negative/refusal controls (N1-N5), and all 4
 scratch-copy mutation-sabotage controls (M1-M4) from an isolated temporary directory.
@@ -36,7 +36,7 @@ def main() -> int:
         print(f"  [{tag}] {leg['id']} ({leg['elapsed_ms']} ms): {leg['summary']}")
 
     overall = "PASS" if report["passed"] else "FAIL"
-    print(f"[{overall}] ftqc_zx selftest ({report['passed_count']}/{report['total_count']} legs)")
+    print(f"[{overall}] ftqc_faults.zx selftest ({report['passed_count']}/{report['total_count']} legs)")
     return 0 if report["passed"] else 1
 
 

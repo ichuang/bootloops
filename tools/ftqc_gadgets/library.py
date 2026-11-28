@@ -24,7 +24,7 @@ Gadget specs (CODE is a ftqc_codes spec without commas, e.g. steane, golay, or r
   seq_syndrome:CODE            the Z checks measured one after another, each with one bare
                                ancilla, and a Pauli-frame decoder for X errors (negative
                                control: an X fault between two checks is miscorrected)
-  fc:SPEC                      a ftqc_audit library circuit as a gadget without inputs
+  fc:SPEC                      a ftqc_faults.audit library circuit as a gadget without inputs
 Suffixes: `,ideal` makes every operation noiseless and adds noisy wires on the outputs (the
 specification of the gadget; for cnot one noisy two-qubit location per qubit pair, since one
 fault of a transversal gate may leave an error on both blocks); `,idles` inserts idle locations.
@@ -236,7 +236,7 @@ def seq_syndrome(code, idles=False):
 
 
 def from_circuit(circ, code=None):
-    """A ftqc_audit circuit as a gadget without inputs (one output block)."""
+    """A ftqc_faults.audit circuit as a gadget without inputs (one output block)."""
     blk = Block("out", circ.outputs, code)
     return Gadget(circ, [], [blk], [], 0, circ.name)
 

@@ -84,10 +84,6 @@
   "cmd": "python3 asdminer/run_control.py && python3 deform_transport/battery/run_battery_deform.py --stages S0,S1 && python3 -m frobenius_boundary.selftest",
   "cwd": "package"
  },
- "ftqc_audit": {
-  "cmd": "python3 tools/ftqc_audit/selftest.py",
-  "cwd": "root"
- },
  "ftqc_codes": {
   "cmd": "python3 tools/ftqc_codes/selftest.py && python3 -m unittest ftqc_codes.test_discovered_actions",
   "cwd": "root"
@@ -105,7 +101,7 @@
   "cwd": "root"
  },
  "ftqc_faults": {
-  "cmd": "python3 -m unittest discover -s tools/ftqc_faults -t tools",
+  "cmd": "python3 tools/ftqc_faults/audit/selftest.py && python3 tools/ftqc_faults/zx/selftest.py && python3 -m unittest discover -s tools/ftqc_faults -t tools",
   "cwd": "root"
  },
  "ftqc_gadgets": {
@@ -118,10 +114,6 @@
  },
  "ftqc_uncompute": {
   "cmd": "python3 tools/ftqc_uncompute/selftest.py",
-  "cwd": "root"
- },
- "ftqc_zx": {
-  "cmd": "python3 tools/ftqc_zx/selftest.py",
   "cwd": "root"
  },
  "galois": {

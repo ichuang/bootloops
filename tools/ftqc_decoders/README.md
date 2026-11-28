@@ -48,4 +48,4 @@ python3 -m ftqc_decoders decode \
 | `external:tesseract`, `pymatching`, `ldpc_*`, `chromobius` + `Sinter` | `adapters/` | [Beni et al. 2025](https://arxiv.org/abs/2503.10988) · [Higgott & Gidney 2025](https://arxiv.org/abs/2303.15933) |
 | `certify_radius`, `trapping_set`, `enclose_*`, & sibling bridges | `effective_distance.py`, `enclosures.py`, `bridges.py` | [Poulin & Chung 2008](https://arxiv.org/abs/0801.1241) · [Raveendran & Vasić 2021](https://arxiv.org/abs/2012.15297) · [Gottesman 2014](https://arxiv.org/abs/1310.2984) |
 
-See [GUIDE.md](GUIDE.md) for full CLI options, receipt fields, operational-vs-postselected semantics, and the complete bibliography, and [../FTQC.md](../FTQC.md) for cross-tool workflows with `ftqc_codes`, `ftqc_audit`, `ftqc_extractors`, `ftqc_gadgets`, `ftqc_compose`, and `ftqc_uncompute`.
+See [GUIDE.md](GUIDE.md) for full CLI options, receipt fields, operational-vs-postselected semantics, and the complete bibliography, and [../FTQC.md](../FTQC.md) for cross-tool workflows with `ftqc_codes`, `ftqc_faults.audit`, `ftqc_extractors`, `ftqc_gadgets`, `ftqc_compose`, and `ftqc_uncompute`.

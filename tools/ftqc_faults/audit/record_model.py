@@ -84,7 +84,7 @@ class RecordModel:
         }
 
     def replay(self, faults):
-        """Cross-check the chosen fault set through ftqc_audit's forward transporter."""
+        """Cross-check the chosen fault set through ftqc_faults.audit's forward transporter."""
         if len({i for i, _ in faults}) != len(faults):
             raise ValueError("repeated fault site")
         raw = expected = 0

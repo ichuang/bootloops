@@ -12,8 +12,8 @@ reduction      puts the two together as a receipt: the outer gadget's locality
                certificate, and for every kind of operation the outer circuit uses, a
                receipt that the inner gadget has the property that makes it a good
                location.  The step from "inner properties" to "a column with few faults
-               acts ideally" is the level-reduction argument of the literature (or of a
-               monograph's own calculus) and is quoted, not re-proved.
+               acts ideally" is the level-reduction argument of the literature and is
+               quoted, not re-proved.
 two_level      builds the same gadget directly on the concatenated code, physical qubit
                by physical qubit, with hierarchical decoders (ftqc_codes.hier).
 Direct         tests the statement on that physical gadget: fault sets and input errors
@@ -239,7 +239,7 @@ def supports(receipt, kind, prep_spec=None):
     (Pauli weight), from an enumeration, a locality certificate or a composition;
     -1 if it does not.  A refinement of a preparation specification counts as `prep`."""
     best = -1
-    if receipt.get("schema") in (certify.COMPOSITION, "gadgetcert-composition-1"):
+    if receipt.get("schema") == certify.COMPOSITION:
         for c in receipt["conclusions"]:
             if c["kind"] == kind and c.get("weight") in ("pauli", None):
                 best = max(best, c["holds_through"])
@@ -345,7 +345,7 @@ def reduction(outer_receipt, inner, cap=3_000_000, factories=None):
         rec = inner.get(role)
         if rec is None:
             raise certify.Refusal(f"no inner receipt for {role}")
-        if rec.get("schema") in (certify.COMPOSITION, "gadgetcert-composition-1"):
+        if rec.get("schema") == certify.COMPOSITION:
             raise certify.Refusal(f"{role}: pass the composition as dict(composition=, target=, parts=)")
         if "composition" in rec:
             certify.verify_composition(rec["composition"], rec["target"], rec["parts"], cap)

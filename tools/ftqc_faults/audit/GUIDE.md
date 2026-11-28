@@ -1,18 +1,17 @@
-# ftqc_audit — GUIDE
+# ftqc_faults.audit — GUIDE
 
-This engine is part of [ftqc_faults](../ftqc_faults/GUIDE.md);
-overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+This engine is part of [ftqc_faults](../GUIDE.md);
+overview of the FTQC tools: [`../../FTQC.md`](../../FTQC.md).
 
 KIND: engine (Python, stdlib only; imports `ftqc_codes` for the SAT leg and
 for code constructions). The code lives in `tools/ftqc_faults/audit/`
 (`circuit.py`, `stab.py`, `model.py`, `analysis.py`, `certify.py`,
 `library.py`, `stimleg.py`, `record_model.py`, `projected.py`,
-`projected_supports.cpp`, `spacetime.py`, `selftest.py`); `tools/ftqc_audit/`
-forwards to it. The canonical command is `python3 -m ftqc_faults audit`;
-`python3 -m ftqc_audit` is equivalent.
-Battery class: partial (everything exact runs from the clone; the SAT leg needs
-`cadical`, the Stim leg needs the `stim` Python package; both skip with a named
-line otherwise).
+`projected_supports.cpp`, `spacetime.py`, `selftest.py`). The command is
+`python3 -m ftqc_faults audit`.
+Its battery runs inside the `ftqc_faults` entry (everything exact runs from
+the clone; the SAT leg needs `cadical`, the Stim leg needs the `stim` Python
+package; both skip with a named line otherwise).
 
 ## PURPOSE
 
@@ -90,15 +89,14 @@ Legs:
 
 ## INVOKE
 
-From the BootLoops root with `export PYTHONPATH="$PWD/tools"` (the examples
-use the short prefix `ftqc_audit`, equivalent to `ftqc_faults audit`):
+From the BootLoops root with `export PYTHONPATH="$PWD/tools"`:
 
-    python3 -m ftqc_audit analyze surface:3,2 --legs A,B,S -o r.json
-    python3 -m ftqc_audit analyze surface:3,2,z,bad
-    python3 -m ftqc_audit analyze cat:4,verify --strict 2 --heavier 1,2
-    python3 -m ftqc_audit analyze mycircuit.json --max-weight 5 --strict 2
-    python3 -m ftqc_audit verify r.json --full
-    python3 -m ftqc_audit export css_prep:golay --stim
+    python3 -m ftqc_faults audit analyze surface:3,2 --legs A,B,S -o r.json
+    python3 -m ftqc_faults audit analyze surface:3,2,z,bad
+    python3 -m ftqc_faults audit analyze cat:4,verify --strict 2 --heavier 1,2
+    python3 -m ftqc_faults audit analyze mycircuit.json --max-weight 5 --strict 2
+    python3 -m ftqc_faults audit verify r.json --full
+    python3 -m ftqc_faults audit export css_prep:golay --stim
 
 Circuit JSON: `{"name", "n", "ticks": [[["RX",0],["R",1]], [["CX",0,1]], ...],
 "detectors": [[measurement indices], ...] | null, "observables": [[...]],
@@ -112,7 +110,7 @@ circuit. A circuit that declares observables must declare its detectors.
 Library gadgets (`library.py`): `cat:N[,verify]`, `css_prep:CODE` (CODE a
 ftqc_codes spec), `surface:D,R[,z|x[,bad]]`.
 
-Library use: `from ftqc_audit import load, build, verify, Model`;
+Library use: `from ftqc_faults.audit import load, build, verify, Model`;
 `Model(circuit).replay([(location, "XZ"), ...])` gives the (detectors,
 observables, syndrome) signature of any fault set.
 
@@ -121,7 +119,7 @@ Exit codes: 0 ok; 1 refusal (receipt fails, legs disagree, Stim disagrees);
 
 ## GATES
 
-`python3 tools/ftqc_audit/selftest.py`: 5,637 checks and two named skips (SAT,
+`python3 tools/ftqc_faults/audit/selftest.py`: 5,637 checks and two named skips (SAT,
 Stim) in 0.7 s on a four-core Linux virtual machine without CaDiCaL or Stim.
 
 - Stabilizer simulator on GHZ, Bell, and reset-and-reuse circuits.
@@ -213,15 +211,15 @@ J. Preskill (2006). SAT leg: ftqc_codes, CaDiCaL (A. Biere et al.), LRAT
 
 ## HGP extractors and logical T circuits
 
-The [ftqc_extractors comparison guide](../ftqc_extractors/AUDIT.md) shows how to analyze an actual HGP meter's cat preparation here and how to use this package's forward propagator to replay a logical fault in the enclosing circuit.
+The [ftqc_extractors comparison guide](../../ftqc_extractors/AUDIT.md) shows how to analyze an actual HGP meter's cat preparation here and how to use this package's forward propagator to replay a logical fault in the enclosing circuit.
 
 ## Repeated gross-code syndrome extraction
 
-Run `python3 -m ftqc_audit records CIRCUIT.json` on an exported CSS probe with explicit detectors and record-only endpoints. The report checks through weight two. Supply repeatable `--fault LOCATION:LABEL` arguments for forward replay, or `--stim` for an independent comparison of all single-fault signatures. ftqc_extractors combines both probes with the bounded projected-support search and the readout check to certify the gross-code measurement. [Run and interpret the gross-code experiment](../ftqc_extractors/GROSS_CIRCUIT.md)
+Run `python3 -m ftqc_faults audit records CIRCUIT.json` on an exported CSS probe with explicit detectors and record-only endpoints. The report checks through weight two. Supply repeatable `--fault LOCATION:LABEL` arguments for forward replay, or `--stim` for an independent comparison of all single-fault signatures. ftqc_extractors combines both probes with the bounded projected-support search and the readout check to certify the gross-code measurement. [Run and interpret the gross-code experiment](../../ftqc_extractors/GROSS_CIRCUIT.md)
 
-Receipts use `ftqc_audit-receipt-1`. The verifier also reads `faultcert-receipt-1` receipts.
+Receipts use `ftqc_faults-audit-receipt-1`.
 
-The `injection` command audits the closed Y probes built from simultaneous CSS preparations. The optional fault ledger retains the physical sites and Pauli mode of each accepted fault. [Circuit models and command](../ftqc_extractors/GUIDE.md#closed-physical-y-probes)
+The `injection` command audits the closed Y probes built from simultaneous CSS preparations. The optional fault ledger retains the physical sites and Pauli mode of each accepted fault. [Circuit models and command](../../ftqc_extractors/GUIDE.md#closed-physical-y-probes)
 
 ## License
 

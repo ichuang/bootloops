@@ -1,4 +1,4 @@
-"""Live bridges from `ftqc_decoders` to sibling `ftqc_gadgets`, `ftqc_audit`,
+"""Live bridges from `ftqc_decoders` to sibling `ftqc_gadgets`, `ftqc_faults.audit`,
 `ftqc_extractors`, `ftqc_compose`, and `ftqc_uncompute` packages.
 
 Provides:
@@ -7,7 +7,7 @@ Provides:
      eliminating the `2^(n-k)` coset-leader lookup-table wall on `qr:47`, `bch`,
      `hgp`, and `bb72`/`bb144`!
   2. `decode_open_record_probe`: operational (unpostselected) spacetime decoding of
-     `ftqc_audit.RecordModel` / `ftqc_extractors` (`gross_circuit`, `reading_audit`,
+     `ftqc_faults.audit.RecordModel` / `ftqc_extractors` (`gross_circuit`, `reading_audit`,
      HGP) probes with forward replay verification.
   3. `estimate_reaction_decoder_latency`: deterministic classical decoder work &
      backlog latency estimator for `ftqc_uncompute` `HMR` / spooky-pebbling
@@ -133,7 +133,7 @@ def decode_open_record_probe(
     decoder_spec: str | dict[str, Any] = "bp_lsd",
     location_prior: str = "1/1000",
 ) -> dict[str, Any]:
-    """Operationally decode a non-zero detector history on an `ftqc_audit.RecordModel`
+    """Operationally decode a non-zero detector history on an `ftqc_faults.audit.RecordModel`
     (such as an `ftqc_extractors` BB144 `gross_circuit` or `reading_audit` probe) without
     postselection!
 

@@ -49,10 +49,10 @@ The registered packages, grouped as the index groups them:
 - **Exact statistics and evidence** — Mixalot (with Boxwalk, the exact box-moment
   contiguity walker, as member), Popcorn, POSQ, and JaCK & Jill.
 - **Fault-tolerant quantum computing** — `ftqc_codes` certifies CSS code parameters,
-  `ftqc_audit` checks faults in scheduled circuits, and `ftqc_gadgets` verifies
+  `ftqc_faults` checks faults in scheduled circuits (audit engine) and verifies and
+  synthesizes Clifford gadgets with ZX methods (ZX engine), and `ftqc_gadgets` verifies
   encoded operations, locality, and concatenated levels. `ftqc_extractors` checks logical
-  measurements, `ftqc_zx` verifies and synthesizes Clifford gadgets with ZX
-  methods, `ftqc_compose` joins distillation, residual frames, and local-stochastic
+  measurements, `ftqc_compose` joins distillation, residual frames, and local-stochastic
   error bounds across operations, and `ftqc_uncompute` certifies and simplifies logical
   reversible arithmetic using Hadamard-Measure-Reset (`HMR`), spooky pebbling, and
   superposition masking; `ftqc_decoders` certifies operational syndrome decoding and

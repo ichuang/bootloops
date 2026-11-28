@@ -10,7 +10,7 @@ and GF(2) algebra: `gf2.py`, `codes.py`, `interchange.py`, `constructions.py`,
 `bch.py` (D), `cuts.py` (E), `concat.py` (F), `orbit_minweight.py` (G).
 `hier.py` (hierarchical decoding), `certify.py` (receipts), `producers/`
 (optional exporters run in separate environments), `selftest.py`,
-`examples/`. The flat shim `tools/qeccert.py` keeps `import qeccert` working.
+`examples/`.
 Battery class: partial (the SAT leg needs `cadical`, the Lean leg needs `lake`
 and a built Lean-QEC; both skip with a named line otherwise).
 
@@ -19,8 +19,7 @@ and a built Lean-QEC; both skip with a named line otherwise).
 Certified facts about CSS quantum error-correcting codes, as receipts that the
 other FTQC tools take as inputs.
 
-- **Code facts** (`ftqc_codes-receipt-1`; `qeccert-receipt-1` receipts
-  are also read): n, k, d_X, d_Z, d = min(d_X, d_Z), t = ⌊(d−1)/2⌋, the lightest
+- **Code facts** (`ftqc_codes-receipt-1`): n, k, d_X, d_Z, d = min(d_X, d_Z), t = ⌊(d−1)/2⌋, the lightest
   stabilizer weights `wmin_x` and `wmin_z`, and the flags `self_dual`,
   `doubly_even_x/z` and `all_ones_logical`. Every number is an interval. The
   upper end has a witness checked with dot products; the lower end names the

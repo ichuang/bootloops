@@ -138,11 +138,11 @@ theorem {N}_dist : {d} ≤ {N}_css.toBSM.distance (by norm_num) := by
 
 
 def _leanqec_root():
-    return os.environ.get("FTQC_CODES_LEANQEC") or os.environ.get("QECCERT_LEANQEC")
+    return os.environ.get("FTQC_CODES_LEANQEC")
 
 
 def find_lake():
-    cand = os.environ.get("FTQC_CODES_LAKE") or os.environ.get("QECCERT_LAKE") or shutil.which("lake")
+    cand = os.environ.get("FTQC_CODES_LAKE") or shutil.which("lake")
     if not cand:
         home = os.path.expanduser("~/.elan/bin/lake")
         cand = home if os.path.isfile(home) else None

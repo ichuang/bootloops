@@ -87,7 +87,7 @@ def _first_bad(per, key):
 
 def verify(receipt, full=False, cap=3_000_000):
     """Raises Refusal; returns the list of things that were checked."""
-    if receipt.get("schema") not in (SCHEMA, "gadgetcert-receipt-1"):
+    if receipt.get("schema") != SCHEMA:
         raise Refusal(f"not a {SCHEMA} receipt")
     light = bool(receipt.get("stats", {}).get("light"))
     try:
@@ -298,7 +298,7 @@ def _code_json(g, part):
 
 
 def verify_composition(comp, target, parts, cap=3_000_000):
-    if comp.get("schema") not in (COMPOSITION, "gadgetcert-composition-1"):
+    if comp.get("schema") != COMPOSITION:
         raise Refusal(f"not a {COMPOSITION} receipt")
     again = compose(target, parts, cap)
     for k in ("target_sha256", "target_receipt_sha256", "parts", "conclusions", "theorem"):
@@ -308,7 +308,7 @@ def verify_composition(comp, target, parts, cap=3_000_000):
 
 
 def summary(receipt):
-    if receipt.get("schema") in (COMPOSITION, "gadgetcert-composition-1"):
+    if receipt.get("schema") == COMPOSITION:
         out = [f"{receipt['target']} with " + ", ".join(
             f"{p['role']} := {p['implementation']} (refines its specification through order "
             f"{p['refines_through']})" for p in receipt["parts"])]

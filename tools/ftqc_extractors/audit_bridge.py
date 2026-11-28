@@ -1,4 +1,4 @@
-"""Cross-check ftqc_extractors location faults with ftqc_audit's independent Clifford transport."""
+"""Cross-check ftqc_extractors location faults with ftqc_faults.audit's independent Clifford transport."""
 
 import argparse
 import json
@@ -31,7 +31,7 @@ class Bridge:
     def __init__(self, spec, arm="gate"):
         self.ft, two_blocks = schedule(spec, arm)
         inputs = self.ft.n * (2 if two_blocks else 1)
-        # ftqc_audit's Circuit requires each wire to be introduced. These ideal
+        # ftqc_faults.audit's Circuit requires each wire to be introduced. These ideal
         # placeholders precede every fault. Only the input-independent Pauli
         # transfer function is used; their state is never used as the HGP input.
         ticks = [[("!R", q) for q in range(inputs)]]
@@ -94,7 +94,7 @@ class Bridge:
     def replay(self, faults):
         sig = self.signature(faults)
         if sig != self.ft.signature(dict(faults)):
-            raise ValueError("ftqc_audit and ftqc_extractors disagree on the witness")
+            raise ValueError("ftqc_faults.audit and ftqc_extractors disagree on the witness")
         return {
             "faults": faults,
             "detectors": list(bits(sig & self.ft.mask)),
@@ -105,7 +105,7 @@ class Bridge:
     def compare(self, weight, cap):
         if type(weight) is not int or type(cap) is not int or weight < 1 or cap < 1:
             raise ValueError("positive search limits required")
-        # ftqc_extractors uses reverse propagation. ftqc_audit simulates forward through
+        # ftqc_extractors uses reverse propagation. ftqc_faults.audit simulates forward through
         # its physical circuit and we evaluate the shared endpoint predicate.
         columns = {}
         count = 0
@@ -121,7 +121,7 @@ class Bridge:
                     key = (observed & self.ft.mask, observed >> len(self.ft.det))
                     columns.setdefault(key, (site, mode))
                 count += 1
-            # The other two ftqc_audit preparation Paulis should be either
+            # The other two ftqc_faults.audit preparation Paulis should be either
             # harmless or equivalent to ftqc_extractors's one eigenstate flip.
             if op.name in ("R", "RX"):
                 q = op.qs[0]

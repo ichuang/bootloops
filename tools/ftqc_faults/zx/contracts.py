@@ -1,16 +1,16 @@
-"""Zero-Float Outward-Rounded Stochastic Gadget Contracts (`ftqc_zx-contract-v1`).
+"""Zero-Float Outward-Rounded Stochastic Gadget Contracts (`ftqc_faults-zx-contract-1`).
 
 Bridges adversarial w-fault equivalence (Rodatz, Poor, and Kissinger, arXiv:2506.17181v4)
-to rigorous stochastic FTQC space-time ledgers (`ftqc_masking_v2c_certified_carbon` and
-`ftqc_masking_v3a_fable` Filter Calculus):
+to stochastic space-time fault ledgers and the filter calculus of purification trees
+(see `ftqc_compose`, study `filter-contract`):
   1) Packs any physical `CliffordCircuit` into a discrete ASAP tick schedule, counting
      concurrent active qubits, idle wire locations, gate counts, total locations `L`,
      and exact wire-tick volume `W`.
   2) Exhaustively audits all single-location faults under `circuit_depolarizing` or
      `circuit_css`, computing:
-       - `v2c` per-coordinate active single-fault location counts `(v_X[c], v_Z[c])` for
-         cone-reset `S_ec` coin envelopes, AND
-       - `v3a` Filter-Calculus partition (`benign_zero`, `local_weight1`, `flagged_hook`,
+       - per-coordinate active single-fault location counts `(v_X[c], v_Z[c])` for
+         cone-reset `S_ec` coin envelopes, and
+       - the filter-calculus partition (`benign_zero`, `local_weight1`, `flagged_hook`,
          `bad_unheralded`) plus flag-conditioned decoder verification when inline.
   3) Evaluates exact all-orders fault-count polynomials in `fractions.Fraction` and emits
      outward-rounded `decimal.Decimal` string intervals (`ROUND_FLOOR` for lower bounds,
@@ -490,7 +490,7 @@ def build_gadget_contract(
     certified_w: int = 3,
     t_allow: int = 1,
 ) -> dict[str, Any]:
-    """Audit `circuit` and emit a zero-float outward-rounded `ftqc_zx-contract-v1` dictionary."""
+    """Audit `circuit` and emit a zero-float outward-rounded `ftqc_faults-zx-contract-1` dictionary."""
     if noise_model not in ("circuit_depolarizing", "circuit_css"):
         raise RefusalError("CONTRACT-NOISE-MODEL", f"unsupported contract noise model {noise_model!r}")
     p = parse_exact_rate(p_phys)
@@ -714,7 +714,7 @@ def build_gadget_contract(
                         active_z_locs_sets[c].add(sloc.loc_id)
                         z_hits_here[c] += 1
 
-        # Classify location in `v3a` Filter-Calculus partition:
+        # Classify location in the filter-calculus partition:
         if bad_here > 0:
             n_bad_unheralded_locs += 1
         elif saw_flagged_hook_here:
@@ -780,7 +780,7 @@ def build_gadget_contract(
     raw_escape_hi_exact = p_one_bad + p_ge2_exact
     cond_escape_hi_exact = min(Fraction(1), raw_escape_hi_exact / p_acc_lo_exact)
 
-    # Certified per-coordinate outgoing error upper bounds (`S_ec` cone-reset coins in `v2c`/`v3a`):
+    # Certified per-coordinate outgoing error upper bounds (`S_ec` cone-reset coins):
     qx_hi_strs: list[str] = []
     qz_hi_strs: list[str] = []
     for c in range(n_out):
@@ -811,7 +811,7 @@ def build_gadget_contract(
     )
 
     return {
-        "schema": "ftqc_zx-contract-v1",
+        "schema": "ftqc_faults-zx-contract-1",
         "verdict": verdict,
         "circuit_name": circuit.name,
         "noise_model": noise_model,
@@ -851,7 +851,7 @@ def build_gadget_contract(
             "max_active_x_locs": max(vx_counts, default=0),
             "max_active_z_locs": max(vz_counts, default=0),
         },
-        "filter_calculus_v3a": {
+        "filter_calculus": {
             "benign_zero_locs": n_benign_zero_locs,
             "local_weight1_locs": n_local_w1_locs,
             "flagged_hook_locs": n_flagged_hook_locs,

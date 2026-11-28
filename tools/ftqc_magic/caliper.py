@@ -43,8 +43,6 @@ from .rings import parse_exact_fraction, round_down_str, round_up_str
 def _ensure_tools_on_syspath() -> None:
     for candidate in (
         Path(__file__).resolve().parents[1],
-        Path("/Volumes/t2/Documents/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
-        Path("/home/ike/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
     ):
         if (candidate / "ftqc_decoders").is_dir():
             s = str(candidate)
@@ -174,7 +172,7 @@ def build_surface_escape_dem(
     `0 .. committed_rounds - 1` are committed mid-circuit (`D_comm`) and rounds
     `committed_rounds .. total_rounds - 1` are open future detectors (`D_open`)!
 
-    When `stim` and `ftqc_decoders` are installed (e.g. on `pleiades.local`), cross-builds
+    When `stim` and `ftqc_decoders` are installed, cross-builds
     the DEM directly from a live `stim.Circuit` repetition/escape slice via
     `DecodingProblem.from_stim_dem_text` to verify exact schema & graphlike parity agreement!
     """

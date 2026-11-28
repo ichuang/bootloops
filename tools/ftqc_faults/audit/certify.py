@@ -12,7 +12,7 @@ from . import analysis
 from .circuit import Circuit
 from .model import Model
 
-SCHEMA = "ftqc_audit-receipt-1"
+SCHEMA = "ftqc_faults-audit-receipt-1"
 VERSION = "0.2.0"
 NOISE = ("one fault = one location: any non-identity Pauli after R, RX, I, H, S, SDG, Z_IF (one qubit) or "
          "CX (two qubits), or a flipped outcome at M, MX; weight = number of locations")
@@ -126,7 +126,7 @@ def _leg_b(model, kind, cols, back, res, max_weight, workdir, timeout):
         D += [sum(1 << i for i, c in enumerate(cols) if (c[part] >> b) & 1) for b in range(nb)]
     tmp = None
     if workdir is None:
-        tmp = tempfile.mkdtemp(prefix="ftqc_audit-sat-")
+        tmp = tempfile.mkdtemp(prefix="ftqc_faults-audit-sat-")
         workdir = tmp
     os.makedirs(workdir, exist_ok=True)
     try:
@@ -168,7 +168,7 @@ def build(circuit, max_weight=4, strict_order=0, legs=("A",), cap=3_000_000, wor
     rec = dict(schema=SCHEMA, circuit=circuit.to_json(), noise_model=NOISE,
                counts=circuit.counts(), model=model.stats(),
                detectors=model.detectors, results={},
-               tool=dict(name="ftqc_audit", version=VERSION, python=platform.python_version()))
+               tool=dict(name="ftqc_faults.audit", version=VERSION, python=platform.python_version()))
     for kind in ("circuit_distance", "fault_distance"):
         if kind in want:
             rec["results"][kind] = distance(model, kind, max_weight, legs, cap, workdir, sat_timeout)
@@ -194,7 +194,7 @@ def build(circuit, max_weight=4, strict_order=0, legs=("A",), cap=3_000_000, wor
 
 
 def verify(receipt, full=False, cap=3_000_000):
-    if receipt.get("schema") not in (SCHEMA, "faultcert-receipt-1"):
+    if receipt.get("schema") != SCHEMA:
         raise Refusal("unknown receipt schema")
     try:
         circuit = Circuit.from_json(receipt["circuit"])

@@ -153,6 +153,6 @@
   "kind": "pipeline",
   "optimality_gap": null,
   "schema": "ftqc_magic-receipt-1",
-  "source_sha256": "be6971009f26fa936ebb3be934db456e9826fc35f06da5f858528030d1abf0bb",
+  "source_sha256": "1a5d503e1270e39d00fcdb10e1f1fcec14849f06c4ff0442cf87b0d994d0fa99",
   "spec_sha256": "6f461d4677867d8868e840a72fa6c5ee161c6b9309ae2c7f0cae583dffb25f89"
 }

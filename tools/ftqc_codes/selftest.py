@@ -781,7 +781,7 @@ def t_interchange_and_constructions():
     lp6_crec = constructions.build_construction_receipt(
         lp6,
         static_receipt=lp6_srec,
-        provenance={"paper": "PLANS/high-rate-qec.md", "version": "baseline", "locator": "table 1"},
+        provenance={"paper": "Panteleev-Kalachev lifted product control", "version": "arXiv:2012.04068", "locator": "LP(6,2)"},
     )
     check("LP(6,2) construction receipt verifies (reproduced, rate=[2,6])",
           bool(constructions.verify_construction_receipt(lp6_crec, static_receipt=lp6_srec))
@@ -1124,10 +1124,6 @@ def t_cli():
         for ex in ("steane.receipt.json", "golay.receipt.json"):
             ex_rec = json.load(open(os.path.join(HERE, "examples", ex)))
             check(f"banked example {ex} verifies", bool(certify.verify(ex_rec, full=True)))
-        import qeccert as _legacy_shim
-        from qeccert.codes import CSSCode as _LegacyCSSCode
-        check("legacy qeccert shim resolves to ftqc_codes",
-              _legacy_shim.VERSION == certify.VERSION and _LegacyCSSCode is codes.CSSCode)
 
 
 # ---------------------------------------------------------------- 8. High-rate paper families & Leg G orbit search

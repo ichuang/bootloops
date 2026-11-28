@@ -95,10 +95,10 @@ are handled separately (see the next section but one).
 | [`ftqc_magic`](ftqc_magic/GUIDE.md) | What output quality, acceptance and active qubit count does a magic-state factory or cultivation pipeline have, and may its outputs be used as independent? | exact distillation algebra, recycled check schedules, Clifford-hook cultivation distances, correlation rules for multi-stage pipelines |
 | [`ftqc_uncompute`](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup in a logical reversible circuit preserve its quantum action? Is a pebbling schedule or a superposition mask valid? | exact symbolic checks of Hadamard-measure-reset (HMR) cleanup, block proofs for wide arithmetic, pebbling and mask validators, a rewrite advisor |
 
-`ftqc_faults` holds two engines with their own guides and batteries:
-[`ftqc_audit`](ftqc_audit/GUIDE.md) (location faults in one circuit) and
-[`ftqc_zx`](ftqc_zx/GUIDE.md) (relations between circuits, after Rodatz, Poór
-and Kissinger). Both can also be imported and run under those names.
+`ftqc_faults` holds two engines with their own guides:
+[`ftqc_faults.audit`](ftqc_faults/audit/GUIDE.md) (location faults in one
+circuit) and [`ftqc_faults.zx`](ftqc_faults/zx/GUIDE.md) (relations between
+circuits, after Rodatz, Poór and Kissinger). One battery covers both.
 
 ## What the tools do not do
 
@@ -178,19 +178,16 @@ From the BootLoops root, with Python 3.10 or later:
 
 ```sh
 export PYTHONPATH="$PWD/tools"
-python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute ftqc_magic ftqc_faults
+python3 run_selftests.py ftqc_codes ftqc_faults ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_compose ftqc_uncompute ftqc_magic
 ```
 
-The ten battery entries cover the eight tools and the two engines inside
-`ftqc_faults`. Measured on a four-core Linux virtual machine with Python
+There is one battery entry per tool. Measured on a four-core Linux virtual machine with Python
 3.10, without Stim or CaDiCaL:
 
 | Battery | Result | Time |
 |---|---|---|
 | `ftqc_codes` | 3,188 checks, 2 named skips (SAT, Lean) | 8 s |
-| `ftqc_audit` | 5,637 checks, 2 named skips (SAT, Stim) | 1 s |
-| `ftqc_zx` | 10 legs | 5 s |
-| `ftqc_faults` | 5 tests | 1 s |
+| `ftqc_faults` | audit: 5,637 checks, 2 named skips (SAT, Stim); ZX: 10 legs; bridge: 3 tests | 6 s |
 | `ftqc_extractors` | 72 tests, 6 skipped | 52 s |
 | `ftqc_decoders` | 10 legs | 2 s |
 | `ftqc_gadgets` | 6,971 checks | 33 s |
@@ -734,11 +731,11 @@ certify a noisy T source. [Injection study](ftqc_extractors/INJECTION.md) ·
 ## Run all FTQC batteries
 
 ```sh
-python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute ftqc_magic
-python3 run_selftests.py ftqc_faults
+python3 run_selftests.py ftqc_codes ftqc_faults ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_compose ftqc_uncompute ftqc_magic
 ```
 
-The second line runs the cross-engine checks of `ftqc_faults`.
+The `ftqc_faults` entry runs both engine batteries and the cross-engine
+checks.
 
 CREDIT: each package's `GUIDE.md` names the papers and programs it follows,
 and bracketed keys resolve in [`REFERENCES.md`](../REFERENCES.md). Treating

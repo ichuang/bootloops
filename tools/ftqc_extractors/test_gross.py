@@ -135,7 +135,7 @@ class NoisyCycleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "incorrect ideal check"):
             validate_cycle(body, hx, hz)
 
-    def test_record_columns_against_forward_ftqc_audit(self):
+    def test_record_columns_against_forward_audit(self):
         from ftqc_faults.audit.circuit import Circuit
         from ftqc_faults.audit.model import Model
         from ftqc_faults.audit.record_model import RecordModel

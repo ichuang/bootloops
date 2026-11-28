@@ -14,7 +14,6 @@ from . import gf2, minweight
 from .codes import CSSCode
 
 SCHEMA = "ftqc_codes-receipt-1"
-LEGACY_SCHEMAS = ("qeccert-receipt-1",)
 VERSION = "0.1.0"
 
 
@@ -208,7 +207,7 @@ def verify(receipt, full=False, max_combos=5_000_000):
     upper-bound witness, and internal consistency.  Full mode also re-proves
     every leg-A and leg-G lower bound.  Returns a list of check lines; raises
     Refusal on the first failure."""
-    if receipt.get("schema") not in (SCHEMA, *LEGACY_SCHEMAS):
+    if receipt.get("schema") != SCHEMA:
         raise Refusal("unknown receipt schema")
     try:
         code = CSSCode.from_json(receipt["code"])

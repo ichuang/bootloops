@@ -1,16 +1,15 @@
-# ftqc_zx — GUIDE
+# ftqc_faults.zx — GUIDE
 
-This engine is part of [ftqc_faults](../ftqc_faults/GUIDE.md);
-overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+This engine is part of [ftqc_faults](../GUIDE.md);
+overview of the FTQC tools: [`../../FTQC.md`](../../FTQC.md).
 
 KIND: engine (Python standard library; no floating-point literals). The code
 lives in `tools/ftqc_faults/zx/`: `gf2.py`, `diagram.py`, `pauliweb.py`,
 `frame_oracle.py`, `equivalence.py`, `rewrites.py`, `synthesize.py`,
 `decoder_synth.py`, `contracts.py`, `cli.py`, `adapters/` (optional `pyzx` and
-`stim` bridges), `battery.py`, `selftest.py`, `examples/`. `tools/ftqc_zx/`
-forwards to it. The canonical command is `python3 -m ftqc_faults zx`;
-`python3 -m ftqc_zx` and `python3 tools/ftqc_zx/cli.py` are equivalent. Battery
-class: selftest.
+`stim` bridges), `battery.py`, `selftest.py`, `examples/`. The command is
+`python3 -m ftqc_faults zx`; `python3 tools/ftqc_faults/zx/cli.py` is
+equivalent. Its battery runs inside the `ftqc_faults` entry.
 
 ## PURPOSE
 
@@ -28,7 +27,7 @@ by Construction* framework of Rodatz, Poór and Kissinger [RPK25].
   (7.5–7.7), Steane syndrome extractors including the 15-CNOT five-ancilla
   circuit (7.8–7.12), with their proofs, and flag-conditioned decoder tables
   (Appendix C.2).
-- **Stochastic contracts** (`ftqc_zx-contract-v1`). For one scheduled gadget
+- **Stochastic contracts** (`ftqc_faults-zx-contract-1`). For one scheduled gadget
   and a rational fault rate: the schedule (ticks, locations, wire-tick
   volume), an exact audit of every single fault (rejected, harmless, or bad),
   and outward-rounded bounds on acceptance and on escape. Every event with two
@@ -92,11 +91,11 @@ proof); 2 input or side-condition refusal (`RefusalError`).
 
 Verdict lines such as `[FAULT-EQUIV-PASS] w=3 ...` or `[PROOF-VALID] ...`, JSON
 with `--json`, circuit files from `synth` (JSON, Stim, OpenQASM 2), and
-`ftqc_zx-contract-v1` documents.
+`ftqc_faults-zx-contract-1` documents.
 
 ## GATES
 
-`python3 tools/ftqc_zx/selftest.py`: 10 legs in 5 s on a four-core Linux
+`python3 tools/ftqc_faults/zx/selftest.py`: 10 legs in 5 s on a four-core Linux
 virtual machine, in a scratch directory.
 
 - **L1** no `float` literals or calls in the package; JSON contracts reject

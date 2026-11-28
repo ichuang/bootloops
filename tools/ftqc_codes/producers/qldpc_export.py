@@ -4,7 +4,7 @@
 IMPORTANT: Run in an isolated environment where `qLDPC` (e.g. `qLDPC==0.2.9`,
 `numpy<2.5`, `scipy`) is installed, WITHOUT `bootloops/tools` on `PYTHONPATH`
 (putting `bootloops/tools` on `PYTHONPATH` shadows PyPI `galois` with
-`tools/galois`; see `PLANS/qec-library-survey.md`).
+`tools/galois`).
 
 Examples:
     /path/to/qec_producers/bin/python tools/ftqc_codes/producers/qldpc_export.py \
@@ -93,7 +93,7 @@ def build_preset(preset, *, map_to_native=False):
         name = "LP(6,2)"
         prov = {
             "paper": "Panteleev-Kalachev lifted product control",
-            "version": "PLANS/high-rate-qec.md & PLANS/qec-library-survey.md",
+            "version": "arXiv:2012.04068",
             "locator": "LPCode([[1+x]], [[1+x]]) over GF(2)[C_3]",
         }
         p_claims = {"d": 2, "d_x": 2, "d_z": 2}
