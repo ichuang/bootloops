@@ -1,32 +1,608 @@
 # Fault-tolerant quantum computing in BootLoops
 
-Eight tools are available on `ftqc_integration`.
+Eight packages check the separate statements that a fault-tolerance argument
+for a quantum computer is built from. Each one takes a code, a circuit, a
+decoder, a schedule or a factory, answers one kind of question about it
+exactly, and writes the answer and its evidence to a JSON receipt that a
+verifier replays. Together they do not prove a threshold or an end-to-end
+logical error rate for a computation. They check pieces of such an argument
+and name every premise that is left. The packages are on the
+`ftqc_integration` branch and have no pages on bootloops.ai yet.
 
-The arrows show what one tool supplies to another in selected studies.
+This page goes from the general to the particular: the argument the tools
+check and the conventions they share, what each tool is for, what the tools do
+not do, how their receipts connect, and then worked examples from the smallest
+to the largest. Inputs, gates and hazards of each package are in its
+`GUIDE.md`.
 
-![FTQC tool relationships across the eight packages](figures/ftqc-tools.svg)
+## The argument the tools check
 
-| Tool | Input and question | Evidence |
+A fault-tolerance argument passes through levels. Each level has its own
+statement and its own way of counting how many faults it takes to do harm.
+
+| Level | Typical statement | What is counted | Tool |
+|---|---|---|---|
+| Code | every nontrivial logical operator has weight at least d | data qubits in a logical Pauli (static distance) | [`ftqc_codes`](ftqc_codes/GUIDE.md) |
+| Circuit | no set of fewer than d faulty locations passes every detector and changes a protected result | faulty locations (circuit or fault distance) | [`ftqc_faults`](ftqc_faults/GUIDE.md) |
+| Logical operation | a measurement, gate or correction on encoded blocks acts correctly on every input, up to some number of faults | faults plus incoming errors, per block or per coordinate | [`ftqc_extractors`](ftqc_extractors/GUIDE.md), [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) |
+| Decoding | a polynomial-time decoder corrects every pattern up to radius t | the decoder's operational radius | [`ftqc_decoders`](ftqc_decoders/GUIDE.md) |
+| Composition | joined operations meet each other's input requirements, and the whole fails with probability at most ε under a stated noise law | bad fault supports, decoding events, tail probabilities | [`ftqc_compose`](ftqc_compose/GUIDE.md) |
+| Resources | a factory delivers magic states of a given quality, acceptance and size; a logical circuit restores its scratch qubits | exact output error polynomials; symbolic phase and reset checks | [`ftqc_magic`](ftqc_magic/GUIDE.md), [`ftqc_uncompute`](ftqc_uncompute/GUIDE.md) |
+
+Static distance counts qubits and circuit distance counts locations. One
+faulty CNOT is one location even when it leaves errors on both of its qubits,
+so a distance-d code can sit inside a schedule whose circuit distance is
+smaller than d: the [surface-code example](#find-a-hook-in-a-surface-code-schedule)
+gives 3 and 2 for two CNOT orders on the same code. In the same way a code
+that can correct t errors can be paired with a practical decoder that corrects
+fewer: the [Golay example](#certify-and-break-a-decoder) gives 2 instead of 3.
+Each level therefore needs its own check, and the higher levels take receipts
+from the lower ones as inputs.
+
+### What every receipt has in common
+
+- **It is bound to its input.** A receipt carries the SHA-256 digest of the
+  canonical input. `verify` recomputes the result from the input and refuses a
+  receipt whose input, evidence or result has been edited.
+- **Bounds are intervals.** An upper end comes with a witness that a separate
+  code path replays: a logical operator, a fault set, a failing syndrome. A
+  lower end names the argument that proved it: exhaustive enumeration, a SAT
+  refutation whose LRAT proof is re-checked by the checker in `ftqc_codes`, a
+  structural lemma whose hypotheses are checked on the instance, or, for code
+  distance only, a Lean 4 theorem. A value is exact when the two ends meet.
+- **A failed claim is a result.** A counterexample exits 1 and is written with
+  its witness. A search that runs out of budget leaves the claim open and is
+  not a counterexample.
+- **Premises are listed.** Ideal boundaries, declared noise laws, supplied
+  contracts and theorems quoted from papers are written into the receipt, and
+  a result that rests on them is marked conditional.
+- **Arithmetic is exact.** Bits over GF(2), integers, rationals and exact
+  algebraic numbers in Z[ω₈] and Q(√2). Decimal values are rounded outward:
+  upper bounds up, lower bounds down.
+
+The exit codes are shared: 0 proved or verified, 1 counterexample or refused
+receipt, 2 malformed input. `ftqc_extractors` and the surgery commands of
+`ftqc_gadgets` use 3 for a search that ended without a decision.
+
+### The fault model
+
+A *location* is one preparation, gate, idle or measurement in a scheduled
+circuit. A fault there is any nonidentity Pauli after the operation (all 15
+two-qubit Paulis after a CNOT belong to one location) or a flipped outcome at
+a measurement. The weight of a fault set is its number of locations. Idles
+exist only where the schedule writes them. Most circuit results assume an
+ideal encoded input and an ideal final syndrome measurement and say so.
+
+For Pauli faults in a Clifford circuit, the effect of a set of faults is the
+XOR of the effects of its members. "At most j faults" then means "a sum of at
+most j columns" of a binary matrix, and circuit distance becomes a
+minimum-weight problem of the same shape as code distance. The enumeration and
+SAT machinery of `ftqc_codes` applies to it unchanged. This linearity is what
+makes exact answers possible, and its absence is why non-Clifford operations
+are handled separately (see the next section but one).
+
+## The eight tools
+
+![How receipts flow between the eight FTQC tools, level by level](figures/ftqc-tools.svg)
+
+| Tool | The question it answers | What it returns |
 |---|---|---|
-| [ftqc_codes](ftqc_codes/GUIDE.md) | Given CSS check matrices or a high-rate algebraic seed, which logical errors can the memory detect and how are its logical slots addressed? | Code parameters, construction ancestry (`ftqc_codes-construction-1`), paired logical bases (`ftqc_codes-basis-1`), lift symmetries, bounds on X and Z distance, witnesses and hierarchical decoding guarantees. |
-| [ftqc_extractors](ftqc_extractors/GUIDE.md) | Which logical measurements can a fixed apparatus perform, and what fault distance does a surgery sequence preserve? | Fixed-coupler graphs and bridges, transversal block readings, padded hypergraph surgery, physical fault witnesses, and resource-conditional logical T receipts. |
-| [ftqc_faults](ftqc_faults/GUIDE.md) | How do faults propagate in this circuit, and can an implementation replace a reference under a specified fault model? | Physical fault signatures, distance intervals and witnesses from the audit engine. ZX equivalence, synthesis, flag decoder tables, and stochastic contracts from the ZX engine. |
-| [ftqc_decoders](ftqc_decoders/GUIDE.md) | Does a polynomial-time decoder achieve the code or circuit distance without trapping sets, and what operational error rate does it certify? | Operational radius proofs, split-stabilizer trapping-set witnesses, two-stage metacheck repair, Peierls cluster LER bounds, Stim `.dem` export and audited external (`Tesseract`, `PyMatching`, `ldpc`) runs. |
-| [ftqc_gadgets](ftqc_gadgets/GUIDE.md) | What does a decoded Clifford gadget do to an unknown encoded input with incoming errors and internal faults? | Residual-error bounds, component refinement, two-level checks on concatenated codes, and the faults that can reach each decoding event in a scheduled program. |
-| [ftqc_compose](ftqc_compose/GUIDE.md) | Do the output and fault guarantees of one operation meet the next operation’s input requirements? | Typed joins, residual data and frame checks, level reduction and local-stochastic error bounds for a composed study. |
-| [ftqc_uncompute](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup preserve the logical quantum action? Is a pebbling schedule legal, and what error does a declared mask allow? | Exact symbolic HMR checks, sampled trajectory bounds, mask and schedule checks, and source-bound replay of `ftqc_uncompute-receipt-1`. |
-| [ftqc_magic](ftqc_magic/GUIDE.md) | What output quality, yield, and active-qubit footprint can a magic-state factory or cultivation pipeline deliver, and are its output correlations safe to compose? | Exact $\mathbb{Z}[\omega_8]$ / $\mathbb{Q}(\sqrt{2})$ / rational distillation & stabilizer-collapse proofs, recycled check schedules, $O(n^3)$ Clifford-hook cultivation distances, Caliper open-boundary escape gaps, single-shot qLDPC `CCZ` contracts, and `ftqc_magic-receipt-1` exports. |
+| [`ftqc_codes`](ftqc_codes/GUIDE.md) | For a CSS code given by check matrices or a named family: what are n, k, d_X, d_Z and the lightest stabilizers, how was it constructed, which logical basis is in use, and what does a physical Clifford word do to that basis? | distance intervals from seven proof legs; construction, basis and signed-action receipts |
+| [`ftqc_faults`](ftqc_faults/GUIDE.md) | In a scheduled Clifford circuit, which fault sets escape the detectors and what do they leave? Is one circuit fault-equivalent to another? | the fault model, circuit and fault distance, strict fault tolerance at low order and a location census (audit engine); fault equivalence, ZX rewrite proofs, flag decoders and stochastic gadget contracts (ZX engine) |
+| [`ftqc_extractors`](ftqc_extractors/GUIDE.md) | What logical measurement, logical T or injected state does an apparatus attached to a memory produce, and what distance does it keep? | static, phenomenological and circuit-level receipts for HGP, bivariate bicycle and general CSS memories |
+| [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) | What does a gadget with its decoder do to an arbitrary encoded input carrying incoming errors, under internal faults? | the gate and error-correction properties of Aliferis, Gottesman and Preskill at low order; refinement and composition; coordinate locality for large codes; two-level and purification-tree certificates; fault cones of whole schedules; signed surgery instruments; staged switched-T and pieceable-CCZ gates |
+| [`ftqc_decoders`](ftqc_decoders/GUIDE.md) | Does a given polynomial-time decoder correct every pattern up to radius t, and where does it fail? | exact-arithmetic decoders, radius certificates, trapping-set witnesses, logical-error enclosures, audited runs of external decoders |
+| [`ftqc_compose`](ftqc_compose/GUIDE.md) | Does one operation's output meet the next one's input requirements, and what failure probability follows under a stated noise law? | typed joins, level reduction, local-stochastic and cone tail bounds, purification-tree contracts, schedule volumes, distillation-to-logical-T bounds |
+| [`ftqc_magic`](ftqc_magic/GUIDE.md) | What output quality, acceptance and active qubit count does a magic-state factory or cultivation pipeline have, and may its outputs be used as independent? | exact distillation algebra, recycled check schedules, Clifford-hook cultivation distances, correlation rules for multi-stage pipelines |
+| [`ftqc_uncompute`](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup in a logical reversible circuit preserve its quantum action? Is a pebbling schedule or a superposition mask valid? | exact symbolic checks of Hadamard-measure-reset (HMR) cleanup, block proofs for wide arithmetic, pebbling and mask validators, a rewrite advisor |
 
-## Code automorphisms
+`ftqc_faults` holds two engines with their own guides and batteries:
+[`ftqc_audit`](ftqc_audit/GUIDE.md) (location faults in one circuit) and
+[`ftqc_zx`](ftqc_zx/GUIDE.md) (relations between circuits, after Rodatz, Poór
+and Kissinger). Their old import names and command lines still work.
 
-An action receipt identifies a memory, an ordered logical basis, a physical Clifford word, and the images of every logical X and Z including its sign. A push permutation sends old site `q` to site `perm[q]`. Layers execute in list order. Each physically installed pair needs a coupler. A virtual coordinate or logical frame change supplies no timing or distance evidence.
+## What the tools do not do
 
-From the BootLoops root, replay two externally discovered examples and the Table 4 phase fold.
+The receipts are only as strong as the statements they check. These are the
+gaps to keep in mind before quoting a result.
+
+- **No end-to-end theorem.** Nothing here turns a code, a set of gadgets and a
+  noise rate into a proven logical error rate for a whole computation.
+  `ftqc_compose` joins receipts and computes bounds, but its larger statements
+  rest on arguments quoted from papers or printed in the receipt: level
+  reduction (He, Nguyen and Pattison, Theorem 4.11), the composition theorem
+  and locality lemma of `ftqc_gadgets`, the fault-cone theorem, the filter rule
+  for purification trees. The tools check the hypotheses of these arguments on
+  the instance and test their conclusions on small cases. They do not prove
+  them. The only machine-checked proofs are the Lean 4 distance theorems of
+  `ftqc_codes`, which need a separate Lean-QEC build.
+- **Low fault orders.** Circuit and gadget properties hold for every set of at
+  most j faulty locations, with j usually one to three. Higher orders are
+  reached only through structure: the projected search of the gross-code
+  measurement (exact distance 7), counting lemmas for verified-cat meters,
+  locality certificates. Beyond the proven order, probabilities come from union
+  bounds, which can be loose. The decoded surface-code ZZ measurement below has
+  no single-fault failure, and its pair union bound at p = 10⁻⁵ is still
+  about 1.2 × 10⁻⁴, because it charges every pair of its 1,542 locations.
+- **Ideal boundaries and classical control.** Most circuit receipts start from
+  an ideal encoded input and end with an ideal syndrome measurement.
+  Classical processing, feed-forward and storage of records are ideal. Decoders
+  inside circuit receipts are often lookup tables or postselection.
+- **A narrow noise model.** Pauli faults at listed locations, correlated only
+  inside one location unless a joint law is supplied. Leakage, loss, coherent
+  errors, crosstalk and drift are not modelled. Independence and the
+  local-stochastic condition are hypotheses that the user declares; a finite
+  law is checked against the condition on up to 16 sites.
+- **Non-Clifford steps are special cases.** The circuit engines handle
+  Clifford operations and Z feed-forward from one bit. A logical T is checked
+  as a channel identity with an ideal or contract-described magic state. The
+  staged switched-T and pieceable-CCZ studies are exact through one fault but
+  rely on ideal seeds and ideal terminal recovery. Cultivation is analysed by a dedicated simulation of one subcircuit with an
+  ideal encoded |T⟩ input. Distillation factories use the standard model of
+  independent input errors and ideal Clifford checks. The pipeline composer of
+  `ftqc_magic` adds a surface-code error per rotation from the heuristic
+  formula 0.1·(100p)^((d+1)/2), which is not derived here.
+- **Decoders are certified only at small radius.** A radius certificate checks
+  every pattern up to the radius, which is feasible for small radii (277
+  patterns on Golay at radius 2). Trapping-set search uses targeted probes and
+  is not exhaustive. The connected-cluster bound takes the size of clusters the
+  decoder corrects as an input (the field is named `verified_component_radius`
+  but nothing verifies it), and it bounds one sector of the static code under
+  independent bit flips. On the BB144 example it gives 1.6 × 10⁻¹⁴, against
+  1.1 × 10⁻¹⁴ for the plain union bound under the same assumption.
+- **Published theorems are dependencies.** Extractor receipts check the finite
+  hypotheses of results such as Proposition 3.9 of Cowtan, He, Williamson and
+  Yoder or the canonical extractor of Blue et al., then apply them. They do
+  not re-derive them.
+- **Hardware is an input.** Coupler inventories, placements, durations and
+  feed-forward latency are supplied. No receipt uses a calibrated device
+  model, and routing and storage for the logical T protocol are not compiled.
+- **Codes.** Distance proofs are for binary CSS codes. Signed stabilizer codes
+  enter only through action receipts, fixed-coupler extractors and surgery
+  instruments. Subsystem and qudit codes are out of scope.
+- **Sampling is evidence of another kind.** The tools contain samplers and can
+  drive Stim, sinter and external decoders, but threshold sweeps belong
+  elsewhere. Sampled histograms are labelled empirical and are not bounds.
+- **Speed.** The code is pure Python apart from one C++ search helper and
+  optional solvers (CaDiCaL for SAT legs, Stim for cross-checks and some
+  studies). Three batteries exceed the toolkit's 20 s standard (see
+  [Getting started](#getting-started)).
+- **Provenance.** The code was written by Claude under the author's direction.
+  The batteries test it against brute force, dense simulation, planted defects
+  and, where installed, Stim and CaDiCaL. Comparisons with independent programs
+  (PyMatching, ldpc, qLDPC, AutQEC, the Qiskit bicycle compiler) are optional
+  and not part of the default batteries.
+
+## Getting started
+
+From the BootLoops root, with Python 3.10 or later:
 
 ```sh
 export PYTHONPATH="$PWD/tools"
-ex=tools/ftqc_codes/examples
+python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute ftqc_magic ftqc_faults
+```
+
+The ten battery entries cover the eight tools and the two engines inside
+`ftqc_faults`. Measured on a four-core Linux virtual machine with Python
+3.10, without Stim or CaDiCaL:
+
+| Battery | Result | Time |
+|---|---|---|
+| `ftqc_codes` | 3,188 checks, 2 named skips (SAT, Lean) | 8 s |
+| `ftqc_audit` | 5,637 checks, 2 named skips (SAT, Stim) | 1 s |
+| `ftqc_zx` | 10 legs | 5 s |
+| `ftqc_faults` | 5 tests | 1 s |
+| `ftqc_extractors` | 72 tests, 6 skipped | 52 s |
+| `ftqc_decoders` | 10 legs | 2 s |
+| `ftqc_gadgets` | 6,971 checks | 33 s |
+| `ftqc_compose` | 90 tests, 3 skipped | 22 s |
+| `ftqc_uncompute` | 22 legs | 3 s |
+| `ftqc_magic` | 10 legs | 8 s |
+
+Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to run the
+skipped legs. The Lean leg has its own prerequisites, given in the
+[code guide](ftqc_codes/GUIDE.md). The examples on this page use the shell
+setup above and a scratch directory:
+
+```sh
+export PYTHONPATH="$PWD/tools"
 out=$(mktemp -d)
+```
+
+## How the tools connect
+
+Receipts pass from each level to the levels after it. Each arrow in the
+figure is a check that the consumer performs on the producer's receipt: the
+consumer re-verifies the receipt or rebuilds the evidence it needs.
+
+- **Code to circuit.** `ftqc_faults`, `ftqc_gadgets` and `ftqc_extractors`
+  build their circuits from `ftqc_codes` constructions and reuse its GF(2)
+  algebra, CNF encoding and LRAT checker. A code receipt supplies the decoding
+  radius that a gadget locality certificate then re-proves on the check
+  matrix.
+- **Logical measurement to circuit audit.** `ftqc_extractors` defines the
+  measured logical and its spectators and exports X and Z probe circuits in
+  the audit format. The audit engine computes their fault model, and the
+  extractor combines both probes into one distance receipt.
+  [Comparison guide](ftqc_extractors/AUDIT.md)
+- **Circuit to gadget.** `ftqc_gadgets` uses the audit propagator and adds
+  encoded Bell inputs, reference qubits and decoders, so that a property holds
+  for every input state. Its signed surgery instruments are installed on
+  shared hardware by `ftqc_extractors`.
+  [Surgery interface](ftqc_gadgets/SURGERY.md)
+- **Distance to decoding.** Code and circuit distance describe an ideal
+  minimum-weight decoder or postselection. `ftqc_decoders` checks concrete
+  decoders against them, supplies procedural decoders to `ftqc_gadgets` where
+  lookup tables are too large, repairs noisy surgery syndromes with metachecks
+  and estimates decoder stalls for `ftqc_uncompute`.
+- **Gadgets to bounds.** `ftqc_compose` reads gadget, extractor and factory
+  receipts. It checks typed joins (wires, codes, logical bases, decoders),
+  turns the fault cones of a schedule into tail bounds, derives the ancilla
+  contracts those bounds need from purification-tree certificates, and prices
+  the schedule in physical locations.
+- **Factories to consumers.** `ftqc_magic` exports contracts with an explicit
+  correlation mode (independent, batch-correlated or catalyst-poisoned).
+  `ftqc_compose` and `ftqc_extractors` refuse to treat correlated outputs as
+  independent and carry the factory bound into a logical T.
+- **Logical circuits to physical audit.** `ftqc_uncompute` lowers the Clifford
+  and HMR parts of a logical circuit to the audit and ZX engines, and binds
+  wide arithmetic block programs to a correction schedule in the format that
+  `ftqc_gadgets cones` reads. Its resource estimate combines logical counts
+  with supplied factory, contract and latency numbers.
+  [Bridge](ftqc_uncompute/adapters/ftqc_bridge.py)
+
+## Worked examples
+
+The examples start with one code and end with whole schedules and factories.
+Each says what the commands report and what the result does not cover.
+
+### Certify a code
+
+```sh
+python3 -m ftqc_codes certify steane -o "$out/steane.json"
+python3 -m ftqc_codes verify "$out/steane.json" --full
+python3 -m ftqc_codes certify qr:47 -o "$out/qr47.json"
+python3 -m ftqc_codes verify "$out/qr47.json" --full
+```
+
+Steane has n = 7, k = 1, d = 3 and lightest stabilizers of weight 4. The
+[[47,1,11]] quadratic-residue code has d = 11 and lightest stabilizers of
+weight 12. Both distances are proved by exhaustive information-set
+enumeration (leg A), and `--full` repeats it. Every upper end is a logical
+operator that `verify` checks with dot products. For codes beyond enumeration
+the receipt falls back to the BCH bound, disjoint logical cuts or the
+concatenation product bound, and records which one was used.
+
+### Find a hook in a surface-code schedule
+
+```sh
+python3 -m ftqc_codes certify rotated_surface:3 -o "$out/code.json"
+python3 -m ftqc_faults audit analyze surface:3,2,z -o "$out/standard.json"
+python3 -m ftqc_faults audit analyze surface:3,2,z,bad -o "$out/hook.json"
+```
+
+The distance-3 rotated surface code has static distance 3. Two rounds of
+syndrome extraction (174 locations) with the standard CNOT order have circuit
+distance 3. With the hook-aligned order (`bad`) the circuit distance is 2, and
+the receipt gives a two-fault set that passes all 16 detectors and flips the
+logical. The rounds are noisy, the encoded input and final measurement are
+ideal, and only the idles of the library circuit are counted.
+
+The sector decoder looks at the same memory with decoding in place of
+postselection:
+
+```sh
+python3 -m ftqc_decoders.surface_memory --distance 3 --rounds 3 --basis Z
+```
+
+It projects each physical single fault onto the measured sector and decodes
+it with equal-weight matching. None of the 1,554 single-location fault modes
+of the three-round memory is decoded wrongly. That is a statement about single
+faults only.
+
+### Compare two circuits: the five-ancilla Steane extractor
+
+```sh
+python3 -m ftqc_faults zx equiv steane_5anc steane_spec --w 3 --noise-model circuit_css --code steane_7_1_3
+python3 -m ftqc_faults steane -o "$out/steane-bridge.json"
+python3 -m ftqc_faults steane --verify "$out/steane-bridge.json"
+```
+
+The first command shows that the 15-CNOT, five-ancilla X-syndrome extractor
+of Rodatz, Poór and Kissinger is 3-fault-equivalent to its specification on
+the Steane codespace. It counts X and Z faults separately (`circuit_css`). Under
+joint counting, where one CNOT fault with X on one qubit and Z on the other
+has weight two, the construction is not claimed, and the receipt records the
+model used. The bridge then checks the two engines against each other on the
+physical schedule: each sector has 95 noisy locations, and for all 455
+single-location fault modes the ZX propagator and the audit engine must agree
+on the detectors, all five raw measurement records and the output Pauli.
+[Model, boundaries and fault weights](ftqc_faults/GUIDE.md#five-ancilla-steane-extractor)
+
+### Check a gadget on unknown inputs
+
+```sh
+python3 -m ftqc_gadgets analyze knill:steane,anc=spec --check ec:1 --close 1 -o "$out/gadget.json"
+python3 -m ftqc_gadgets verify "$out/gadget.json" --full
+```
+
+Teleportation-based (Knill) error correction on Steane, with its two ancillas
+given as specifications, has the error-correction properties through order
+one. For any input and one fault or one incoming error, the output is within
+the fault weight of the ideal state; for any input whatever, one fault leaves
+the output within weight one of the code space. The input enters as half of
+an encoded Bell pair, which makes "for every input" a property of one
+stabilizer state.
+
+Enumeration does not reach the radius of QR-47. The locality certificate
+proves instead that every fault and every incoming error stays on its own
+coordinate, and it re-proves the decoder radius on the check matrix:
+
+```sh
+python3 -m ftqc_gadgets analyze steane_ec:qr:47,anc=spec --local --code-receipt "$out/qr47.json" --no-tables -o "$out/outer.json"
+python3 -m ftqc_gadgets verify "$out/outer.json"
+```
+
+The receipt states that the gate, error-correction and any-input properties
+hold whenever faults and input errors touch at most five of the 47
+coordinates, however many faults lie inside them. The step from locality to
+those properties is a lemma printed in the receipt. With each coordinate read
+as a column of inner blocks, this is the outer half of a two-level argument,
+which `ftqc_gadgets/levels.py` joins to inner receipts.
+
+The ancillas of that gadget are specifications. A purification tree that
+makes one is certified separately:
+
+```sh
+python3 -m ftqc_gadgets analyze prep:qr:47,zero,tree=XZXZ,rounds=2 --tree --strict --light --wmin 11 -o "$out/zero.json"
+python3 -m ftqc_gadgets verify "$out/zero.json"
+```
+
+The 16-leaf tree (8,867 locations) acts as its specification, with wire faults
+only on coordinates of failed local and check locations, unless four leaves in
+one sector hold a fault that can spread. `levels.reduction(..., factories=...)`
+then lists no ancilla as assumed and records that count. The probability of
+that junk event is a separate calculation (`Tree.bounds`, or the
+`filter-contract` study below).
+
+### Certify and break a decoder
+
+```sh
+python3 -m ftqc_decoders certify-radius --code golay --decoder bp_osd --osd-order 2 --radius 2 -o "$out/golay2.json"
+python3 -m ftqc_decoders certify-radius --code golay --decoder bp_osd --osd-order 2 --radius 3 -o "$out/golay3.json"
+python3 -m ftqc_decoders verify "$out/golay3.json"
+```
+
+The Golay code [[23,1,7]] can correct three errors. BP+OSD of order two
+corrects all 277 X-sector patterns of weight at most two. The second command
+finds a weight-three pattern that it decodes to a logical error, exits 1 and
+writes the witness. The operational radius of this decoder on this code is
+two.
+
+```sh
+python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb72_trapping_set.json -o "$out/bb_ts.json"
+python3 -m ftqc_decoders verify "$out/bb_ts.json"
+python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb144_peierls_cluster.json -o "$out/bb144_ler.json"
+python3 -m ftqc_decoders verify "$out/bb144_ler.json"
+```
+
+On the [[144,12,12]] gross code (the first input keeps an older file name; its
+`problem.kind` is `bb144`), plain belief propagation does not converge on a
+weight-three half of a weight-six stabilizer, and Relay-BP, BP+LSD and BP+OSD
+each correct it. This is one witness, not a radius certificate. The second
+receipt bounds the X-sector logical error rate at p = 10⁻⁴ under two
+assumptions it prints: disjoint fault clusters decode independently, and every
+connected cluster of at most five faults is corrected. The second is an input.
+[Known gaps](ftqc_decoders/GUIDE.md#known-gaps)
+
+### Measure a logical qubit of a qLDPC memory
+
+```sh
+spec=tools/ftqc_extractors/examples/gross-circuit.json
+python3 -m ftqc_extractors check "$spec" -o "$out/distance.json"
+python3 -m ftqc_extractors verify "$spec" "$out/distance.json"
+python3 -m ftqc_extractors schedule "$spec" --probe Z -o "$out/z-probe.json"
+python3 -m ftqc_faults audit records "$out/z-probe.json" -o "$out/records.json"
+```
+
+This is the unprimed logical Z measurement of the bivariate bicycle gross
+code with the 18-edge partial extractor of Cross, He, Rall and Yoder, compiled
+to a seven-round schedule on 319 qubits. The merged [[162,11,12]] code keeps
+static distance 12. Each of the two CSS probes has 25,048 noisy locations. The
+receipt proves exact circuit distance **7**: a projected search excludes every
+harmful set of at most six faults in both probes, and flipping one port
+measurement in every round changes the logical result while passing every
+detector. With twelve rounds the exact distance is 10
+([details](ftqc_extractors/GROSS_CIRCUIT.md)). The schedule, its barriers and
+idle placement are choices of this implementation, and the input and the final
+test measurements are ideal.
+
+For two BB144 memories, a full transversal reading measures twelve
+independent parities of corresponding logical qubits with 72 added data
+qubits and 144 check meters. With twelve syndrome rounds on each side,
+Proposition 3.9 of Cowtan, He, Williamson and Yoder gives phenomenological
+distance at least 12. A separate one-merge-round circuit with ideal inputs and
+terminal measurements has circuit distance between 3 and 12 in both probes;
+the gap is open. [BB144 benchmark](ftqc_extractors/GUIDE.md#two-block-bb144-benchmark)
+
+### Lattice surgery on surface-code patches, decoded and priced
+
+```sh
+for axis in xx zz; do
+    python3 -m ftqc_extractors.surgery_bench "surface-$axis" -o "$out/$axis.json"
+    python3 -m ftqc_extractors check "$out/$axis.json" -o "$out/$axis-proof.json"
+    python3 -m ftqc_extractors verify "$out/$axis.json" "$out/$axis-proof.json"
+done
+```
+
+Two distance-three rotated patches are merged with nearest-neighbour
+couplers: one split-code round, three merged rounds, three split rounds. For
+each axis the receipt checks that every ideal measurement branch measures the
+signed parity and preserves the named surviving logical pair, excludes all
+one- and two-location faults, and replays a three-fault witness, so the
+circuit distance is exactly 3. The ZZ schedule has 67 ticks, 54 couplers and
+at most 35 live qubits. To price the decoded measurement, pass the installed
+gadget to `ftqc_compose`:
+
+```sh
+python3 - "$out" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+gadget = json.loads((d / "zz-proof.json").read_text())["result"]["gadget"]
+study = dict(kind="decoded-surgery", receipt=gadget, incoming_weight=0, p="1/100000")
+(d / "channel.json").write_text(json.dumps(study))
+PY
+python3 -m ftqc_compose check "$out/channel.json" -o "$out/bound.json"
+python3 -m ftqc_compose verify "$out/channel.json" "$out/bound.json"
+```
+
+The decoder is one syndrome table over all 8,644 single-location alternatives
+of the 1,542 locations, and none of them causes a wrong public bit or a
+residual error. Every higher order is charged by a pair union bound, which
+gives 1188111/10¹⁰ ≈ 1.2 × 10⁻⁴ at p = 10⁻⁵ for the public bit, for the
+residual and for both together. The bound assumes a clean encoded input and
+independent locations.
+
+### Trace a fault through a correction schedule
+
+A decoder sees the faults that can reach its block and Pauli sector by the
+time it runs. `ftqc_gadgets cones` follows these sources through transversal
+gates, idles, measurements and corrections, at one or two levels of
+concatenation:
+
+```sh
+python3 -m ftqc_gadgets cones tools/ftqc_gadgets/examples/two-level-cones.json -o "$out/cones.json"
+python3 -m ftqc_gadgets verify "$out/cones.json"
+```
+
+The seven-layer example has eight inner and four outer decoding events. In
+the X sector the outer correction sees inner events 0 and 2, and the output
+after it sees events 2, 4 and 6: the earlier error stops contributing once the
+correction succeeds. Verification recomputes the cones and checks that linear
+propagation stays inside them for ten settings of the classical controls.
+
+Three `ftqc_compose` studies continue from there. `cone-bound` turns cones
+into a conditional bound on decoding failure from a decoder radius, a noise
+model and ancilla contracts. `filter-contract` derives those contracts from a
+certified purification tree, conditioned on acceptance; the banked 64-leaf
+Golay tree at p = 10⁻⁴ has acceptance lower bounds between 0.91 and 0.97 at
+its six levels. `volume` prices a schedule in expected physical locations; the
+banked two-level example totals 65,578.
+
+```sh
+python3 -m ftqc_compose check tools/ftqc_compose/examples/filter-contract-golay.json -o "$out/filter.json"
+python3 -m ftqc_compose check tools/ftqc_compose/examples/volume-two-level.json -o "$out/volume.json"
+```
+
+The cone theorem, the filter rule and the independence of columns are
+premises of these receipts.
+[Tail bounds](ftqc_compose/GUIDE.md#tail-bounds-over-fault-cones) ·
+[Filter calculus](ftqc_compose/GUIDE.md#filter-calculus-for-purification-trees) ·
+[Volume](ftqc_compose/GUIDE.md#volume-of-a-schedule)
+
+### Carry a distillation bound into a logical T gate
+
+```sh
+python3 -m unittest ftqc_compose.test_logical_t
+```
+
+A correcting 15-to-1 factory feeds an eight-qubit HGP memory through a CSS
+encoder into the extractor's logical T gate. `ftqc_compose` checks all four
+adaptive measurement branches with exact eighth-root phases. With fault-free
+encoding and consumption it bounds half the diamond distance of the logical
+channel by 21/2000, the factory bound min(1, 105p²) at p = 1/100. The encoder
+alone has accepted fault distance one: a Z fault on the raw control after its
+first fan-out CNOT becomes a logical Z. The test also exercises separate
+encoder and gate fault rates.
+[Logical T study](ftqc_compose/GUIDE.md#from-a-distilled-qubit-to-logical-t)
+
+### Direct switched T and pieceable CCZ
+
+```sh
+python3 -m ftqc_gadgets staged tools/ftqc_gadgets/examples/staged-pieceable-ccz.json -o "$out/ccz.json"
+python3 -m ftqc_gadgets verify "$out/ccz.json"
+study=tools/ftqc_compose/examples/switched-t.json
+python3 -m ftqc_compose check "$study" -o "$out/t.json"
+python3 -m ftqc_compose verify "$study" "$out/t.json"
+```
+
+These two studies implement non-Clifford logical gates without magic states.
+The first raises an unknown Steane qubit into the 15-qubit punctured
+Reed–Muller code by gauge measurement, applies transversal T† and lowers it
+again (Anderson, Duclos-Cianci and Poulin). The second applies CCZ to three
+Steane blocks in four pieces of 9, 6, 6 and 6 gates, with syndrome readings
+between the pieces (Yoder, Takagi and Chuang). `ftqc_gadgets` checks the
+action on every basis column with a common phase, so coherence with a
+reference is kept, and shows that every single fault is recovered; the CCZ
+schedule has at most 3,645 locations. `ftqc_compose` joins the three stages
+of the switched T. If every pair of locations is jointly faulty with
+probability at most p², summing the pairs of each stage bounds its failure by
+44431/10¹² at p = 10⁻⁶. Cat seeds, the eight-site seed of the Reed–Muller
+extension, classical control and the final syndrome measurement and recovery
+are ideal services whose own circuits are not certified.
+[Protocols, model and replay](ftqc_gadgets/STAGED.md)
+
+### Certify a recycled factory and a flagged cultivation pipeline
+
+```sh
+ex=tools/ftqc_magic/examples
+python3 -m ftqc_magic check $ex/bh49_recycled_5qubits.json -o "$out/bh49.json"
+python3 -m ftqc_magic verify $ex/bh49_recycled_5qubits.json "$out/bh49.json"
+python3 -m ftqc_magic check $ex/flagged_cultivation_caliper_15to1.json -o "$out/pipe.json"
+python3 -m ftqc_magic verify $ex/flagged_cultivation_caliper_15to1.json "$out/pipe.json"
+```
+
+The Bravyi–Haah 49-to-1 factory has distance 5 and leading error 1411p⁵.
+Measuring and resetting check qubits in the middle of the circuit reduces its
+14 logical wires to 5 active qubits. Its premises are independent input
+errors of rate p and ideal Clifford checks.
+
+For magic-state cultivation (MSC-3), an exact simulation of the Clifford
+errors H± = (X ± Y)/√2 that arise when a Pauli fault passes a T check finds
+four weight-two fault sets that corrupt |T⟩ undetected. A Clifford |S⟩ proxy
+of the same schedule has distance 3, but the unflagged |T⟩ distance is 2. With
+two Z-flag qubits the |T⟩ distance is 3. The pipeline example chains the
+flagged stage, an open-boundary escape stage and a recycled 15-to-1 factory.
+Its receipt lists the premises: an ideal encoded [[7,1,3]] |T⟩ input to the
+final checks, depolarizing circuit noise inside the cultivation subcircuit,
+supplied escape continuation probabilities (used for the cost), ideal Clifford
+checks in distillation, and the heuristic surface-code error per rotation
+named above. [Magic guide](ftqc_magic/GUIDE.md)
+
+### Certify and simplify measurement-based uncomputation
+
+```sh
+dqi=tools/ftqc_uncompute/examples/dqi_rs_tiny_mbuc.kmx
+python3 -m tools.ftqc_uncompute check "$dqi" -o "$out/dqi.json"
+python3 -m tools.ftqc_uncompute verify "$out/dqi.json" --target "$dqi"
+python3 -m tools.ftqc_uncompute pebble --length 12 --mode kmrv -o "$out/pebble12.json"
+python3 -m tools.ftqc_uncompute check "$out/pebble12.json" -o "$out/pebble12.receipt.json"
+python3 -m tools.ftqc_uncompute blocks tools/ftqc_uncompute/examples/block_adder_4bit.json -o "$out/add4.json"
+```
+
+The bilinear circuit over GF(2³) erases a scratch product with HMR. The
+symbolic check proves that scratch is restored, resets are clean, every
+measurement branch is injective, public outputs do not depend on the
+outcomes, and every outcome-dependent phase is cancelled. If the proof exceeds
+its budget or cannot settle injectivity, `check` refuses. Trajectory sampling
+and the small dense Kraus check are separate fields of the receipt, the first
+statistical and the second numerical. A 16-bit ripple adder already exceeds
+the global budget. The `blocks` command proves such programs locally, states
+the arithmetic as an exact integer relation and binds the program to a
+correction schedule in the format of `ftqc_gadgets cones`. Everything here is
+at the logical level, with classical control and AND resources ideal.
+[Cuts and block programs](ftqc_uncompute/GUIDE.md#wide-arithmetic-cuts-and-block-programs)
+
+## Code automorphisms
+
+An action receipt names a memory, an ordered logical basis, a physical
+Clifford word and the signed image of every logical X and Z. A push
+permutation sends site `q` to `perm[q]`, and layers run in list order. A
+virtual relabelling or change of logical frame carries no timing or distance
+evidence. Each physically installed two-qubit gate needs a coupler.
+
+```sh
+ex=tools/ftqc_codes/examples
 python3 -m ftqc_codes verify "$ex/steane.qldpc-h.action.json" --code steane
 python3 -m ftqc_codes verify "$ex/five_qubit.autqec.action.json" --code "$ex/five_qubit.stabilizer.json"
 gb='bb:9,1,x0+x1,x1+x2+x3+x5+x7+x8'
@@ -34,11 +610,22 @@ python3 -m ftqc_codes action "$gb" "$ex/gb18-fold.steps.json" -o "$out/fold.json
 python3 -m ftqc_codes verify "$out/fold.json" --code "$gb"
 ```
 
-A phase fold takes an involution, applies CZ on each two-cycle and S on each fixed point. List fixed sites under `sdg` to use the inverse phase there. The 18-qubit GB example uses the first Table 4 polynomial pair. Nine CZs and a second layer of Z on sites 1, 3, 4 and 7 preserve the signed checks. In the derived basis the two X generators map to +XZ and −ZX. The CZ layer alone fails signed replay. [GBAutomorphisms Table 4 input](https://github.com/ajdav136/GBAutomorphisms/blob/4fc6b77ec17bb9f43de381384a9228f83fde52ce/Examples_table4.ipynb)
+The first two receipts were produced by external discovery programs and are
+replayed here. The third is a phase fold on the 18-qubit generalized bicycle
+code built from the first polynomial pair of Table 4 of the GBAutomorphisms
+examples: an involution with CZ on each two-cycle and S on each fixed point,
+followed by Z on sites 1, 3, 4 and 7. It preserves the signed checks and maps
+the two logical X generators to +XZ and −ZX. The CZ layer alone fails signed
+replay. List fixed sites under `sdg` to use the inverse phase there. A steps
+file `{"actions":[...],"word":[0,{"inverse":0}]}` composes verified generators
+(indexed from zero) into one action. A non-CSS code uses schema
+`ftqc_codes-stabilizer-1` with an integer `n`, signed Pauli `checks` and
+ordered `slots` with `name`, `x` and `z`.
+[GBAutomorphisms Table 4 input](https://github.com/ajdav136/GBAutomorphisms/blob/4fc6b77ec17bb9f43de381384a9228f83fde52ce/Examples_table4.ipynb)
 
-Use `{"actions":[...],"word":[0,{"inverse":0}]}` as the steps file to compose checked generators. Indices start at zero. The result is one replayable action. A non-CSS code specification uses schema `ftqc_codes-stabilizer-1`, an integer `n`, signed Pauli `checks`, and ordered `slots` with `name`, `x`, and `z`. The verifier checks commutation, rank, independence, pairing and signs. The existing CSS distance commands retain their CSS inputs.
-
-The following example distinguishes reachability from physical installation. Logical H sends +Y to −Y. Seven parallel Hadamards implement the action in one tick.
+Reaching a logical state and installing the operation are different claims.
+Logical H on Steane sends +Y to −Y, and seven parallel Hadamards implement it
+in one tick:
 
 ```sh
 python3 - "$ex/steane.qldpc-h.action.json" "$out" <<'PY'
@@ -60,11 +647,26 @@ python3 -m ftqc_compose check "$out/route.json" -o "$out/route-proof.json"
 python3 -m ftqc_compose verify "$out/route.json" "$out/route-proof.json"
 ```
 
-On LP(8,4) the translated seed and ordinary surgery measure positive Z on q2 then q3. In the installed model the translated implementation uses 42 couplers and admits a single fault leaving a residual on the data. Ordinary surgery uses six couplers and passes the distance-two lower-bound check. On BB144, both physical translation words and their signed logical images are checked against the 15 RM15 settings. The 12-by-6 physical translations induce 36 distinct signed logical actions, with each generator of order six, as in the Qiskit compiler's shift group. [Gross shift group](https://github.com/qiskit-community/bicycle-architecture-compiler/blob/ad97e823fc4077a9ee3d5fe57cabc25b6d9201d6/crates/bicycle_common/src/lib.rs)
+The orbit receipt reaches −Y with a one-generator word and proves +X
+unreachable under the supplied generators. The installed route has 21
+single-location faults, each leaving data weight one. A circuit distance would
+also need a detection or recovery protocol.
+
+The same receipts drive two larger comparisons in the batteries. On LP(8,4) a
+translated seed and ordinary surgery both measure positive Z on slots q2 then
+q3; in the installed model the translation uses 42 couplers and admits a
+single fault that leaves a residual on the data, while ordinary surgery uses
+six couplers and passes the distance-two check. On BB144 the 12-by-6 physical
+translations induce 36 distinct signed logical actions, each generator of
+order six, as in the shift group of the Qiskit bicycle compiler.
+[Gross shift group](https://github.com/qiskit-community/bicycle-architecture-compiler/blob/ad97e823fc4077a9ee3d5fe57cabc25b6d9201d6/crates/bicycle_common/src/lib.rs)
 
 ### Optional discovery and comparisons
 
-Native verification uses the Python standard library. Run optional producers in separate environments with `PYTHONPATH` unset so BootLoops' `galois` package does not shadow the PyPI dependency. Examples below assume the named Python executables point to those environments.
+Native verification uses only the Python standard library. Run the optional
+producers in separate environments with `PYTHONPATH` unset, so that the
+BootLoops `galois` package does not shadow the PyPI one. The examples assume
+that the named interpreters point to those environments.
 
 ```sh
 env -u PYTHONPATH "$QEC_PYTHON" tools/ftqc_codes/producers/discover_actions.py qldpc steane "$out/qldpc" --gates H
@@ -73,233 +675,83 @@ env -u PYTHONPATH "$QEC_PYTHON" tools/ftqc_compose/compare_autdec.py
 env -u PYTHONPATH "$BICYCLE_PYTHON" tools/ftqc_compose/compare_bicycle_compiler.py --table "$out/table_gross.dat"
 ```
 
-- qLDPC 0.2.9 with GAP 4.15.1 and GUAVA 3.20 found one transversal H generator and five generators in a separate SWAP-only search on Steane. Restrict the gate set for larger searches. AutQEC 1.0.1 with igraph/Bliss found five candidates on the five-qubit code. Stim checked every physical X and Z generator against each exported circuit. For up to six independent checks the Bliss adapter uses all unsigned stabilizers. Above that size it searches symmetries of the supplied independent generating set. These outputs make no claim of group completeness. [qLDPC](https://github.com/qLDPCOrg/qLDPC) · [AutQEC](https://github.com/hsayginel/autqec/tree/db614a9bfc91f384d324a647557aa9213c6cdc3b) · [Stim](https://github.com/quantumlib/Stim)
-- The AutDEC comparison fixes all 22 Steane weight-zero and single-qubit Pauli inputs, one order-three mechanism permutation and its identity control. The native BP+OSD ensemble had zero logical failures. Upstream BPOSD and its ensemble each had three, using LDPC 2.1.2, ten iterations and OSD order zero. These are finite control counts for the stated implementations. [AutDEC reference implementation](https://github.com/hsayginel/autdec/tree/00746ced028ebc6edca1b4e56ee6db3d9039d553)
-- Bicycle Architecture Compiler 0.1.0 with Qiskit 2.6.2 compiled the same 15 PPRs for Gross, with 15 T injections, 105 measurements and 112 automorphisms across its compiled program. The BootLoops installed factory uses 56 shift and return generators, or 336 CX ticks, for its Gross-port movement alone. Each count covers its own stated operations. [Bicycle Architecture Compiler](https://github.com/qiskit-community/bicycle-architecture-compiler)
+- qLDPC 0.2.9 with GAP 4.15.1 and GUAVA 3.20 found one transversal H generator
+  on Steane, and five generators in a separate SWAP-only search. AutQEC 1.0.1
+  with igraph/Bliss found five candidates on the five-qubit code. For up to six
+  independent checks the Bliss adapter uses all unsigned stabilizers; above
+  that it searches symmetries of the supplied generating set. Stim checked
+  every physical X and Z generator against each exported circuit. Neither
+  output claims a complete group.
+  [qLDPC](https://github.com/qLDPCOrg/qLDPC) ·
+  [AutQEC](https://github.com/hsayginel/autqec/tree/db614a9bfc91f384d324a647557aa9213c6cdc3b) ·
+  [Stim](https://github.com/quantumlib/Stim)
+- On all 22 Steane inputs of weight zero or one, with one order-three
+  mechanism permutation and its identity control, the native BP+OSD ensemble
+  had no logical failures, and the upstream BPOSD and its ensemble had three
+  each (LDPC 2.1.2, ten iterations, OSD order zero). These are finite counts
+  for the stated implementations.
+  [AutDEC](https://github.com/hsayginel/autdec/tree/00746ced028ebc6edca1b4e56ee6db3d9039d553)
+- The Bicycle Architecture Compiler 0.1.0 with Qiskit 2.6.2 compiled the same
+  15 Pauli rotations for the gross code with 15 T injections, 105 measurements
+  and 112 automorphisms. The BootLoops installed factory uses 56 shift and
+  return generators, or 336 CX ticks, for its gross-port movement alone. Each
+  count covers its own stated operations.
+  [Bicycle Architecture Compiler](https://github.com/qiskit-community/bicycle-architecture-compiler)
 
-## Where the tools connect
+## Addressable high-rate blocks and single-slot Magic delivery
 
-- **From a code to a noisy circuit.** The audit, gadget and extractor packages reuse code constructions or binary linear algebra from `ftqc_codes`. A static distance counts data qubits supporting a logical Pauli. To count faulty circuit locations, the study also specifies preparations, gates, idles, measurements, detectors and protected outputs.
-- **From extractor to audit to composition.** The extractor defines the measured logical and its spectators, and exports physical X and Z probes as native audit circuits. The compose gross-code checker replays the extractor distance receipt and uses the audit fault model to calculate the residual data Pauli after applying the split-record frame. The HGP bridge also supports replay in the enclosing circuit and export of verified-cat preparations. [HGP bridge](ftqc_extractors/AUDIT.md) · [Gross-code probes](ftqc_extractors/GROSS_CIRCUIT.md) · [Residual checker](ftqc_compose/GUIDE.md#gross-code-residual-data-and-frame)
-- **From code or circuit distance to operational decoding.** Static and circuit distances count undetected faults under an ideal minimum-weight oracle or postselection. `ftqc_decoders` checks concrete polynomial-time decoders (`BP+OSD`, `BP+LSD`, `Relay-BP`, `Union-Find`, `MWPM`, `SSF`, and audited `.dem` solvers such as `Tesseract`), plugs procedural decoding into `ftqc_gadgets` beyond lookup-table limits, and repairs noisy surgery syndromes via metachecks. To estimate feedback stalls for `ftqc_uncompute`, it measures decoder work on every single-fault-mechanism syndrome and applies the supplied tick costs and reaction depth. The estimate covers that set of syndromes. [Decoder guide](ftqc_decoders/GUIDE.md)
-- **From a Clifford schedule to a concatenated gadget.** `ftqc_gadgets` uses the audit fault propagator and adds encoded Bell inputs, reference qubits and decoders. Its two-level checker binds inner receipts to signed logical operations and outer faults to physical columns. It verifies the decoder radius and records any specified ancillas and the rectangle argument assumed by the reduction. A purification tree that makes such an ancilla gets a factory certificate, which the reduction accepts in place of the assumption. [Gadget guide](ftqc_gadgets/GUIDE.md)
-- **From gadgets to a circuit-wide noise bound.** `ftqc_compose` checks ordered wires, residual filters and bad fault supports. Its level-reduction checker substitutes physical supports into a logical circuit. A local-stochastic bound also needs a joint fault-support model. A two-level gadget receipt can inform the local claim; a Definition 4.8 hypothesis supplied to compose remains an explicit premise. [Composition guide](ftqc_compose/GUIDE.md#level-reduction)
-- **Comparing a ZX design with a location-fault study.** Run the ZX verifier on the proposed circuit and its reference. To use its result in another argument, match the gates and idles, input codespace, flag or detector handling, output frame and fault-counting convention. The ZX contract has its own verifier and noise model. [ZX guide](ftqc_zx/GUIDE.md)
-- **From logical cleanup to physical audit.** The Clifford exporter lowers Hadamard-measure-reset (HMR) to X measurement and reset. A classically controlled Z follows the value of its bit, including a stored constant, an inversion or a later measurement. Conditional quantum gates beyond this direct Z feedback and non-Clifford operations require another implementation before export. The audit bridge builds a weight-one physical fault model for the chosen preparation and outputs. [Audit bridge](ftqc_uncompute/adapters/ftqc_bridge.py)
-- **Pricing a logical circuit.** The resource estimator combines logical gate counts and reaction depth with the supplied ZX contract enclosures and numerical factory cost and escape assumptions. A composed logical-T receipt can justify a factory input separately. The caller supplies that number to the estimator. [Pricing implementation](ftqc_uncompute/adapters/ftqc_bridge.py) · [Logical-T composition](ftqc_compose/GUIDE.md#from-a-distilled-qubit-to-logical-t)
-- **From cultivation and distillation to composed magic contracts.** `ftqc_magic` verifies binary/PPR, $\mathrm{GF}(2^s)$ trace, and non-triorthogonal $\mathbb{Z}[\omega_8]$ stabilizer factories, mid-circuit check recycling, $O(n^3)$ Clifford-hook cultivation (`d_T` vs `d_S`), Caliper open-boundary escape gaps (cross-checked with `ftqc_decoders` Blossom), and single-shot 3D tricycle $\to$ 4D quadcycle `CCZ` factories (repaired via `ftqc_decoders` metachecks). Its pipeline composer enforces `INDEPENDENT_SINGLE`, `BATCH_CORRELATED`, and `CATALYST_POISONED` rules before exporting `ftqc_compose` ancilla contracts and `ftqc_uncompute` pricing records. [Magic factory guide](ftqc_magic/GUIDE.md)
-
-## Compare a surface-code memory or lattice-surgery measurement
-
-The rotated patch uses one data qubit per grid point, with one meter per check
-during a memory round. One such round comprises preparation, four CNOT layers
-and measurement. For a distance-three memory, the standard and hook-aligned
-CNOT orders have circuit distances three and two in the two-round X and Z
-probes. The sector decoder projects each complete physical fault onto the
-measured CSS sector and applies equal-weight MWPM. Its report counts failures
-among all physical single-location alternatives. The exact audit measures
-undetected distance separately.
-
-```sh
-export PYTHONPATH="$PWD/tools"
-out=$(mktemp -d)
-python3 -m ftqc_codes certify rotated_surface:3 -o "$out/code.json"
-python3 -m ftqc_codes verify "$out/code.json" --full
-python3 -m ftqc_faults audit analyze surface:3,2,z,bad -o "$out/hook.json"
-python3 -m ftqc_decoders.surface_memory --distance 3 --rounds 3 --basis Z
-for axis in xx zz; do
-    python3 -m ftqc_extractors.surgery_bench "surface-$axis" -o "$out/$axis.json"
-    python3 -m ftqc_extractors check "$out/$axis.json" -o "$out/$axis-proof.json"
-    python3 -m ftqc_extractors verify "$out/$axis.json" "$out/$axis-proof.json"
-done
-```
-
-The installation accepts odd distances of at least three. It begins with one
-split-code round, measures the merged code for R rounds, then remeasures the
-split code for R rounds. The shared seam meters measure opposing half checks
-in successive subrounds. Their complementary seam checks encode the signed
-parity. The last split record controls the recovery on live data. Gates,
-feedback and idles carry physical faults. The initial encoded state and terminal
-syndrome are ideal. Static square-grid placements and a gate range of one
-check every coupler. Every ideal measurement branch preserves the named
-surviving logical pair. The distance receipt includes single-location and
-two-location exclusions and a forward-replayed physical witness, or a smaller
-counterexample. At d = R = 3 the exact circuit distance is three in both bases.
-A larger patch is opt-in with `--distance 5`; `--rounds` overrides the default
-R = d.
-
-To price a decoded measurement, carry the installed Gadgets proof into Compose:
+`ftqc_codes` emits construction and basis receipts that bind ordered
+matrices, named symplectic logical slots, stabilizer dressings and lift
+symmetries for lifted-product, two-block group algebra, quantum Tanner,
+radial and pair-partition codes. `ftqc_extractors.addressable_surgery`
+installs signed slot measurements and classical feed-forward on an explicit
+coupler inventory, and `ftqc_compose.addressable_magic` delivers a verified
+single-output T state into a named slot while preserving the other data slots
+and their Bell references. [High-rate QEC plan](../PLANS/high-rate-qec.md)
 
 ```sh
-python3 - "$out" <<'PY'
-import json, pathlib, sys
-directory = pathlib.Path(sys.argv[1])
-installed = json.loads((directory / "zz-proof.json").read_text())
-study = dict(kind="decoded-surgery", receipt=installed["result"]["gadget"],
-             incoming_weight=0, p="1/100000")
-(directory / "channel.json").write_text(json.dumps(study))
-PY
-python3 -m ftqc_compose check "$out/channel.json" -o "$out/bound.json"
-python3 -m ftqc_compose verify "$out/channel.json" "$out/bound.json"
+python3 -m ftqc_codes construct pp256 -o "$out/pp256.construct.json"
+python3 -m ftqc_codes basis lp6_2 --method spectral -o "$out/lp6_2.basis.json"
+python3 -m unittest ftqc_extractors.test_highrate_qec ftqc_compose.test_addressable_magic
 ```
 
-The decoder uses one joint syndrome table for public bits and the residual
-Pauli frame. It scores every physical single-location alternative with its
-within-location probability, including correlated CNOT faults. For independent
-sites with common fault probability p, Compose adds a pair union bound for
-all higher orders. The resulting public, residual and joint failure bounds
-assume a clean encoded input. Residual failure means the corrected data Pauli
-lies outside the stabilizers and measured branch subgroup. The research
-checkout's `studies/surface-baseline` contains the matched HGP comparison,
-seeded sampling and twelve-parity resource accounting.
+Published distances of these families that exceed the search budget stay
+under `paper_claims` in the construction receipt and are not used as proved
+bounds.
 
-## Follow a gross-code measurement into the audit tool
+## Supply states from inside a CSS memory
 
-Run these commands from the BootLoops root with Python 3.10 or later.
-
-```sh
-export PYTHONPATH="$PWD/tools"
-out=$(mktemp -d)
-spec=tools/ftqc_extractors/examples/gross-circuit.json
-python3 -m ftqc_extractors schedule "$spec" --probe Z -o "$out/z-probe.json"
-python3 -m ftqc_faults audit records "$out/z-probe.json" -o "$out/records.json"
-python3 -m ftqc_extractors check "$spec" -o "$out/distance.json"
-python3 -m ftqc_extractors verify "$spec" "$out/distance.json"
-```
-
-The audit report counts 25,048 noisy locations in this probe and checks faults through weight two. The extractor receipt combines both CSS probes, the time history of the logical readout, and a physical witness. It proves exact distance **7** for the seven-round measurement. Flipping one fixed port measurement in every round changes the reported logical Z and passes all detectors.
-
-## Cross-block measurements
-
-For two BB144 memories the full reading measures twelve independent corresponding logical parities. The new apparatus uses 72 data qubits and 144 check meters. With twelve syndrome rounds before and after the reading, Proposition 3.9 gives phenomenological distance at least twelve. A separate one-merge-round circuit with ideal encoded inputs and terminal measurements has circuit distance between 3 and 12 in the two complementary audit probes. Compose replays that evidence before using the split-frame residual bound. [BB144 benchmark](ftqc_extractors/GUIDE.md#two-block-bb144-benchmark)
-
-A general fast-surgery study supplies chain maps, auxiliary cycle checks, metachecks and the ordered temporal boundaries. A block-map study instead supplies hardware ports, matching bridges and logical Clifford+T gates. Its output lists the signed measurements available on the installed couplers for each adaptive branch. [Sequence example](ftqc_extractors/examples/three-block-sequence.json) · [Compiler example](ftqc_extractors/examples/bridged-pbc.json) · [ZX comparison](ftqc_extractors/examples/homomorphic-surgery.json)
-
-## Three questions about Steane-code operations
-
-These commands use the same shell setup. The first pair checks the static code parameters. The second checks error correction and output closeness through order one for a Knill gadget whose ancillas are supplied as specifications. The last compares a five-ancilla X-syndrome extractor to its reference through three faults in the ZX tool's CSS circuit noise model.
-
-```sh
-python3 -m ftqc_codes certify steane -o "$out/steane.json"
-python3 -m ftqc_codes verify "$out/steane.json" --full
-python3 -m ftqc_gadgets analyze knill:steane,anc=spec --check ec:1 --close 1 -o "$out/gadget.json"
-python3 -m ftqc_gadgets verify "$out/gadget.json" --full
-python3 -m ftqc_faults zx equiv steane_5anc steane_spec --w 3 --noise-model circuit_css --code steane_7_1_3
-```
-
-The five-ancilla bridge verifies both sector-specific ZX derivations and cross-checks all 455 single-location fault modes in each physical schedule. The two complementary terminal probes recover both components of the raw data Pauli and compare every measurement-record displacement. Replay the study with the same shell setup. [Model, boundaries and fault weights](ftqc_faults/GUIDE.md#five-ancilla-steane-extractor)
-
-```sh
-python3 -m ftqc_faults steane -o "$out/steane-bridge.json"
-python3 -m ftqc_faults steane --verify "$out/steane-bridge.json"
-```
-
-## QR-47 as an outer code
-
-The [[47,1,11]] quadratic-residue code supplies a candidate decoding radius of five. With lookup tables disabled, the gadget verifier proves that radius from the actual decoder check matrix and checks that each fault stays in its assigned physical column.
-
-```sh
-python3 -m ftqc_codes certify qr:47 -o "$out/qr47.json"
-python3 -m ftqc_gadgets analyze steane_ec:qr:47,anc=spec --local --code-receipt "$out/qr47.json" --no-tables -o "$out/outer.json"
-python3 -m ftqc_gadgets verify "$out/outer.json"
-```
-
-The report states that the gate, error-correction and any-input properties hold when faults and input errors touch at most five coordinates. Read with a coordinate as a column of inner blocks, that is the outer half of a two-level argument; `ftqc_gadgets/levels.py` joins it to the inner receipts.
-
-That gadget takes its two ancillas as specifications. A purification tree that makes one is certified separately. One level up an idle is an inner correction, so a raw outer preparation ends with idle rounds, and only the last round counts as local.
-
-```sh
-python3 -m ftqc_gadgets analyze prep:qr:47,zero,tree=XZXZ,rounds=2 --tree --strict --light --wmin 11 -o "$out/zero.json"
-python3 -m ftqc_gadgets verify "$out/zero.json"
-```
-
-The report says the sixteen-copy tree acts as its specification, with wire faults only in columns holding a failed local or check location, unless four leaves each hold a failed junk-capable location. `levels.reduction(..., factories=...)` then lists no assumed ancilla and records that count. Given independent faults across leaves and checks, the separate `Tree.bounds` calculation bounds the probability of junk conditional on acceptance, each check’s acceptance probability from below, and expected leaf consumption. [Factory guide](ftqc_gadgets/GUIDE.md)
-
-## Trace a fault through a correction schedule
-
-A decoder sees faults that can reach its measured block and Pauli sector by that point in the schedule. The `cones` command in `ftqc_gadgets` follows these sources through transversal gates, idles, measurements and corrections. An inner cone counts location classes per coordinate and residual errors from delivered ancillas. At the outer level the receipt lists the contributing inner events and outer ancilla sources.
-
-Run the seven-layer example from the BootLoops root with the shell setup above.
-
-```sh
-python3 -m ftqc_gadgets cones tools/ftqc_gadgets/examples/two-level-cones.json -o "$out/cones.json"
-python3 -m ftqc_gadgets verify "$out/cones.json"
-```
-
-The receipt lists eight inner and four outer decoding events. In the X sector, the outer correction sees inner events 0 and 2. After that correction the output cone sees events 2, 4 and 6. This shows exactly where the earlier X error stops contributing, assuming successful decoding. Verification recomputes the cones and checks inner propagation over GF(2) for the tested control settings. The gadget suite also exercises physical one-level Clifford examples. A `cone-bound` study in `ftqc_compose` turns the cone into a conditional upper bound on decoding failure using a declared decoder radius, noise model and ancilla contracts. It supports independent faults at one or two levels and local-stochastic faults at one level. The two-level calculation also assumes independent columns. A `filter-contract` study derives the ancilla contracts themselves from a certified purification tree, with conditioning on acceptance, at the physical level and for a tree of encoded blocks. A `volume` study prices the same schedule in expected physical locations from a ledger of its block-ticks, corrections and delivered resources, with ancilla costs taken from the filter studies. [Volume](ftqc_compose/GUIDE.md#volume-of-a-schedule) · [Filter calculus](ftqc_compose/GUIDE.md#filter-calculus-for-purification-trees) · [Tail bounds and premises](ftqc_compose/GUIDE.md#tail-bounds-over-fault-cones) [Example schedule](ftqc_gadgets/examples/two-level-cones.json) · [Gadget guide](ftqc_gadgets/GUIDE.md#fault-cone-receipts)
-
-## Carry a distillation bound into a logical T gate
-
-The eight-qubit HGP example feeds a correcting 15-to-1 factory through a CSS encoder into the extractor’s logical T gate. Compose checks all four adaptive measurement branches. With ideal encoding and consumption, the example bounds the logical-channel half-diamond distance by 21/2000. A single encoder fault can produce an accepted logical Z. The test also exercises separate encoder and gate fault rates. [Logical T example and checks](ftqc_compose/test_logical_t.py)
-
-```sh
-PYTHONPATH=tools python3 -m unittest ftqc_compose.test_logical_t
-```
-
-## Certify and simplify measurement-based uncomputation
-
-The bilinear circuit over GF(2³) uses HMR to erase a scratch product. The global symbolic check tests scratch restoration, clean resets, branch injectivity, outcome-independent public basis outputs, and cancellation of measurement-dependent phases. If the proof exceeds its budget or leaves injectivity unresolved, `check` refuses the certificate. Trajectories compare against the supplied oracle (identity by default). Their confidence bound and the optional small-width numerical Kraus checks have separate fields in the receipt.
-
-```sh
-dqi=tools/ftqc_uncompute/examples/dqi_rs_tiny_mbuc.kmx
-python3 -m tools.ftqc_uncompute check "$dqi" -o "$out/dqi.receipt.json"
-python3 -m tools.ftqc_uncompute verify "$out/dqi.receipt.json" --target "$dqi"
-python3 -m tools.ftqc_uncompute pebble --length 12 --mode kmrv -o "$out/pebble12.json"
-python3 -m tools.ftqc_uncompute check "$out/pebble12.json" -o "$out/pebble12.receipt.json"
-python3 -m tools.ftqc_uncompute verify "$out/pebble12.receipt.json" --target "$out/pebble12.json"
-```
-
-Wide arithmetic exceeds the global symbolic budget: a 16-bit ripple adder is already refused. The `blocks` command certifies such programs compositionally. It names intermediate values, proves every deletion locally, proves the arithmetic statement as one exact integer relation, and binds a correction schedule in the format of `ftqc_gadgets cones` to the program, so the schedule whose failure probability `cone-bound` bounds is shown to compute the stated function. [Cuts and block programs](ftqc_uncompute/GUIDE.md#wide-arithmetic-cuts-and-block-programs)
-
-Receipt verification needs the matching input and compares the complete regenerated evidence. The rewrite advisor recognizes seven rule families. For KickMix, `--apply` implements temporary-AND cleanup, bilinear cleanup and scratch reuse, then compares the symbolic public action. For arithmetic DAGs the verification checks the lowered circuit’s HMR obligations. Abstract nodes can still be costed and inspected. [Uncomputation guide](ftqc_uncompute/GUIDE.md) · [Packaged examples](ftqc_uncompute/examples)
-
-## Expose a qLDPC trapping set and certify operational decoding
-
-On the `[[144,12,12]]` BB144 gross code, plain belief propagation stalls on a weight-three half of a weight-six stabilizer. The first receipt replays this witness and verifies that Relay-BP, BP+LSD (maximum cluster rank one), and BP+OSD each correct it. [Trapping-set input](ftqc_decoders/examples/bb72_trapping_set.json)
-
-The second receipt computes a Peierls upper bound on the X-sector logical error rate at physical error probability 1/10,000. It assumes that disjoint fault clusters in the interaction graph decode independently and that the decoder corrects every connected cluster of size at most five. [Peierls input](ftqc_decoders/examples/bb144_peierls_cluster.json) · [Decoder guide](ftqc_decoders/GUIDE.md#known-gaps)
-
-```sh
-python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb72_trapping_set.json -o "$out/bb_ts.receipt.json"
-python3 -m ftqc_decoders verify "$out/bb_ts.receipt.json"
-python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb144_peierls_cluster.json -o "$out/bb144_ler.receipt.json"
-python3 -m ftqc_decoders verify "$out/bb144_ler.receipt.json"
-```
-
-## Certify a recycled factory and a flagged cultivation pipeline
-
-On the Bravyi–Haah `49T -> 1T` ($d = 5$, $1411 p^5$) factory, mid-circuit check measurement and reset compresses 14 logical rows down to **5** active qubits. On `MSC-3` magic-state cultivation, exact $O(n^3)$ simulation of propagated Clifford errors $H_{\pm} = (X \pm Y)/\sqrt{2}$ exposes 4 weight-two malignant faults on $|T\rangle$ ($d_T = 2$ despite $d_S = 3$ on $|S\rangle$) when unflagged, and certifies $d_T = 3$ once two $Z$-flag ancillas are added and chained through Caliper open-boundary escape into a recycled Litinski 15-to-1 stage. [Factory examples](ftqc_magic/examples) · [Magic guide](ftqc_magic/GUIDE.md)
-
-```sh
-python3 -m ftqc_magic check tools/ftqc_magic/examples/bh49_recycled_5qubits.json -o "$out/bh49.receipt.json"
-python3 -m ftqc_magic verify tools/ftqc_magic/examples/bh49_recycled_5qubits.json "$out/bh49.receipt.json"
-python3 -m ftqc_magic check tools/ftqc_magic/examples/flagged_cultivation_caliper_15to1.json -o "$out/cult_pipe.receipt.json"
-python3 -m ftqc_magic verify tools/ftqc_magic/examples/flagged_cultivation_caliper_15to1.json "$out/cult_pipe.receipt.json"
-```
+The simultaneous injection checker of `ftqc_extractors` verifies a fresh CSS
+source from the signed logical action on its carriers, following Liu et al.
+Its BB144 and HGP225 inputs include the first-round selection mask of each
+published circuit. Four closed Y probes use the native fault propagation and
+Stim, with optional BP+OSD sampling. The two-output S consumer study of
+`ftqc_compose` (it needs Stim) conditions the joint error distribution on
+batch acceptance. Sampled histograms reproduce published figures but do not
+certify a noisy T source. [Injection study](ftqc_extractors/INJECTION.md) ·
+[Batch contract](ftqc_compose/GUIDE.md#simultaneous-y-source-and-ideal-consumers)
 
 ## Reproduce the integration checks
-
-From BootLoops, run the nine suites, including the separate audit and ZX engine batteries, then run the cross-engine checks. Install Stim and put CaDiCaL on `PATH` (or set `FTQC_CODES_CADICAL`) to exercise external SAT+LRAT and stabilizer checks. The optional Lean build has separate prerequisites and an opt-in command in the [code guide](ftqc_codes/GUIDE.md).
 
 ```sh
 python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute ftqc_magic
 python3 run_selftests.py ftqc_faults
 ```
 
-## Addressable high-rate blocks and single-slot Magic delivery
+The second line runs the cross-engine checks of `ftqc_faults`. The research
+checkout beside BootLoops banks larger studies with replay commands under
+`studies/` (surface baselines, surgery, the in-situ bicycle factory); they are
+not part of this repository.
 
-`ftqc_codes` emits replayable `ftqc_codes-construction-1` and `ftqc_codes-basis-1` receipts binding ordered matrices, named symplectic logical slots, stabilizer dressings, and lift symmetries (`LP`, `2BGA`, Quantum Tanner, `radial90`, and pair-partition `PP256` / `APM1152`). `ftqc_extractors.addressable_surgery` installs signed slot measurements and classical feed-forward on explicit coupler inventories, flattens schedules through `ftqc_faults` and `ftqc_decoders`, verifies typed residual contracts in `ftqc_compose`, and prices reaction stalls in `ftqc_uncompute`. `ftqc_compose.addressable_magic` delivers verified single-output `ftqc_magic` $T$ states via `occupied_swap` into a named resource slot while preserving untouched data slots and Bell references. [High-rate QEC roadmap](../PLANS/high-rate-qec.md)
+CREDIT: each package's `GUIDE.md` names the papers and programs it follows,
+and bracketed keys resolve in [`REFERENCES.md`](../REFERENCES.md). Treating
+fault tolerance as properties over fault counts follows Aliferis, Gottesman
+and Preskill and Chen et al.; fault equivalence follows Rodatz, Poór and
+Kissinger; typed composition follows He, Nguyen and Pattison.
 
-```sh
-python3 -m ftqc_codes construct pp256 -o "$out/pp256.construct.json"
-python3 -m ftqc_codes basis lp6_2 --method spectral -o "$out/lp6_2.basis.json"
-PYTHONPATH=tools python3 -m unittest ftqc_extractors.test_highrate_qec ftqc_compose.test_addressable_magic
-```
+## License
 
-## Supply states from inside a CSS memory
-
-The simultaneous injection checker verifies a fresh CSS source from the signed logical action on its carriers. Its BB144 and HGP225 inputs include the circuit-specific first-round selection mask. Four closed Y probes use native fault propagation, Stim cross-checks and optional BP+OSD sampling. The two-state S consumer conditions a joint error distribution on batch acceptance. A T consumption study requires suitable evidence for a T source. [Injection study and replay commands](ftqc_extractors/INJECTION.md) · [Exact batch contract](ftqc_compose/GUIDE.md#simultaneous-y-source-and-ideal-consumers)
-
-## Direct switched T and pieceable CCZ
-
-Gadgets verifies both gauge changes, the signed transversal phase and the four-piece Steane gate with its intermediate recovery history. Compose joins the typed stages and bounds failures under a declared pair-noise premise. [Protocols, model, CLI and replay](ftqc_gadgets/STAGED.md)
+MIT License. Copyright (c) 2026 Anthropic, PBC. Created by Matthew D. Schwartz;
+code written by Claude (Anthropic) under his supervision. Documentation is
+licensed CC BY 4.0. See LICENSE, LICENSE-CONTENT and NOTICE at the repository
+root.
