@@ -91,6 +91,12 @@ def run_decoder(
             stop_n_solutions=int(cfg.get("stop_n_solutions", 1)),
             seed=int(cfg.get("seed", 20260601)),
         )
+    if alg == "localized":
+        from .linked_cluster import decode_localized
+
+        return decode_localized(
+            problem, syndrome, cfg.get("base", "union_find"), int(cfg.get("detector_range", 1))
+        )
     if alg == "union_find":
         return decode_union_find(problem, syndrome, use_bp_guidance=False)
     if alg == "belief_find":

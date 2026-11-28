@@ -226,6 +226,21 @@ def evaluate_study(study: dict[str, Any], *, base_dir: Path | None = None) -> tu
         )
         return problem, res_p
 
+    if kind == "enclose_linked_cluster":
+        from .linked_cluster import enclose_linked_cluster
+
+        res_l = enclose_linked_cluster(
+            problem,
+            study.get("base_decoder", "union_find"),
+            study["physical_p"],
+            detector_range=int(study.get("detector_range", 1)),
+            max_cluster_size=int(study.get("max_cluster_size", 2)),
+            kappa=int(study.get("observable_mask", 1)),
+            budget_cap=int(study.get("budget_cap", 200_000)),
+            digits=int(study.get("digits", 30)),
+        )
+        return problem, res_l
+
     if kind == "enclose_stratified_shells":
         res_s = enclose_stratified_shells(
             problem,

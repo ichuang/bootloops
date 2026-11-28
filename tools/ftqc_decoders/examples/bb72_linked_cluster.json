@@ -1,0 +1,11 @@
+{
+  "problem": {
+    "kind": "bb72",
+    "sector": "X"
+  },
+  "study": "enclose_linked_cluster",
+  "base_decoder": "bp_osd",
+  "detector_range": 2,
+  "max_cluster_size": 2,
+  "physical_p": "1/100000000"
+}

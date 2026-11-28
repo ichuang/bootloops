@@ -39,6 +39,7 @@ from .enclosures import (
     enclose_peierls_cluster,
     enclose_stratified_shells,
 )
+from .linked_cluster import decode_localized, enclose_linked_cluster
 from .mwpm import MWPMResult, decode_mwpm
 from .relay_bp import decode_relay_bp
 from .sat_mwd import (
@@ -87,7 +88,9 @@ __all__ = [
     "decode_tanner_local",
     "decode_union_find",
     "decode_with_metachecks",
+    "decode_localized",
     "enclose_exact_shells",
+    "enclose_linked_cluster",
     "enclose_peierls_cluster",
     "enclose_stratified_shells",
     "estimate_reaction_decoder_latency",

@@ -211,9 +211,52 @@ class TailTests(unittest.TestCase):
                                 for o in flow.outer}), 1)
         with self.assertRaisesRegex(ValueError, "outer code"):
             cone_bound_result(spec(p="1/1000", program=prog, contracts=contracts))
-        with self.assertRaisesRegex(ValueError, "independent noise only"):
+        with self.assertRaisesRegex(ValueError, "column_weight"):
             cone_bound_result(dict(s, noise="local-stochastic",
                                    contracts={k: {"X": {"equivalents": 1}, "Z": {"equivalents": 1}} for k in contracts}))
+
+    def test_two_levels_local_stochastic(self):
+        """No independence of columns: union weights of source-disjoint columns multiply."""
+        from ftqc_gadgets import cones
+        prog = {"name": "two", "inputs": [], "outputs": ["Q"],
+                "layers": [[["NEW", "zero2", "Q"]], [["ECa", "Q"]], [["ECb", "Q"]], [["EC2a", "Q"]], [["EC2b", "Q"]],
+                           [["ECa", "Q"]], [["ECb", "Q"]]]}
+        inner = {"X": {"equivalents": 1}, "Z": {"equivalents": 1}}
+        col = {"X": {"column_weight": "1/1000", "junk": "1/100000"}, "Z": {"column_weight": "1/1000", "junk": "0"}}
+        contracts = {"plus": inner, "zero": inner, "plus2": col, "zero2": col}
+        s = spec(p="1/10000", noise="local-stochastic", program=prog, contracts=contracts, outer={"n": 7, "t": 1})
+        r = cone_bound_result(s)
+        self.assertEqual(r["status"], "conditional")
+        self.assertTrue(any("disjoint" in x for x in r["premises"]))
+        self.assertFalse(any("columns are independent" in x for x in r["premises"]))
+        probs, terms = tails.event_bounds(s)
+        flow = cones.Flow(cones.Program.from_json(prog), two=True)
+        ev_of = {i: x["event"] for i, x in enumerate(flow.sources) if x["level"] == 2 and x["kind"] == "event"}
+        want = []
+        for o in flow.outer:
+            mem = list(cones._bits(flow.cone_of[o["node"]]))
+            W = sum((probs[ev_of[i]] for i in mem if i in ev_of), F(0))
+            W += sum(F(1, 1000) for i in mem if flow.sources[i]["kind"] == "atom")
+            want.append(up(21 * up(W) ** 2))
+        self.assertEqual([x for t, x in terms if t in ("ec2", "out")], want)
+        # an inner event under the local-stochastic rule: C(7, 2) (weight p)^2
+        L, atoms = flow.weight(flow.cone(flow.events[0]))
+        self.assertEqual(probs[0], up(21 * (F(L + sum(atoms.values()), 10000)) ** 2))
+        # junk of every delivered outer resource is charged at the top level
+        junk = [x for t, x in terms if t.startswith("junk:")]
+        self.assertEqual(junk, [F(1, 100000)] * len(junk))
+        self.assertEqual(len(junk), len(flow.terms))
+        # monotone in the column weight, and the same model under independent noise is close
+        heavier = {k: ({"X": dict(col["X"], column_weight="1/500"), "Z": dict(col["Z"], column_weight="1/500")}
+                       if k.endswith("2") else v) for k, v in contracts.items()}
+        self.assertGreater(F(cone_bound_result(dict(s, contracts=heavier))["upper"]), F(r["upper"]))
+        ind = {k: {t: {"pi": "0", "modes": [["1", "1/10000"]]} for t in "XZ"} for k in ("plus", "zero")}
+        ind.update({k: {"X": {"pi": "1/100000", "modes": [["1", "1/1000"]]},
+                        "Z": {"pi": "0", "modes": [["1", "1/1000"]]}} for k in ("plus2", "zero2")})
+        ri = cone_bound_result(dict(s, noise="independent", contracts=ind))
+        self.assertLess(abs(F(r["upper"]) - F(ri["upper"])), F(ri["upper"]) / 20)
+        with self.assertRaisesRegex(ValueError, "location equivalents"):
+            cone_bound_result(dict(s, contracts=dict(contracts, plus=col)))
 
     def test_refusals(self):
         with self.assertRaisesRegex(ValueError, "no contract"):

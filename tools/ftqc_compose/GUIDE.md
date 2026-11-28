@@ -207,6 +207,19 @@ The result is `conditional`. Its premises are the cone theorem for the program, 
 
 The tests compare the binomial tail with enumeration, the threshold count with an explicit bad-support family of this package, mixtures with their exact expansion, every inner and outer term with the formula written out, and sampled failures of a physical circuit (through `ftqc_gadgets.cones.Direct`) with the bound. Seventeen planted defects each fail them; one needed a new check first.
 
+Two levels can also be bounded under `local-stochastic` noise, without independence of columns. A set of faulty sources that makes a column dirty lies in that column, and different columns have disjoint sources, so the probability that t₂ + 1 given columns are all dirty is at most the product of their union weights W. The outer event then fails with probability at most C(n₂, t₂+1)·W^(t₂+1). Inner ancillas keep their contract in location equivalents. An outer ancilla needs `{"column_weight": w, "junk": j}` per sector: apart from an event of probability j, charged where it is delivered, the columns of any set A are all dirty with probability at most w^|A|, jointly with the physical locations. The premise list names the disjointness of column sources in place of the independence of columns. The tests compare every term with the formula written out and with the independent-noise result for the same model.
+
+## Regions of several noise rates
+
+A `regions` study takes a checked `source` (as for `local-stochastic`) and `kinds`, a map from every non-ideal physical site to a named kind of location. When a location of kind k is faulty with probability c_k·ε^(w_k), the union bound over the minimal bad supports has leading power ε^τ with τ(w) the minimum of w·n over the vectors n of fault counts by kind. The result lists these vectors with their multiplicities, the componentwise-minimal ones, and for two kinds the vertices of the lower hull with the exponent ratios at which the dominant vertex changes. Each entry of the optional `exponents` list gets its τ, the dominant vectors and the number of minimal supports behind them. With independent faults the bad-support probability has the same exponent and leading coefficient; the tests check this against exact enumeration.
+
+```json
+{"kind": "regions", "source": {"kind": "family", "expression": {"op": "family",
+   "sites": ["d1", "d2", "m1"], "minimal": [["d1", "d2"], ["d1", "m1"]]}},
+ "kinds": {"d1": "data", "d2": "data", "m1": "meas"},
+ "exponents": [{"data": "1", "meas": "1/2"}]}
+```
+
 ## Filter calculus for purification trees
 
 A `filter-contract` study derives the contract that a `cone-bound` study takes as a hypothesis: what an accepted purification tree delivers, given that every check on the way accepted. A contract of one sector is a junk probability `pi` and modes `[[w, q], ...]`. Apart from the junk event, the block's error is equivalent to one supported on a random set of dirty coordinates, and every increasing event of that set is at most the sum over modes of w times its probability under independent dirt of rate q.
