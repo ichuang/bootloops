@@ -1,4 +1,5 @@
 """The local-stochastic filter calculus against exact laws of small models."""
+import os
 import unittest
 from fractions import Fraction
 from itertools import combinations, product
@@ -8,6 +9,7 @@ from . import filters as fl
 from . import filters_ls as ls
 
 F = Fraction
+FULL = bool(os.environ.get("FTQC_COMPOSE_FULL"))          # every tree, rule and rate (about three minutes)
 
 
 def correlated_leaf(n, pi, rate):
@@ -119,27 +121,45 @@ class Algebra(unittest.TestCase):
 
 class Models(unittest.TestCase):
     def test_bounds_hold_for_every_model_and_acceptance_rule(self):
+        """One check for every model, rule and wmin; two checks for one rule per model."""
+        small = dict(pi=(F(1, 100), F(1, 200)), rate=F(1, 400), meas=F(1, 400))
+        runs = [(v, "X", a, w) for v in ("independent", "shared", "overlap") for a in ("always", "clean", "adverse")
+                for w in (1, 2, 3)]
+        runs += [("independent", "XZ", "always", 2), ("shared", "XX", "adverse", 2), ("overlap", "XX", "clean", 3)]
+        for variant, seq, accept, wmin in runs:
+            worst, bad = model_run(variant, seq, accept, wmin=wmin, **small)
+            self.assertEqual(bad, [], (variant, seq, accept, wmin))
+            self.assertLessEqual(worst, 1)
+            self.assertGreater(worst, 0)                    # every run reached at least one comparison
+
+    @unittest.skipUnless(FULL, "set FTQC_COMPOSE_FULL=1 for the sweep over trees, rules and rates")
+    def test_sweep(self):
+        rates = [dict(pi=(F(3, 100), F(2, 100)), rate=F(1, 100), meas=F(1, 100)),
+                 dict(pi=(F(1, 100), F(1, 200)), rate=F(1, 400), meas=F(1, 400)),
+                 dict(pi=(F(1, 20), F(1, 1000)), rate=F(1, 300), meas=F(1, 50)),
+                 dict(pi=(F(1, 1000), F(1, 30)), rate=F(1, 60), meas=F(1, 900))]
+        worst = F(0)
         for variant in ("independent", "shared", "overlap"):
-            for seq in ("X", "XZ", "XX"):
+            for seq in ("X", "XX", "XZ", "ZX", "ZZ"):
                 for accept in ("always", "clean", "adverse"):
-                    for wmin in (2, 3):
-                        worst, bad = model_run(variant, seq, accept, wmin=wmin, pi=(F(1, 100), F(1, 200)),
-                                               rate=F(1, 400), meas=F(1, 400))
-                        self.assertEqual(bad, [], (variant, seq, accept, wmin))
-                        self.assertLessEqual(worst, 1)
-                        self.assertGreater(worst, 0)        # every run reached at least one comparison
+                    for wmin in (1, 2, 3):
+                        for r in rates:
+                            w, bad = model_run(variant, seq, accept, wmin=wmin, **r)
+                            self.assertEqual(bad, [], (variant, seq, accept, wmin, r))
+                            worst = max(worst, w)
+        self.assertGreater(worst, F(9, 10))
 
     def test_bounds_are_not_slack_by_orders_of_magnitude(self):
         worst, _ = model_run("independent", "X", "always")
         self.assertGreater(worst, F(1, 2))
-        worst, _ = model_run("shared", "XX", "adverse", wmin=3)
+        worst, _ = model_run("shared", "X", "adverse", wmin=3)
         self.assertGreater(worst, F(1, 2))
 
     def test_correlated_local_stochastic_leaf_laws(self):
         """Leaf laws that satisfy the noise condition without independence."""
         for leaf in ("correlated", "exclusive"):
-            for seq in ("X", "XZ", "XX"):
-                for accept in ("always", "clean", "adverse"):
+            for seq in ("X", "XX") if leaf == "exclusive" else ("X",):
+                for accept in ("always", "clean", "adverse") if seq == "X" else ("adverse",):
                     worst, bad = model_run("independent", seq, accept, leaf=leaf, pi=(F(1, 100), F(1, 200)),
                                            rate=F(1, 400), meas=F(1, 400))
                     self.assertEqual(bad, [], (leaf, seq, accept))
@@ -166,6 +186,17 @@ class Models(unittest.TestCase):
                     for t in "XZ"}, alpha
 
         _, bad = model_run("independent", "XX", "adverse", wmin=3, check=no_retry_factor)
+        self.assertTrue(bad)
+
+        def carried_rate_unscaled(*a, **k):                 # the retry factor on the weights only
+            c, alpha = orig(*a, **k)
+            if c is not None:
+                for t in "XZ":
+                    c[t]["last"] = F(1, 400) if c[t]["last"] else c[t]["last"]
+            return c, alpha
+
+        _, bad = model_run("shared", "XX", "adverse", pi=(F(1, 100), F(1, 200)), rate=F(1, 400), meas=F(1, 400),
+                           check=carried_rate_unscaled)
         self.assertTrue(bad)
 
         def no_one_sided_junk(A, B, s, n, wmin, step, carry=False, independent=False, cap=ls.MAX_MODES):

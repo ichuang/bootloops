@@ -1,18 +1,247 @@
 # Fault-tolerant quantum computing in BootLoops
 
-Eight packages check the separate statements that a fault-tolerance argument
-for a quantum computer is built from. Each one takes a code, a circuit, a
-decoder, a schedule or a factory, answers one kind of question about it
-exactly, and writes the answer and its evidence to a JSON receipt that a
-verifier replays. Together they do not prove a threshold or an end-to-end
-logical error rate for a computation. They check pieces of such an argument
-and name every premise that is left.
+BootLoops began as a toolkit for perturbative field theory: exact reductions,
+certified numerics, and a receipt for every number. This page describes eight
+packages that bring the same discipline to a different problem with the same
+shape. A quantum computer is built from parts that fail with a small
+probability, and fault tolerance is the theory of how the whole can fail much
+less often than its parts. It is a perturbation theory in the failure
+probability, with a free part, a coupling, connected diagrams and a
+renormalization group, and its results can be stated and checked the way
+BootLoops states and checks results about Feynman integrals.
 
-This page goes from the general to the particular: the argument the tools
-check and the conventions they share, what each tool is for, what the tools do
-not do, how their receipts connect, and then worked examples from the smallest
-to the largest. Inputs, gates and hazards of each package are in its
-`GUIDE.md`.
+The page starts with the problem as a field theorist would meet it, then states
+the main theorem the tools support, then goes from the general to the
+particular: the argument the tools check and the conventions they share, what
+each tool is for, what the tools do not do, how their receipts connect, and
+worked examples from the smallest to the largest. Inputs, gates and hazards of
+each package are in its `GUIDE.md`.
+
+## Fault tolerance for a field theorist
+
+### The problem
+
+Every operation in a quantum computer (preparing a qubit, a gate, waiting, a
+measurement) goes wrong with some probability p. In present hardware p is of
+order 10⁻³. A computation worth running has billions of operations, so run
+bare it fails with certainty.
+
+The remedy is redundancy with repeated checking. One *logical* qubit is stored
+in n physical qubits, in a subspace fixed by a set of commuting parity checks:
+an error-correcting code. The checks are measured over and over. Their
+outcomes, the *syndrome*, say nothing about the stored information and a great
+deal about which faults have occurred. A classical program, the *decoder*,
+reads the syndrome and decides what correction to apply. The computation goes
+wrong only when enough faults occur, in the right places, to make the decoder
+choose wrongly.
+
+The task is to bound the probability of that event in terms of p, for the
+whole computation, with every gate acting on encoded qubits and every check
+itself built from faulty operations. A scheme is *fault-tolerant* when the
+bound falls rapidly as p falls, and the *threshold theorem* says that below a
+critical value of p the failure probability can be made as small as desired at
+modest cost.
+
+### Why it looks familiar
+
+**A free theory with a gauge symmetry.** For the faults that matter first
+(Pauli errors) in the circuits that do the checking (Clifford circuits), every
+fault flips a fixed set of checks and a fixed set of logical observables, and
+the effects of several faults add modulo two. Before the decoder acts, the
+theory is linear over the field with two elements. Linearity does here what
+Gaussianity does for a free field: the expectation of any character of the
+syndrome and the logical observables factorizes into one factor 1 − 2p for
+each location it involves. A set of faults that flips nothing is a
+*stabilizer*, and fault sets that differ by a stabilizer are physically the
+same, a gauge redundancy. A *logical error* is a set of faults that no check
+sees and that is not gauge-trivial: a closed loop that cannot be contracted,
+the analogue of a Wilson loop around a handle. The code distance d is the
+length of the shortest such loop. For the surface code this is more than an
+analogy: decoding maps onto a Z₂ lattice gauge theory with quenched disorder,
+and the threshold is its phase transition (Dennis, Kitaev, Landahl and
+Preskill, 2002).
+
+**A small coupling, and a process forbidden at low order.** A code with a
+decoder that corrects any t faults has no failure through order p^t. The
+failure probability is A·p^(t+1) + …, where A counts the smallest sets of
+faults that defeat the decoder. Finding A exactly is a finite enumeration, the
+counterpart of evaluating the leading diagrams exactly. `ftqc_faults` and
+`ftqc_decoders` do it by exhaustive search and by SAT with checked proofs.
+
+**Two expansions exchanged by a duality.** One can sum over sets of faults,
+each weighted by p for every fault in it. Or one can Fourier transform and sum
+over *Pauli webs*, closed combinations of checks and a logical observable,
+each damped by 1 − 2p for every location the web crosses. These are the low-
+and high-temperature expansions of the same quantity, related by the
+transform that gives the MacWilliams identity of coding theory and
+Kramers–Wannier duality. `ftqc_faults.zx` computes with Pauli webs.
+
+**Connected diagrams.** When a decoder treats far-apart groups of faults
+independently, their contributions to the logical fidelity multiply, and the
+logarithm of the fidelity is a sum over connected clusters of faults. It is
+extensive: a memory that runs for T rounds keeps its state with probability
+exp(−γT), and γ, the logical error rate per round, has an expansion in p,
+convergent for small p, whose first term is given by the count A above. `ftqc_decoders` computes
+two-sided bounds from this expansion for decoders whose locality it can prove.
+
+**A renormalization group.** Codes can be nested: each physical qubit of an
+outer code is itself a logical qubit of an inner code. One level of nesting
+maps an effective fault rate ε to C·ε^(t+1), with C a combinatorial constant.
+The map has an unstable fixed point, the threshold, and below it the rate
+flows to zero doubly exponentially in the number of levels (Aliferis,
+Gottesman and Preskill, 2006). As in any coarse-graining step, the difficulty
+is that the effective theory does not have the form of the original one:
+failures of neighbouring encoded operations are correlated, because they share
+physical faults and share the ancillary states that the checks consume. The
+main theorem below is a statement about what can be carried from one level to
+the next in spite of this.
+
+**Several small parameters.** Gates, idle steps and measurements fail at
+different rates. If a location of kind k fails with probability of order
+ε^(w_k), the failure probability scales as ε^τ, where τ is the minimum of a
+linear function of the exponents over the minimal failing sets: a tropical
+polynomial. The domains on which one class of failing sets dominates are the
+normal cones of a Newton polytope, the structure behind expansion by regions.
+The `regions` study of `ftqc_compose` computes them.
+
+**Where the analogy ends.** The bounds are sums of positive terms: there are
+no cancellations to control and nothing is subtracted. The interaction is a
+classical algorithm, not a local action, and its locality has to be
+established decoder by decoder. Rigorous expansions converge only for p far
+below the rates of real devices, as rigorous cluster expansions usually do.
+And the operations that make a quantum computer universal are not Clifford,
+so they break the linear structure and are treated case by case.
+
+### What the tools contribute
+
+Low orders are computed exactly, by enumeration or by SAT with a proof that a
+separate checker replays, in arithmetic over GF(2), the integers and the
+rationals. Statements to all orders are bounds, rounded outward, with every
+premise written into the result. Each answer is a JSON receipt bound to its
+input, which a verifier recomputes. A field theorist will recognise the
+division of labour: exact coefficients where they can be had, certified
+enclosures elsewhere, and no number without a way to replay it.
+
+## The main theorem
+
+The statement one wants has the form: under a stated assumption about the
+noise, and nothing else about the noise, a given computation fails with
+probability at most U(p). The tools support such a statement for programs
+protected by two nested codes.
+
+**Setting.** A program acts on qubits encoded at two levels: an inner code on
+n₁ coordinates whose decoder corrects t₁ errors, and an outer code on n₂
+columns whose decoder corrects t₂. Gates act transversally, coordinate by
+coordinate. Error correction consumes encoded ancillary states. These are made
+by *purification trees*: freshly prepared blocks are checked against one
+another, a block is kept only if its check accepts, and a rejected check is
+repeated with fresh blocks. A *decoding event* is one run of a decoder on one
+block, and a coordinate is *dirty* for it if a fault that can reach that
+coordinate has occurred.
+
+**The assumption about the noise.** For every finite set S of physical
+locations,
+
+    Pr[ every location of S is faulty ]  ≤  p^|S| .
+
+This is *local-stochastic* noise. It bounds every correlation function of the
+fault indicators and says nothing more. Faults need not be independent, and
+what a faulty location does may be chosen adversarially.
+
+**The deterministic assumptions.** Four statements about what fault patterns
+do, with no probability in them. The tools check their hypotheses on the
+instance; the general arguments are quoted, not proved here.
+
+1. *The cone theorem.* If every decoding event has at most its radius of dirty
+   coordinates, every decoder returns the pattern it faces
+   (`ftqc_gadgets cones`).
+2. *The filter rule.* A block that leaves an accepted check is bad only in the
+   ways the rule lists: both inputs bad, or enough dirty coordinates on the two
+   sides together; otherwise its old errors survive only where the partner's
+   side is dirty as well (`ftqc_gadgets` factory certificates).
+3. *Acceptance.* A check accepts when its incoming patterns are trivial and
+   nothing in its own step that can cause rejection is faulty, and a rejected
+   check is repeated with fresh inputs.
+4. *Bookkeeping.* Distinct ancillas, distinct attempts and distinct columns
+   occupy distinct physical locations.
+
+**Theorem (probabilistic closure).** Under the noise assumption and
+statements 1 to 4, the probability that a delivered ancilla is bad or that
+some decoding event of the program has more than its radius of dirty
+coordinates is at most U(p). Otherwise every decoder returns the pattern it
+faces. U(p) is an explicit rational number, computed by the `closure` study of
+`ftqc_compose`. It is of order p^((t₁+1)(t₂+1)) when the trees purify enough
+that bad ancillas are not the leading term.
+
+**How to read it.** The input about the noise is a bound on its correlation
+functions, and the output is a bound on the failure of the whole. No model of
+the noise is used, and nothing is assumed independent: not the faults, not the
+ancillas, not the columns of the outer code. Purification is usually analysed
+by conditioning on acceptance, which the noise assumption cannot support; here
+it is not needed.
+
+**Why it is true.** Call an event *covered with weight w* when it forces every
+location of some member of a family of sets to be faulty, the weights p^|G| of
+the members adding up to at most w. Three rules do all the work.
+
+- An event covered with weight w has probability at most w.
+- Covers of events on disjoint locations multiply, and covers of alternatives
+  add. This is the cluster property: what shares no source factorizes.
+- If a procedure is repeated on fresh locations until it accepts, an event of
+  the delivered output is covered with the weight of the event in one attempt
+  divided by one minus the weight of rejection. This is a geometric series
+  over the attempts, and it replaces conditioning.
+
+The filter rule is not monotone (making one input bad can make the output
+better), but each of its cases is an intersection of covered events on
+disjoint locations, so the rules apply case by case. One level of nesting then
+sends a cover weight ε to C(n, t+1)·(Lε)^(t+1), where L counts the events that
+can dirty one coordinate: the renormalization step of the previous section, as
+a statement about bounds. Every term is positive, so nothing has to cancel.
+The argument for each line is in the module docstrings of
+[`filters_ls.py`](ftqc_compose/filters_ls.py),
+[`tails.py`](ftqc_compose/tails.py) and
+[`closure.py`](ftqc_compose/closure.py), and the tests compare the calculus
+with exact laws of small trees, including noise that satisfies the assumption
+without being independent.
+
+**An instance.** Two levels of the seven-qubit Steane code, eight inner and
+four outer decoding events, inner ancillas from four-leaf trees and outer
+ancillas from four-leaf trees of encoded blocks:
+
+```sh
+export PYTHONPATH="$PWD/tools"
+out=$(mktemp -d)
+python3 -m ftqc_compose check tools/ftqc_compose/examples/closure-two-level-steane.json -o "$out/closure.json"
+python3 -m ftqc_compose verify tools/ftqc_compose/examples/closure-two-level-steane.json "$out/closure.json"
+```
+
+The receipt gives U = 5.121 × 10⁻¹³ at p = 10⁻⁶ and lists the noise assumption,
+the four deterministic statements, and the premises the chain no longer needs.
+At p = 10⁻⁵ and 10⁻⁷ the bound is 5.15 × 10⁻⁹ and 5.12 × 10⁻¹⁷: fourth order,
+as two levels with t = 1 should give.
+
+**What is not claimed.** The theorem closes the probabilistic half of an
+end-to-end argument. The deterministic half is quoted. It covers transversal
+Clifford programs whose ancillas come from purification trees; lattice
+surgery, magic states and the logical T gate are composed by other studies
+with their own premises. It is a bound, loose by the combinatorial factors of
+union bounds, and it is not a threshold for the codes of current experiments.
+The example's leaf counts are typed in from a Steane tree profile; a certified
+factory receipt can be supplied in their place.
+
+**The exact companion.** For independent Pauli faults and a decoder that
+decodes each group of nearby fired checks on its own, the logical flip
+probability is (1 − λ)/2 with
+
+    | log λ + 2 S_m |  ≤  2 M θ^min(m+1, t+2) ,
+
+where S_m sums x^|C| over the failing connected fault sets C of size at most
+m, x = p/(1 − p), M is the number of fault mechanisms and θ < 1 measures how
+far p is inside the radius of convergence. The failing sets are enumerated, so
+the leading term is exact and the bound is two-sided. This is the
+`enclose_linked_cluster` study of `ftqc_decoders`
+([guide](ftqc_decoders/GUIDE.md#linked-cluster-enclosure)).
 
 ## The argument the tools check
 
@@ -90,8 +319,8 @@ are handled separately (see the next section but one).
 | [`ftqc_faults`](ftqc_faults/GUIDE.md) | In a scheduled Clifford circuit, which fault sets escape the detectors and what do they leave? Is one circuit fault-equivalent to another? | the fault model, circuit and fault distance, strict fault tolerance at low order and a location census (audit engine); fault equivalence, ZX rewrite proofs, flag decoders and stochastic gadget contracts (ZX engine) |
 | [`ftqc_extractors`](ftqc_extractors/GUIDE.md) | What logical measurement, logical T or injected state does an apparatus attached to a memory produce, and what distance does it keep? | static, phenomenological and circuit-level receipts for HGP, bivariate bicycle and general CSS memories |
 | [`ftqc_gadgets`](ftqc_gadgets/GUIDE.md) | What does a gadget with its decoder do to an arbitrary encoded input carrying incoming errors, under internal faults? | the gate and error-correction properties of Aliferis, Gottesman and Preskill at low order; refinement and composition; coordinate locality for large codes; two-level and purification-tree certificates; fault cones of whole schedules; signed surgery instruments; staged switched-T and pieceable-CCZ gates |
-| [`ftqc_decoders`](ftqc_decoders/GUIDE.md) | Does a given polynomial-time decoder correct every pattern up to radius t, and where does it fail? | exact-arithmetic decoders, radius certificates, trapping-set witnesses, logical-error enclosures, audited runs of external decoders |
-| [`ftqc_compose`](ftqc_compose/GUIDE.md) | Does one operation's output meet the next one's input requirements, and what failure probability follows under a stated noise law? | typed joins, level reduction, local-stochastic and cone tail bounds, purification-tree contracts, schedule volumes, distillation-to-logical-T bounds |
+| [`ftqc_decoders`](ftqc_decoders/GUIDE.md) | Does a given polynomial-time decoder correct every pattern up to radius t, and where does it fail? | exact-arithmetic decoders, radius certificates, trapping-set witnesses, logical-error enclosures (union, connected-cluster and two-sided linked-cluster), audited runs of external decoders |
+| [`ftqc_compose`](ftqc_compose/GUIDE.md) | Does one operation's output meet the next one's input requirements, and what failure probability follows under a stated noise law? | typed joins, level reduction, local-stochastic and cone tail bounds, purification-tree contracts under independent or local-stochastic noise, the closure of a two-level program, regions of several noise rates, schedule volumes, distillation-to-logical-T bounds |
 | [`ftqc_magic`](ftqc_magic/GUIDE.md) | What output quality, acceptance and active qubit count does a magic-state factory or cultivation pipeline have, and may its outputs be used as independent? | exact distillation algebra, recycled check schedules, Clifford-hook cultivation distances, correlation rules for multi-stage pipelines |
 | [`ftqc_uncompute`](ftqc_uncompute/GUIDE.md) | Does measurement-based cleanup in a logical reversible circuit preserve its quantum action? Is a pebbling schedule or a superposition mask valid? | exact symbolic checks of Hadamard-measure-reset (HMR) cleanup, block proofs for wide arithmetic, pebbling and mask validators, a rewrite advisor |
 
@@ -105,16 +334,18 @@ circuits, after Rodatz, Poór and Kissinger). One battery covers both.
 The receipts are only as strong as the statements they check. These are the
 gaps to keep in mind before quoting a result.
 
-- **No end-to-end theorem.** Nothing here turns a code, a set of gadgets and a
-  noise rate into a proven logical error rate for a whole computation.
-  `ftqc_compose` joins receipts and computes bounds, but its larger statements
-  rest on arguments quoted from papers or printed in the receipt: level
-  reduction (He, Nguyen and Pattison, Theorem 4.11), the composition theorem
-  and locality lemma of `ftqc_gadgets`, the fault-cone theorem, the filter rule
-  for purification trees. The tools check the hypotheses of these arguments on
-  the instance and test their conclusions on small cases. They do not prove
-  them. The only machine-checked proofs are the Lean 4 distance theorems of
-  `ftqc_codes`, which need a separate Lean-QEC build.
+- **The end-to-end theorem is half quoted.** The [main theorem](#the-main-theorem)
+  leaves one probabilistic premise, but its deterministic premises are
+  arguments quoted from papers or printed in the receipt: the fault-cone
+  theorem, the filter rule for purification trees, and, in other studies,
+  level reduction (He, Nguyen and Pattison, Theorem 4.11) and the composition
+  theorem and locality lemma of `ftqc_gadgets`. The tools check the hypotheses
+  of these arguments on the instance and test their conclusions on small
+  cases. They do not prove them. The theorem covers two-level transversal
+  Clifford programs with tree-made ancillas; nothing turns an arbitrary code,
+  set of gadgets and noise rate into a proven logical error rate. The only
+  machine-checked proofs are the Lean 4 distance theorems of `ftqc_codes`,
+  which need a separate Lean-QEC build.
 - **Low fault orders.** Circuit and gadget properties hold for every set of at
   most j faulty locations, with j usually one to three. Higher orders are
   reached only through structure: the projected search of the gross-code
@@ -131,7 +362,9 @@ gaps to keep in mind before quoting a result.
   inside one location unless a joint law is supplied. Leakage, loss, coherent
   errors, crosstalk and drift are not modelled. Independence and the
   local-stochastic condition are hypotheses that the user declares; a finite
-  law is checked against the condition on up to 16 sites.
+  law is checked against the condition on up to 16 sites. Only the `closure`
+  chain and the local-stochastic studies it is built from avoid independence
+  altogether.
 - **Non-Clifford steps are special cases.** The circuit engines handle
   Clifford operations and Z feed-forward from one bit. A logical T is checked
   as a channel identity with an ideal or contract-described magic state. The
@@ -148,7 +381,10 @@ gaps to keep in mind before quoting a result.
   decoder corrects as an input (the field is named `verified_component_radius`
   but nothing verifies it), and it bounds one sector of the static code under
   independent bit flips. On the BB144 example it gives 1.6 × 10⁻¹⁴, against
-  1.1 × 10⁻¹⁴ for the plain union bound under the same assumption.
+  1.1 × 10⁻¹⁴ for the plain union bound under the same assumption. The
+  linked-cluster enclosure assumes nothing about the decoder, but it applies
+  to a decoder localized at a chosen range, which gives up distance at short
+  range, and its radius of convergence is far below device rates.
 - **Published theorems are dependencies.** Extractor receipts check the finite
   hypotheses of results such as Proposition 3.9 of Cowtan, He, Williamson and
   Yoder or the canonical extractor of Blue et al., then apply them. They do
@@ -189,9 +425,9 @@ There is one battery entry per tool. Measured on a four-core Linux virtual machi
 | `ftqc_codes` | 3,188 checks, 2 named skips (SAT, Lean) | 8 s |
 | `ftqc_faults` | audit: 5,637 checks, 2 named skips (SAT, Stim); ZX: 10 legs; bridge: 3 tests | 6 s |
 | `ftqc_extractors` | 72 tests, 6 skipped | 52 s |
-| `ftqc_decoders` | 10 legs | 2 s |
+| `ftqc_decoders` | 10 legs, 8 tests | 2 s |
 | `ftqc_gadgets` | 6,971 checks | 33 s |
-| `ftqc_compose` | 90 tests, 3 skipped | 22 s |
+| `ftqc_compose` | 111 tests, 4 skipped | 22 s |
 | `ftqc_uncompute` | 22 legs | 3 s |
 | `ftqc_magic` | 10 legs | 8 s |
 
@@ -492,7 +728,13 @@ python3 -m ftqc_compose check tools/ftqc_compose/examples/volume-two-level.json 
 ```
 
 The cone theorem, the filter rule and the independence of columns are
-premises of these receipts.
+premises of these receipts. With `"noise": "local-stochastic"` the
+`cone-bound` and `filter-contract` studies drop independence and conditioning,
+and the `closure` study chains them so that no contract is declared: see
+[the main theorem](#the-main-theorem) and the
+[closure guide](ftqc_compose/GUIDE.md#closure-of-a-two-level-program). A
+`regions` study reports which kinds of fault dominate a bad-support family
+under several noise rates.
 [Tail bounds](ftqc_compose/GUIDE.md#tail-bounds-over-fault-cones) ·
 [Filter calculus](ftqc_compose/GUIDE.md#filter-calculus-for-purification-trees) ·
 [Volume](ftqc_compose/GUIDE.md#volume-of-a-schedule)
