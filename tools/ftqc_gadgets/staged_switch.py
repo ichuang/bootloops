@@ -93,5 +93,7 @@ def check(spec):
                     raise Counterexample("corrected branch isometry", record=record, logical_bit=bit)
         result["ideal"] = dict(branches=8, branch_probability="1/8", ancillary_x=split[3:],
                                split_z=split_z, discarded_ancilla="fixed pure CSS state")
+    from .staged_switch_faults import check_faults
+    result["faults"] = check_faults(spec, (small, large, split, split_z, dual))
     return result
 
