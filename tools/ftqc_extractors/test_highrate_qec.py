@@ -49,6 +49,7 @@ class HighRateQECTests(unittest.TestCase):
     def test_translated_seed_substitution_on_lp8_4(self):
         comp = addressable_surgery.compare_translated_seed_vs_ordinary_surgery()
         self.assertEqual(comp["seed_orbit_certificate"]["covered_rank"], 2)
+        self.assertEqual(comp["seed_orbit_certificate"]["signed_z_slots_in_order"], ["q2", "q3"])
         faults = comp["translated_seed_gadget"]["faults"]
         self.assertEqual((faults["status"], faults["upper"]), ("counterexample", 1))
         self.assertTrue(faults["residual"] or faults["readout_flip"])
