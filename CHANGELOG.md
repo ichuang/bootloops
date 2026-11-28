@@ -4,6 +4,11 @@ All notable changes to BootLoops are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/) (1.0.x = fixes and tool additions that change nothing existing, 1.x.0 = changes to existing tools).
 
+## Unreleased
+
+- The eight FTQC tools now share signed code-action receipts for permutations, local Cliffords and folds. Measurement orbit replay, installed schedules and single-fault spread, decoder ensembles, RM15 frames and reaction pricing are described in the [FTQC guide](tools/FTQC.md#code-automorphisms).
+- The LP(8,4) comparison now verifies both implementations on the same ordered slots and records the single-fault counterexample for the translated schedule.
+
 ## 1.0.2 (2026-10-22)
 
 ### Changed

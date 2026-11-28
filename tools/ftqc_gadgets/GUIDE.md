@@ -442,3 +442,7 @@ order are part of the receipt.
 The [in-situ BB144 factory guide](../ftqc_extractors/BICYCLE_FACTORY.md)
 covers injection batch replay, RM15 input assignment, signed native pivot
 measurements, physical scheduling and full-attempt pricing.
+
+## Code automorphisms
+
+Run `python3 -m ftqc_gadgets installed-action spec.json` to verify a physical unitary on an unknown data input. Supply `kind: installed-action`, a code, its signed action receipt, the physical width, tick-ordered disjoint gates, and an undirected coupler list. Data occupies sites zero through n−1. Spectators can undergo a separate unitary. A missing edge, data-generator sign error or leaked data support fails replay. See the [worked example](../FTQC.md#code-automorphisms).

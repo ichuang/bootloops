@@ -158,3 +158,7 @@ N. Raveendran, D. Declercq & B. Vasić (arXiv:2503.07567), J. Y. Lee
 (arXiv:2607.28605), Y. Hirasaki & J. Y. Lee (arXiv:2607.28621), L. Berent,
 L. Z. Cohen & A. O. Quintavalle (arXiv:2609.11723), J. Y. Lee et al.
 (arXiv:2609.30069), and N. Maskara et al. (arXiv:2610.06749).
+
+## Code automorphisms
+
+Use `action SPEC steps.json -o action.json` to certify an ordered push permutation, Clifford layers, or a phase fold on a named logical basis. Use `verify action.json --code SPEC` to regenerate the signed images. The action command also accepts signed stabilizer codes with explicit logical slots. The [worked examples](../FTQC.md#code-automorphisms) include a non-CSS code, a signed GB fold and optional external discovery.

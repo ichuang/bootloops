@@ -11,6 +11,8 @@ under `../upgrades/`; the patched forks of Kira, Blade and AMFlow.cpp that sever
 live in their own repositories, listed in [`../upgrades/ENGINES.md`](../upgrades/ENGINES.md)
 together with the environment variables through which the packages find the built binaries.
 
+The [FTQC automorphism workflow](FTQC.md#code-automorphisms) links signed code actions, installed circuits, decoders and resource accounting across the eight FTQC tools.
+
 **Scope.** These are the general-purpose packages. Code specific to an individual
 problem (per-problem evaluators, results-table scripts, single-result engines) is not
 in this repository — it ships with the problem pages on
