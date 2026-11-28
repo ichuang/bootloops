@@ -230,6 +230,8 @@ def surface_setting(distance, rounds, axis):
     spec, coordinates = patch_pair(distance, rounds, axis)
     setting = installed([(spec, list(range(len(coordinates))), None)],
                         spec["n"], spec["checks"], 2, idles=True)
+    setting["basis"] = spec["basis"]
+    setting["surface_distance"] = dict(distance=distance, axis=axis)
     setting["transport"] = dict(initial=coordinates, gate_range=1,
                                 layers=[dict(moves=[], move_time=0, gate_time=1)
                                         for _ in spec["ticks"]])

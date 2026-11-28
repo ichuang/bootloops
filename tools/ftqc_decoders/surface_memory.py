@@ -1,4 +1,5 @@
 """Decode the measured Pauli sector of a closed rotated-patch memory experiment."""
+
 import argparse
 import json
 
@@ -14,8 +15,11 @@ def benchmark(distance, rounds, basis, bad=False):
         raise ValueError("expected positive syndrome rounds and X or Z readout")
     circ = surface(distance, rounds, basis, bad)
     records = RecordModel(circ)
-    selected = [i for i, det in enumerate(circ.detectors)
-                if all(circ.meas[j][3] == basis for j in det)]
+    selected = [
+        i
+        for i, det in enumerate(circ.detectors)
+        if all(circ.meas[j][3] == basis for j in det)
+    ]
 
     def project(det):
         return sum(((det >> i) & 1) << j for j, i in enumerate(selected))
@@ -39,11 +43,23 @@ def benchmark(distance, rounds, basis, bad=False):
                 raise ValueError("incomplete matching")
             predictions[syndrome] = match.observable_mask
     failures = sum(predictions[d] != bit for d, bit in modes)
-    return dict(distance=distance, rounds=rounds, basis=basis, hook_order="bad" if bad else "standard",
-                circuit_sha256=circ.sha256(), data=distance**2, physical_qubits=circ.n,
-                ticks=len(circ.ticks), locations=len(records.groups), single_modes=len(modes),
-                failed_single_modes=failures, detector_sector=basis, graph_edges=len(signatures),
-                decoder="equal-weight sector MWPM", boundary="noisy product preparation and destructive readout")
+    return dict(
+        distance=distance,
+        rounds=rounds,
+        basis=basis,
+        hook_order="bad" if bad else "standard",
+        circuit_sha256=circ.sha256(),
+        data=distance**2,
+        physical_qubits=circ.n,
+        ticks=len(circ.ticks),
+        locations=len(records.groups),
+        single_modes=len(modes),
+        failed_single_modes=failures,
+        detector_sector=basis,
+        graph_edges=len(signatures),
+        decoder="equal-weight sector MWPM",
+        boundary="noisy product preparation and destructive readout",
+    )
 
 
 def main():

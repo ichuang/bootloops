@@ -4,10 +4,11 @@ A shared boundary meter measures the two half checks in successive subrounds
 when split, and their product in one subround when merged. The complementary
 seam checks multiply to the joint logical Pauli. Qubit zero is the low bit.
 """
+
 from functools import reduce
 from operator import xor
 
-from ftqc_codes.codes import rotated_plaquettes
+from ftqc_codes.codes import rotated_boundaries, rotated_plaquettes
 from ftqc_codes.gf2 import dot, from_supp, supp, systematic
 from .surgery_merge import word
 
@@ -18,14 +19,15 @@ def patch_pair(d, rounds, axis):
     if axis not in ("X", "Z") or type(rounds) is not int or rounds < 1:
         raise ValueError("expected X or Z and positive merge and split rounds")
     normal = 0 if axis == "Z" else 1
-    n = 2*d*d
+    n = 2 * d * d
     points = []  # doubled row and column; meters are at odd coordinates
+
     def reflect(point):
         reflected = list(point)
-        reflected[normal] = 4*d-2 - point[normal]
+        reflected[normal] = 4 * d - 2 - point[normal]
         return tuple(reflected)
 
-    data = [(2*r, 2*c) for r in range(d) for c in range(d)]
+    data = [(2 * r, 2 * c) for r in range(d) for c in range(d)]
     points.extend(data + [reflect(p) for p in data])
     ids = {point: q for q, point in enumerate(points)}
     halves = [{}, {}]
@@ -41,11 +43,11 @@ def patch_pair(d, rounds, axis):
 
     for block in (0, 1):
         for kind, (i, j), cells in rotated_plaquettes(d):
-            center = (2*i-1, 2*j-1)
-            sites = [q + block*d*d for q in cells.values()]
+            center = (2 * i - 1, 2 * j - 1)
+            sites = [q + block * d * d for q in cells.values()]
             key, meter = check(kind, reflect(center) if block else center, sites)
             split[key] = meter
-            if center[normal] == 2*d-1:
+            if center[normal] == 2 * d - 1:
                 halves[block][meter] = key
             else:
                 merged[key] = meter
@@ -53,18 +55,21 @@ def patch_pair(d, rounds, axis):
     # On alternating seam plaquettes, the old half checks become one full
     # check. All other seam checks measure new gauge degrees of freedom.
     seam = []
-    for j in range(d+1):
-        center = (2*d-1, 2*j-1)
+    for j in range(d + 1):
+        center = (2 * d - 1, 2 * j - 1)
         if normal == 1:
             center = center[::-1]
-        sites = [q for q in range(n) if
-                 all(abs(a-b) == 1 for a,b in zip(points[q], center))]
+        sites = [
+            q
+            for q in range(n)
+            if all(abs(a - b) == 1 for a, b in zip(points[q], center))
+        ]
         meter = ids.get(center)
         if meter in halves[0]:
             kind, mask = halves[0][meter]
             key = kind, mask | halves[1][meter][1]
         else:
-            if ("Z" if (d+j) % 2 else "X") != axis:
+            if ("Z" if (d + j) % 2 else "X") != axis:
                 continue  # unused corner at the outer boundary
             key, meter = check(axis, center, sites)
             seam.append(key)
@@ -80,35 +85,39 @@ def patch_pair(d, rounds, axis):
     def subround(checks):
         nonlocal record_count
         live = set(range(n)) | set(checks.values())
-        emit([["RX" if k == "X" else "R", m] for (k,_),m in checks.items()], live)
-        orders = {"X": [(-1,-1),(-1,1),(1,-1),(1,1)],
-                  "Z": [(-1,-1),(1,-1),(-1,1),(1,1)]}
+        emit([["RX" if k == "X" else "R", m] for (k, _), m in checks.items()], live)
+        orders = {
+            "X": [(-1, -1), (-1, 1), (1, -1), (1, 1)],
+            "Z": [(-1, -1), (1, -1), (-1, 1), (1, 1)],
+        }
         for step in range(4):
             ops = []
             for (kind, mask), meter in checks.items():
-                i,j = points[meter]
-                di,dj = orders[kind][step]
-                q = ids.get((i+di,j+dj))
+                i, j = points[meter]
+                di, dj = orders[kind][step]
+                q = ids.get((i + di, j + dj))
                 if q is not None and mask >> q & 1:
                     ops.append(["CX", meter, q] if kind == "X" else ["CX", q, meter])
             emit(ops, live)
-        emit([["MX" if k == "X" else "M", m] for (k,_),m in checks.items()], live)
-        records = {k: record_count+i for i,k in enumerate(checks)}
+        emit([["MX" if k == "X" else "M", m] for (k, _), m in checks.items()], live)
+        records = {k: record_count + i for i, k in enumerate(checks)}
         record_count += len(records)
         return records
 
     def split_round():
         delayed = set(halves[1].values())
-        first = subround({k:m for k,m in split.items() if k not in delayed})
-        return first | subround({k:m for k,m in split.items() if k in delayed})
+        first = subround({k: m for k, m in split.items() if k not in delayed})
+        return first | subround({k: m for k, m in split.items() if k in delayed})
 
     before = split_round()
     detectors.extend([[r] for r in before.values()])
     previous = subround(merged)
-    detectors.extend([[before[k], previous[k]] for k in sorted(before.keys() & previous.keys())])
+    detectors.extend(
+        [[before[k], previous[k]] for k in sorted(before.keys() & previous.keys())]
+    )
     for m, (k, left) in halves[0].items():
         right = halves[1][m][1]
-        detectors.append([before[k,left], before[k,right], previous[k,left|right]])
+        detectors.append([before[k, left], before[k, right], previous[k, left | right]])
     for _ in range(1, rounds):
         current = subround(merged)
         detectors.extend([[previous[k], current[k]] for k in current])
@@ -116,10 +125,12 @@ def patch_pair(d, rounds, axis):
     read = [previous[k] for k in seam]
 
     after = split_round()
-    detectors.extend([[previous[k], after[k]] for k in sorted(previous.keys() & after.keys())])
-    for m, (k,left) in halves[0].items():
+    detectors.extend(
+        [[previous[k], after[k]] for k in sorted(previous.keys() & after.keys())]
+    )
+    for m, (k, left) in halves[0].items():
         right = halves[1][m][1]
-        detectors.append([previous[k,left|right], after[k,left], after[k,right]])
+        detectors.append([previous[k, left | right], after[k, left], after[k, right]])
     for _ in range(1, rounds):
         current = split_round()
         detectors.extend([[after[k], current[k]] for k in current])
@@ -129,23 +140,86 @@ def patch_pair(d, rounds, axis):
     # Each pivot flips exactly one left half and its matching right half.
     left_keys = list(halves[0].values())
     h = len(left_keys)
-    augmented = [sum(dot(mask,l) << i for i,(_,l) in enumerate(left_keys)) | mask << h
-                 for _,mask in seam]
-    solutions, pivots = systematic(augmented, n+h, range(h))
+    augmented = [
+        sum(dot(mask, l) << i for i, (_, l) in enumerate(left_keys)) | mask << h
+        for _, mask in seam
+    ]
+    solutions, pivots = systematic(augmented, n + h, range(h))
     if len(pivots) != h:
         raise ValueError("seam checks do not span split gauge syndromes")
     live = set(range(n))
     for solution, pivot in zip(solutions, pivots):
         sites = supp(solution >> h)
         if axis == "X":
-            emit([["H",q] for q in sites], live)
-        emit([["Z_IF",q,after[left_keys[pivot]]] for q in sites], live)
+            emit([["H", q] for q in sites], live)
+        emit([["Z_IF", q, after[left_keys[pivot]]] for q in sites], live)
         if axis == "X":
-            emit([["H",q] for q in sites], live)
-    joint = reduce(xor, (mask for _,mask in seam))
-    spec = dict(n=n, checks=[word(n,mask,k) for k,mask in split],
-                targets=[word(n,joint,axis)], ticks=ticks,
-                detectors=detectors, readouts=[dict(records=read, sign=0)], terminal_syndrome=True)
+            emit([["H", q] for q in sites], live)
+    joint = reduce(xor, (mask for _, mask in seam))
+    spec = dict(
+        n=n,
+        checks=[word(n, mask, k) for k, mask in split],
+        targets=[word(n, joint, axis)],
+        ticks=ticks,
+        detectors=detectors,
+        readouts=[dict(records=read, sign=0)],
+        terminal_syndrome=True,
+    )
+    edges = rotated_boundaries(d)
+    x, z = from_supp(edges["right"]), from_supp(edges["bottom"])
+    xb, zb = x << (d * d), z << (d * d)
+    if joint != (z | zb if axis == "Z" else x | xb):
+        raise ValueError("seam parity differs from the declared boundary logicals")
+    joint_x, joint_z = (xb, z | zb) if axis == "Z" else (x | xb, zb)
+    kept_x, kept_z = (x | xb, z) if axis == "Z" else (x, z | zb)
+    spec["basis"] = dict(
+        input=[
+            dict(name=name, x=word(n, lx, "X"), z=word(n, lz, "Z"))
+            for name, lx, lz in (
+                ("parity", joint_x, joint_z),
+                ("survivor", kept_x, kept_z),
+            )
+        ],
+        surviving=["survivor"],
+    )
     # Rotate the doubled checkerboard onto the integer square coupling grid.
-    coordinates = [[(r+c)//2,(r-c)//2] for r,c in points]
+    coordinates = [[(r + c) // 2, (r - c) // 2] for r, c in points]
     return spec, coordinates
+
+
+def distance_evidence(inst, d, axis):
+    """Single/pair exclusions and a forward-replayed logical-string witness."""
+    from ftqc_faults.audit.model import propagate
+    from .surgery_faults import pair_search
+
+    if inst.n != 2 * d * d or axis not in ("X", "Z"):
+        raise ValueError("expected a two-patch instrument for the requested basis")
+    singles = inst.audit(1, sum(15 for _ in inst.c.locations()))
+    if singles["status"] == "counterexample":
+        return singles
+    pairs = pair_search(inst)
+    if pairs["status"] == "witness":
+        return dict(lower=2, upper=2, order_one=singles, witness=pairs)
+    # In the first tick a conjugate logical string on the first patch
+    # changes the reported parity without changing a stabilizer.
+    boundary = rotated_boundaries(d)["left" if axis == "Z" else "top"]
+    faults, responses = [], []
+    for index, (tick, _, op) in enumerate(inst.c.locations()):
+        if tick != 1 or op.name != "I" or op.qs[0] not in boundary:
+            continue
+        q = op.qs[0]
+        x, z = (1 << q, 0) if axis == "Z" else (0, 1 << q)
+        faults.append([index, "X" if x else "Z"])
+        responses.append(inst.response(*propagate(inst.c, tick, x, z, 0)))
+    if len(faults) != d:
+        raise ValueError("first tick does not expose the conjugate string")
+    det, bit, res = [reduce(xor, col) for col in zip(*responses)]
+    if det or not bit:
+        raise ValueError("logical-string witness failed physical replay")
+    return dict(
+        lower=3,
+        upper=d,
+        order_one=singles,
+        order_two=pairs,
+        witness=dict(faults=faults, readout_flip=bit, residual=res),
+    )

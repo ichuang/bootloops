@@ -20,7 +20,7 @@ from .t_bounds import structural
 from .gross_distance import gross_certificate
 
 FIELDS = {
-    "installed_surgery": ("n checks targets couplers batches idles terminal_syndrome target", "transport"),
+    "installed_surgery": ("n checks targets couplers batches idles terminal_syndrome target", "transport basis surface_distance"),
     "bicycle_rm15_map": ("", "candidate"),
     "injection_export": ("attempt block model", ""),
     "injection_circuit": ("case", ""),

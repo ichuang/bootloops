@@ -223,6 +223,14 @@ def rotated_plaquettes(d):
                 yield axis, (i, j), cells
 
 
+def rotated_boundaries(d):
+    """Ordered data sites. Top/bottom carry logical Z, left/right logical X."""
+    if type(d) is not int or d < 2:
+        raise SpecError("expected integer distance >= 2")
+    return dict(top=list(range(d)), bottom=list(range(d*(d-1), d*d)),
+                left=list(range(0, d*d, d)), right=list(range(d-1, d*d, d)))
+
+
 def rotated_surface(d):
     """Rotated surface code [[d^2, 1, d]]: data qubits on a d x d grid, bulk
     plaquettes in a checkerboard, weight-2 X checks on the top and bottom

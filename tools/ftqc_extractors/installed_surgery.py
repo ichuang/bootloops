@@ -154,6 +154,7 @@ def compile_schedule(s):
         detectors=detectors,
         readouts=readouts,
         terminal_syndrome=s["terminal_syndrome"],
+        **({"basis": s["basis"]} if "basis" in s else {}),
     ), peak
 
 
@@ -161,6 +162,15 @@ def analyze(s, budget):
     spec, peak = compile_schedule(s)
     proof = receipt(spec, s["target"] - 1, max(1, budget))
     timing = {}
+    if "surface_distance" in s:
+        from ftqc_gadgets.surgery import Instrument
+        from ftqc_gadgets.surface_surgery import distance_evidence
+        request = s["surface_distance"]
+        if set(request) != {"distance", "axis"}:
+            raise ValueError("expected surface distance and axis")
+        timing["circuit_distance"] = distance_evidence(
+            Instrument(spec), request["distance"], request["axis"]
+        )
     if "transport" in s:
         from .surgery_layout import transport
 
