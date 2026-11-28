@@ -66,10 +66,12 @@ class GeometryTests(unittest.TestCase):
             self.assertEqual(pair_search(instrument)["status"], "excluded")
             self.assertEqual(instrument.audit(1, 100000)["status"], "proved")
             wrong = deepcopy(spec)
-            # Complement a measured split-frame control with an unconditional
-            # Pauli on one of its targets; the ideal Choi check must reject it.
-            q = next(op[1] for row in wrong["ticks"] for op in row if op[0] == "Z_IF")
-            wrong["ticks"].extend([[["S", q]], [["S", q]]])
+            # Invert an actual split-frame bit: after the conditional Z,
+            # apply Z unconditionally on its whole support (before the X-basis undo).
+            index, row = next((i, r) for i, r in enumerate(wrong["ticks"])
+                              if any(op[0] == "Z_IF" for op in r))
+            phase = [["S", op[1]] for op in row if op[0] == "Z_IF"]
+            wrong["ticks"][index+1:index+1] = [phase, phase]
             with self.assertRaises(ValueError):
                 Instrument(wrong)
             broken = deepcopy(setting)

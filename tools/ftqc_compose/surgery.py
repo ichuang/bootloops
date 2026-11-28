@@ -108,6 +108,47 @@ def leaf(node):
     )
 
 
+def decoded_channel(spec):
+    """Sufficient failure bounds for an unpostselected decoded instrument."""
+    from fractions import Fraction
+    from ftqc_gadgets.surgery import Instrument
+    from ftqc_gadgets.surgery_faults import columns
+    from ftqc_decoders.surgery_signatures import single_fault_table, decoded_damage
+
+    fields(spec, "kind", "receipt", "incoming_weight", "p")
+    if type(spec["incoming_weight"]) is not int or spec["incoming_weight"] != 0:
+        raise ValueError("decoded surgery bound requires a clean encoded input")
+    if not isinstance(spec["p"], (str, int)) or isinstance(spec["p"], bool):
+        raise ValueError("expected an exact location probability")
+    p = Fraction(spec["p"])
+    if not 0 <= p <= 1:
+        raise ValueError("invalid location probability")
+    proof = verify(spec["receipt"])
+    inst = Instrument(proof["spec"])
+    groups, _ = columns(inst)
+    table = single_fault_table(groups)
+    counts = [0, 0, 0]
+    masses = [Fraction(0) for _ in counts]
+    for group in groups:
+        for _, sig in group:
+            bit, residual = decoded_damage(table, sig)
+            for i, failed in enumerate((bit, residual, bit or residual)):
+                if failed:
+                    counts[i] += 1
+                    masses[i] += Fraction(1, len(group))
+    # A union bound covers every pair of faulty sites, including larger sets.
+    # The single-fault terms use per-site mode probabilities.
+    pair_tail = comb(len(groups), 2) * p*p
+    return dict(status="proved", circuit_sha256=inst.c.sha256(), locations=len(groups),
+                modes=sum(map(len, groups)), incoming_weight=0,
+                noise="independent locations, uniform alternative within each faulty location",
+                decoder="joint single-fault signature table, identity on unseen syndrome",
+                terminal_syndrome=inst.boundary, p=str(p),
+                metrics={name: dict(single_failures=count, single_coefficient=str(mass),
+                                    upper=str(min(Fraction(1), mass*p + pair_tail)))
+                         for name,count,mass in zip(("public","residual","joint"), counts, masses)})
+
+
 def channel(spec):
     """Exact accepted law and monotone upper envelope by admitted input weight."""
     from fractions import Fraction
