@@ -299,3 +299,7 @@ PYTHONPATH=tools python3 -m unittest ftqc_extractors.test_highrate_qec ftqc_comp
 ## Supply states from inside a CSS memory
 
 The simultaneous injection checker verifies a fresh CSS source from the signed logical action on its carriers. Its BB144 and HGP225 inputs include the circuit-specific first-round selection mask. Four closed Y probes use native fault propagation, Stim cross-checks and optional BP+OSD sampling. The two-state S consumer conditions a joint error distribution on batch acceptance. A T consumption study requires suitable evidence for a T source. [Injection study and replay commands](ftqc_extractors/INJECTION.md) · [Exact batch contract](ftqc_compose/GUIDE.md#simultaneous-y-source-and-ideal-consumers)
+
+## Direct switched T and pieceable CCZ
+
+Gadgets verifies both gauge changes, the signed transversal phase and the four-piece Steane gate with its intermediate recovery history. Compose joins the typed stages and bounds failures under a declared pair-noise premise. [Protocols, model, CLI and replay](ftqc_gadgets/STAGED.md)

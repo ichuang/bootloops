@@ -143,3 +143,5 @@ measurements, physical scheduling and full-attempt pricing.
 ## Code automorphisms
 
 The `action_orbit` study takes `code`, a paired `basis`, a list of verified `actions`, and signed logical `seed` and `targets`. It returns a shortest generator word for each reachable target and physically replays its sign and stabilizer coset. A completed orbit certifies unreachability under the supplied generators. Exceeding the state budget leaves the result inconclusive. The [LP and Gross examples](../FTQC.md#code-automorphisms) compare measurement settings with installed implementations.
+
+The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.

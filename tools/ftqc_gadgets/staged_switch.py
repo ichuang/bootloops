@@ -3,6 +3,7 @@
 Word amplitudes are integers with one common normalization per branch. Both
 logical basis columns must carry the same amplitude and branch probability.
 """
+
 from ftqc_codes.codes import steane, rm15
 from ftqc_codes.gf2 import dot, nullspace
 from .staged import Counterexample, endpoint
@@ -39,8 +40,9 @@ def example(operation):
     if operation not in ("raise", "lower"):
         raise ValueError("unknown staged operation")
     up = operation == "raise"
-    return dict(s, checks=dual if up else small.hx,
-                corrections=span(small.hx if up else dual))
+    return dict(
+        s, checks=dual if up else small.hx, corrections=span(small.hx if up else dual)
+    )
 
 
 def check(spec):
@@ -52,24 +54,39 @@ def check(spec):
     names = spec["blocks"]
     source = "steane" if op == "raise" else "rm15"
     target = "steane" if op == "lower" else "rm15"
-    result = dict(status="proved", inputs=endpoint(source, names),
-                  outputs=endpoint(target, names), action="T" if op == "rm15-phase" else "I")
+    result = dict(
+        status="proved",
+        inputs=endpoint(source, names),
+        outputs=endpoint(target, names),
+        action="T" if op == "rm15-phase" else "I",
+    )
     if op == "rm15-phase":
         powers = spec["exponents"]
-        if len(powers) != 15 or any(type(p) is not int or p not in (-1, 1) for p in powers):
+        if len(powers) != 15 or any(
+            type(p) is not int or p not in (-1, 1) for p in powers
+        ):
             raise ValueError("expected fifteen signed native T gates")
         for bit in (0, 1):
             for w in span(large.hx):
                 word = w ^ (32767 * bit)
                 phase = sum(p for j, p in enumerate(powers) if word >> j & 1) % 8
                 if phase != bit:
-                    raise Counterexample("signed logical T phase", bit=bit, word=word, phase=phase)
+                    raise Counterexample(
+                        "signed logical T phase", bit=bit, word=word, phase=phase
+                    )
         result["ideal"] = dict(coset_words=32, modulus=8)
     else:
         checks, corrections = spec["checks"], spec["corrections"]
-        if (len(checks) != 3 or len(corrections) != 8 or
-                any(type(v) is not int or not 0 <= v < 32768 for v in checks + corrections)):
-            raise ValueError("expected three check masks and eight record-indexed corrections")
+        if (
+            len(checks) != 3
+            or len(corrections) != 8
+            or any(
+                type(v) is not int or not 0 <= v < 32768 for v in checks + corrections
+            )
+        ):
+            raise ValueError(
+                "expected three check masks and eight record-indexed corrections"
+            )
         # Reject substitutions before using the canonical gauge fault model.
         if checks != base["checks"]:
             raise ValueError("unsupported gauge generators")
@@ -79,7 +96,11 @@ def check(spec):
             rm_words = {w ^ (32767 * bit) for w in span(large.hx)}
             for record, correction in enumerate(corrections):
                 if up:
-                    output = {w ^ correction for w in split_words if syndrome(w, checks) == record}
+                    output = {
+                        w ^ correction
+                        for w in split_words
+                        if syndrome(w, checks) == record
+                    }
                     correct = output == rm_words
                 else:
                     # Expand the three commuting X projectors and apply the Z frame.
@@ -87,13 +108,22 @@ def check(spec):
                     for subset, x in enumerate(span(checks)):
                         for w in rm_words:
                             v = w ^ x
-                            amps[v] = amps.get(v, 0) + (-1)**(dot(subset, record) ^ dot(v, correction))
+                            amps[v] = amps.get(v, 0) + (-1) ** (
+                                dot(subset, record) ^ dot(v, correction)
+                            )
                     correct = set(amps) == split_words and set(amps.values()) == {1}
                 if not correct:
-                    raise Counterexample("corrected branch isometry", record=record, logical_bit=bit)
-        result["ideal"] = dict(branches=8, branch_probability="1/8", ancillary_x=split[3:],
-                               split_z=split_z, discarded_ancilla="fixed pure CSS state")
+                    raise Counterexample(
+                        "corrected branch isometry", record=record, logical_bit=bit
+                    )
+        result["ideal"] = dict(
+            branches=8,
+            branch_probability="1/8",
+            ancillary_x=split[3:],
+            split_z=split_z,
+            discarded_ancilla="fixed pure CSS state",
+        )
     from .staged_switch_faults import check_faults
+
     result["faults"] = check_faults(spec, (small, large, split, split_z, dual))
     return result
-

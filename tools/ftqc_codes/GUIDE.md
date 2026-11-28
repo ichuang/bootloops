@@ -162,3 +162,5 @@ L. Z. Cohen & A. O. Quintavalle (arXiv:2609.11723), J. Y. Lee et al.
 ## Code automorphisms
 
 Use `action SPEC steps.json -o action.json` to certify an ordered push permutation, Clifford layers, or a phase fold on a named logical basis. Use `verify action.json --code SPEC` to regenerate the signed images. The action command also accepts signed stabilizer codes with explicit logical slots. The [worked examples](../FTQC.md#code-automorphisms) include a non-CSS code, a signed GB fold and optional external discovery.
+
+The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.

@@ -232,3 +232,5 @@ literature below; external decoders are invoked out-of-tree via optional Python 
 ## Code automorphisms
 
 Select `{"algorithm":"automorphism_ensemble","base":"bp_osd","permutations":[...]}` in a decoder study or pass it with `decode --decoder-spec FILE`. Permutations push original mechanism indices to new indices. A static CSS study can supply `actions` containing verified code-action receipts in place of `permutations`. Each action must preserve single-qubit errors in the selected sector. For DEMs, provide explicit mechanism maps. The verifier checks priors, weights, check row space and the joint check/observable row space. It inverse-transports each candidate, tests its original syndrome, and selects a valid minimum-soft-weight candidate including the identity member. See [reference results](../FTQC.md#code-automorphisms).
+
+The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.

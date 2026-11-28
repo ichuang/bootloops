@@ -193,3 +193,5 @@ measurements, physical scheduling and full-attempt pricing.
 ## Code automorphisms
 
 The `installed-action` study binds physical couplers, ticks and fault propagation to a verified signed code action. Use the ordinary `check` and `verify` commands. The `rm15-action` study transports the 15 rotation axes into a verified frame. The existing `bb144-rm15` installation checks the signed Gross orbit and replays physical return routes. See [code automorphisms](../FTQC.md#code-automorphisms) for examples and an optional Qiskit comparison.
+
+The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.

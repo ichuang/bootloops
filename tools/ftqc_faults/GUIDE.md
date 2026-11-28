@@ -27,3 +27,5 @@ The canonical imports are `ftqc_faults.audit` and `ftqc_faults.zx`. Existing `ft
 ## Code automorphisms
 
 The installed-action verifier uses `ftqc_faults.action` to propagate each signed data X and Z generator through physical Clifford ticks. Its single-fault model inserts each nonidentity Pauli after a gate and X, Y or Z on every idle site per tick. The report counts the resulting data weights, including faults that propagate from spectators. Circuit distance requires a specified detection or recovery protocol. See the [installation workflow](../FTQC.md#code-automorphisms).
+
+The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.
