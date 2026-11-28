@@ -65,6 +65,10 @@ def evaluate(spec):
         from .regions import regions_result
 
         return regions_result(spec)
+    if spec["kind"] == "syndrome-envelope":
+        from .syndrome import syndrome_result
+
+        return syndrome_result(spec)
     if spec["kind"] == "cone-bound":
         from .tails import cone_bound_result
 
