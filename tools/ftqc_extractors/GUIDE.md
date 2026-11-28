@@ -1,5 +1,155 @@
-# ftqc_extractors
-Version 1 input is a JSON object with schema integer 1, kind, and model-specific fields. Bit zero is coordinate zero. HGP qubits use row-major ordering in the two product blocks. Checks and supports are binary.
+# ftqc_extractors — GUIDE
+
+Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+
+KIND: package (Python standard library for generation and replay; CaDiCaL
+optional for SAT evidence; Stim optional for some injection studies; a C++17
+compiler for the twelve-round gross-code search). Core: `algebra.py`,
+`extractor.py`, `circuit.py`, `proof.py`. Gross code: `gross.py`,
+`gross_cycle.py`, `gross_distance.py`, `gross_noisy.py`, `gross_probes.py`,
+`css_cover.py`. Surgery and compilation: `fixed_graph.py`, `block_reading.py`,
+`surgery_*.py`, `installed_surgery.py`, `addressable_surgery.py`, `pbc.py`,
+`pbc_surgery.py`, `bicycle.py`, `staged.py`. Logical T and injection:
+`t_*.py`, `magic*.py`, `injection*.py`, `import_injection.py`. Bridges:
+`audit.py`, `audit_bridge.py`, `action_orbit.py`. Tests `test_*.py`,
+`examples/`. Battery class: selftest.
+
+## PURPOSE
+
+Fault-tolerance claims about logical operations performed on encoded memory
+by an apparatus attached to it. An *extractor system* couples auxiliary
+qubits to a memory so that a choice of checks measures a logical Pauli; a full
+extractor reaches every logical Pauli of the block, a partial one a stated
+set (He, Cowtan, Williamson and Yoder, §§4.2–4.5). Given a code and a
+measurement construction, a circuit schedule, a logical T protocol or an
+injection source, the package writes a receipt with one of these statements:
+
+- **static**: the deformed (merged) code keeps a target distance, and the
+  ideal instrument measures the requested signed logical and preserves the
+  surviving logicals;
+- **phenomenological**: a lower bound from the checked finite hypotheses of a
+  published theorem (Blue et al., Appendices E–F; Cowtan, He, Williamson and
+  Yoder, Proposition 3.9; intermediate-time soundness);
+- **circuit**: the number of faulty locations in an explicit schedule needed
+  to change the readout or a protected logical while every detector stays
+  silent, with an ideal input and terminal syndrome;
+- **channel**: the conditional logical T of an ideal encoded magic state, or
+  a signed injection isometry from raw carriers.
+
+A failed target is reported with the witness that breaks it.
+
+## SCOPE
+
+CSS memories given by check matrices (HGP seeds, BB144, general CSS); signed
+stabilizer codes for fixed-coupler graphs. Fault model: any nonidentity Pauli
+after a gate (one location per gate), a flipped preparation or record, idles
+only where scheduled. Boundaries: ideal encoded input and ideal terminal
+syndrome unless the input says otherwise. Published theorems are applied
+after their finite hypotheses are checked; they are not re-derived.
+
+## USE-WHEN
+
+- A lattice-surgery or extractor construction should be shown to measure the
+  intended signed logical, keep its spectators and keep a distance.
+- A noisy schedule for such a measurement needs an exact or bounded circuit
+  distance with a physical witness.
+- A logical T protocol, a Pauli-based compilation onto installed couplers, or
+  an in-situ injection source needs its logical action checked branch by
+  branch.
+
+## NOT-FOR
+
+- Code facts alone (`ftqc_codes`), decoders (`ftqc_decoders`), probability
+  bounds (`ftqc_compose`).
+- Generic circuits without a logical measurement: use `ftqc_faults`.
+- Threshold estimates: the samplers here report empirical histograms only.
+
+## INVOKE
+
+From the BootLoops root with `export PYTHONPATH="$PWD/tools"`:
+
+    python3 -m ftqc_extractors check SPEC.json -o receipt.json [--backend exact|sat] [--budget N] [--seconds S]
+    python3 -m ftqc_extractors verify SPEC.json receipt.json
+    python3 -m ftqc_extractors schedule SPEC.json --probe X|Z -o probe.json     # export to the audit engine
+    python3 -m ftqc_extractors measurement gross-z.json -o measurement.json
+    python3 -m ftqc_extractors export-surgery SPEC.json -o instrument.json
+    python3 -m ftqc_extractors injection bb-uniform [--faults modes.jsonl --decode]
+    python3 -m ftqc_extractors.audit_bridge compare|replay|export-cat SPEC.json ...
+    python3 -m ftqc_extractors.surgery_bench --help
+
+Exit codes of `check`: 0 proved, 1 counterexample, 2 invalid input, 3
+inconclusive search. `verify` returns 0 for a faithfully replayed positive or
+negative receipt.
+
+## INPUTS
+
+JSON with `schema: 1`, a `kind` and kind-specific fields; bit 0 is coordinate
+0; HGP qubits are row-major in the two product blocks. Kinds:
+
+| Kind | What the receipt establishes |
+|---|---|
+| `hgp` | n, k and base distance from two classical seed matrices |
+| `column` | a single-column Z surgery on HGP memory meets a static distance target |
+| `canonical` | phenomenological lower bound min(d, k², kλ) for the full cyclic HGP extractor, from checked hypotheses |
+| `circuit` | logical Z readout, surviving logicals and undetected-fault distance of a listed schedule |
+| `t_gate`, `t_bounds`, `t_source` | the conditional logical T with an ideal encoded magic state, per branch and readout arm; the in-situ preparation and its accepted counterexample |
+| `gross_z` | the ideal unprimed logical Z measurement of BB144 and exact static distance 12 of memory and merged code |
+| `gross_circuit` | circuit distance of the noisy BB144 logical Z measurement (exact 7 at seven rounds) |
+| `block_reading`, `gross_block_reading` | transversal reading of logical parities across blocks, split frame, phenomenological bound |
+| `fixed_graph`, `pbc` | routing, expansion and couplers of a fixed extractor; signed settings for a bridged Clifford+T program |
+| `surgery_sequence`, `intermediate_reading`, `modular_expansion`, `surgery_zx` | sequence-level phenomenological bounds, intermediate-time soundness, hypergraph expansion, ZX comparison of measurement and surgery |
+| `installed_surgery`, `staged_install` | placed Gadgets instruments on a coupler inventory, replayed on all data |
+| `action_orbit` | reachability of signed logical settings under verified code actions |
+| `injection`, `injection_search`, `injection_circuit`, `injection_export`, `bicycle_rm15_map` | signed injection sources, finite source search, closed Y probes, raw-T sources and the BB144 RM15 parity map |
+
+Inputs are trusted JSON; do not run files from sources you do not trust.
+
+## OUTPUTS
+
+A receipt bound to the SHA-256 of the canonical input, with the status, the
+lower and upper ends and their evidence (search counts, LRAT proof, structural
+certificate), witnesses as `[location, mode]` pairs, and the stated model and
+boundaries.
+
+## GATES
+
+The registered battery (sixteen `unittest` modules, listed in
+`tools/BATTERIES.json`): 72 tests, 6 skipped, in 52 s on a four-core Linux
+virtual machine without Stim or CaDiCaL. It exceeds the toolkit's 20 s
+standard. The tests cover the algebra, receipts and their tampering, the
+edge-extractor proof and its hook control, logical T branches, the audit
+bridge, the gross-code static and circuit receipts, architecture and PBC
+compilation, injection, installed surgery, layouts, Magic delivery, the
+bicycle factory map, and the LP(8,4) translated-seed comparison. A banked
+LRAT proof is re-checked even without CaDiCaL.
+
+## FOOTGUNS
+
+- Static distance counts qubits; circuit distance counts locations. One
+  faulty CNOT can damage both operands at weight one.
+- Exact distance needs both a lower bound and a matching witness. A search
+  that exhausts `--budget` or `--seconds` leaves the claim open (exit 3).
+- Include every routing gate and idle whose faults the claim should cover;
+  unlisted locations are noiseless.
+- Phenomenological and circuit receipts have different boundaries and are not
+  interchangeable; the two-block BB144 reading is ≥ 12 phenomenologically and
+  only in [3, 12] at circuit level.
+- The basis label of a dual (X) experiment names the probe before the global
+  Hadamard conjugation.
+
+## KNOWN GAPS
+
+- The cited theorems (Blue et al., Cowtan–He–Williamson–Yoder, Liu et al.) and
+  the counting lemma of the verified-cat T protocol are dependencies, not
+  re-derived or machine-checked.
+- Whole-program noisy fault distance of a compiled PBC program, of parallel
+  surgery compositions and of the BB144 RM15 factory is open.
+- Hardware routing, storage and timing are inputs; the T protocol is not
+  compiled onto a fixed coupler network.
+- Decoding is postselection or a lookup over single faults unless
+  `ftqc_decoders` is used.
+
+The sections below document each input kind in detail.
 
 ## Claims
 * Base distance counts nontrivial Pauli normalizer elements modulo stabilizers.
@@ -7,8 +157,6 @@ Version 1 input is a JSON object with schema integer 1, kind, and model-specific
 * The canonical full cyclic extractor in Appendix F has phenomenological lower bound min(d,k²,k λ). The inputs must establish every nonzero single-column case and use the canonical assembly and d-round protocol of Appendix E.1. k is the seed dimension.
 * A circuit claim counts faulty scheduled locations with ideal input code and final syndrome boundary. It requires a checked logical measurement and preservation of the remaining logical algebra. The weight of a correlated two-qubit Pauli at one gate is one.
 * A lower bound is obtained by ruling out every damaging undetected fault below the threshold. Exact distance also requires a witness at the threshold. A resource limit leaves an open obligation.
-
-Credit: He, Cowtan, Williamson and Yoder, arXiv:2503.10390; Blue, He, Zhou and Chuang, arXiv:2606.03507v2.
 
 ## Running a verification
 
@@ -145,3 +293,17 @@ measurements, physical scheduling and full-attempt pricing.
 The `action_orbit` study takes `code`, a paired `basis`, a list of verified `actions`, and signed logical `seed` and `targets`. It returns a shortest generator word for each reachable target and physically replays its sign and stabilizer coset. A completed orbit certifies unreachability under the supplied generators. Exceeding the state budget leaves the result inconclusive. The [LP and Gross examples](../FTQC.md#code-automorphisms) compare measurement settings with installed implementations.
 
 The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.
+
+CREDIT: extractor systems: Z. He, A. Cowtan, D. J. Williamson and T. J. Yoder
+(arXiv:2503.10390); the canonical HGP extractor: Blue, He, Zhou and Chuang
+(arXiv:2606.03507v2); gross-code partial extractor: Cross, He, Rall and Yoder
+(arXiv:2407.18393v4); fast surgery and Proposition 3.9: Cowtan, He, Williamson
+and Yoder (arXiv:2510.14895); simultaneous injection: Liu et al.
+(arXiv:2604.05126); in-situ bicycle factory: Xu et al. (arXiv:2602.20546).
+
+## License
+
+MIT License. Copyright (c) 2026 Anthropic, PBC. Created by Matthew D. Schwartz;
+code written by Claude (Anthropic) under his supervision. Documentation is
+licensed CC BY 4.0. See LICENSE, LICENSE-CONTENT and NOTICE at the repository
+root.

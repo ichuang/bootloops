@@ -1,6 +1,14 @@
 # ftqc_decoders
 
-`ftqc_decoders` turns silent "ideal minimum-weight decoder" assumptions in fault-tolerant quantum computing (FTQC) studies into replayable, zero-float JSON certificates (`ftqc_decoders-receipt-1`). Give it a CSS code from `ftqc_codes`, a circuit-level `RecordModel` from `ftqc_audit` / `ftqc_extractors`, a surgery cone with metachecks, or a standard Stim `.dem` file. It runs deterministic operational decoders, certifies low-weight decoding radii or finds replayable sub-distance trapping-set witnesses, computes non-vacuous logical error bounds, and audits external C++/Rust decoders such as Google Quantum AI's **Tesseract**.
+Code and circuit distance describe an ideal minimum-weight decoder.
+`ftqc_decoders` checks concrete polynomial-time decoders instead. Given a CSS
+code from `ftqc_codes`, a circuit record model from `ftqc_faults` or
+`ftqc_extractors`, a surgery cone with metachecks, or a Stim `.dem` file, it
+runs decoders in exact arithmetic, certifies that every pattern up to a small
+radius is corrected or returns the pattern that is not, finds trapping-set
+witnesses, computes logical-error bounds under printed assumptions, and audits
+the output of external decoders such as Tesseract. Results are
+`ftqc_decoders-receipt-1` receipts.
 
 ## Quickstart
 
@@ -10,11 +18,11 @@ From the BootLoops repository root:
 export PYTHONPATH=tools
 work=$(mktemp -d)
 
-# 1. Run the <2 s cold-clone self-certification & mutation battery
+# 1. Run the battery (about 2 s)
 python3 tools/ftqc_decoders/selftest.py
 
 # 2. Expose a weight-3 symmetric split-stabilizer trapping set on BB144 [[144,12,12]]
-#    under plain BP, and verify that Relay-BP, BP+LSD, and BP+OSD all heal it.
+#    under plain BP, and check that Relay-BP, BP+LSD and BP+OSD each correct it.
 #    The fixture retains its original filename. Its problem.kind field selects bb144.
 python3 -m ftqc_decoders check tools/ftqc_decoders/examples/bb72_trapping_set.json -o "$work/bb144-trap.json"
 python3 -m ftqc_decoders verify "$work/bb144-trap.json"

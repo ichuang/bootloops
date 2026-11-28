@@ -1,13 +1,17 @@
 # ftqc_audit
 
-This engine is part of [ftqc_faults](../ftqc_faults/GUIDE.md). Its canonical CLI is `python3 -m ftqc_faults audit`. The legacy entry point and receipt formats remain supported.
+The location-fault engine of [ftqc_faults](../ftqc_faults/GUIDE.md). Its code
+is in `tools/ftqc_faults/audit/`; this directory keeps the old import name and
+command line working.
 
-Circuit-level fault properties of Clifford gadgets as receipts: the fault model,
-circuit distance, fault distance, strict fault tolerance at low order and a
-location census, by exact enumeration, by SAT with a checked LRAT proof, and
-cross-checked against Stim.
+For one scheduled Clifford circuit it gives the fault model (detectors fired,
+observables flipped and output damage for every Pauli at every location),
+circuit and fault distance as intervals with replayable witnesses, strict
+fault tolerance at low order, and a location census, by exact enumeration and
+by SAT with a re-checked LRAT proof, optionally cross-checked against Stim.
 
-    python3 -m ftqc_audit analyze surface:3,2 --legs A,B,S   # from tools/
-    python3 tools/ftqc_audit/selftest.py                     # battery, from the repository root
+    export PYTHONPATH="$PWD/tools"                       # from the BootLoops root
+    python3 -m ftqc_faults audit analyze surface:3,2 --legs A,B,S
+    python3 tools/ftqc_audit/selftest.py                 # battery
 
-See `GUIDE.md`.
+See [`GUIDE.md`](GUIDE.md).

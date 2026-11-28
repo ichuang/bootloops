@@ -1,8 +1,17 @@
 # ftqc_gadgets — GUIDE
 
-KIND: package (Python, stdlib only; imports `ftqc_audit` and `ftqc_codes` from this
-repository; `gadget.py`, `effects.py`, `props.py`, `library.py`, `certify.py`,
-`selftest.py`). Battery class: selftest (everything runs from the clone).
+Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+
+KIND: package (Python standard library; imports `ftqc_faults` (audit engine)
+and `ftqc_codes`). Core: `gadget.py`, `effects.py`, `props.py`, `library.py`,
+`certify.py`. Large codes and levels: `levels.py`, `factories.py`,
+`cones.py`, `roles.py`, `columns.py`. Surgery instruments: `surgery*.py`,
+`surface_surgery.py`, `parsimonious.py`, `bicycle_ports.py` (see
+[SURGERY.md](SURGERY.md)). Transfers and installed routes:
+`magic_transfer.py`, `occupied_transfer.py`, `installed_action.py`. Staged
+non-Clifford gates: `staged*.py` (see [STAGED.md](STAGED.md)). `selftest.py`,
+`test_*.py`, `examples/`. Battery class: selftest (everything runs from the
+clone).
 
 ## PURPOSE
 
@@ -161,8 +170,10 @@ separately). The two give different verdicts and the receipt says which was used
 - All-orders statements and probabilities. Everything is "for all fault sets of at
   most j locations", j small. Composition transfers such statements; it does not
   produce a threshold.
-- Non-Clifford gates and adaptive circuits. Decoders may only feed a Pauli frame or
-  correct the record; they cannot choose later gates.
+- Non-Clifford gates and adaptive circuits in the general analysis. Decoders may
+  only feed a Pauli frame or correct the record; they cannot choose later gates.
+  The staged switched-T and pieceable-CCZ studies are separate, special-purpose
+  checks ([STAGED.md](STAGED.md)).
 - Output weights beyond the radius in which the lightest error of a block is unique
   (above t for a distance 2t + 1 code): the package refuses and says so.
 - Fault equivalence in the full sense of Rodatz, Poor and Kissinger (all weights, on
@@ -176,7 +187,7 @@ separately). The two give different verdicts and the receipt says which was used
 
 ## INVOKE
 
-With `tools/` on `PYTHONPATH` (or from `tools/`):
+From the BootLoops root with `export PYTHONPATH="$PWD/tools"`:
 
     python3 -m ftqc_gadgets analyze cnot:golay --check gate:3 -o r.json
     python3 -m ftqc_gadgets analyze knill:steane,anc=spec --check ec:1 --close 1 -o ec.json
@@ -229,7 +240,8 @@ Read `inner_events` for per-coordinate location weights and ancilla contribution
 
 ## GATES
 
-`python3 tools/ftqc_gadgets/selftest.py` (about 35 s, 6943 checks; `--heavy` adds the
+`python3 tools/ftqc_gadgets/selftest.py` (6,971 checks in 33 s on a four-core Linux
+virtual machine, above the toolkit's 20 s standard; `--heavy` adds the
 Golay gadgets at t = 3 and larger two-level tests, about 5 minutes):
 
 - **Against a state-vector simulation**: seven small gadgets (teleportation and
@@ -399,6 +411,22 @@ fails on each. The last was a real bug found this way.
 - The composition theorem is an argument printed in the receipt and tested against
   direct analysis on small gadgets. It is not machine-checked.
 
+## KNOWN GAPS
+
+- Orders are small: "for all fault sets of at most j locations" with j up to
+  about three on the Golay code. Higher-weight statements come only through
+  the locality certificate, the factory rule and the cone theorem.
+- The composition theorem, the locality lemma, the cone theorem and the
+  filter rule are printed arguments, tested against direct analysis on small
+  cases; none is machine-checked. A levels receipt quotes the level-reduction
+  step from the literature.
+- Probabilities are not computed here except `Tree.bounds` and
+  `factories.accepted_law`; the calculus of contracts is in `ftqc_compose`.
+- Decoders are lookup tables or hierarchical decoders. Procedural decoders
+  come from `ftqc_decoders` through `Decoder.rule`.
+- The staged gates and surgery instruments rely on ideal services (cat seeds,
+  classical control, terminal recovery) listed in their receipts.
+
 ## What runs publicly
 
 Everything.
@@ -423,9 +451,13 @@ destructive X/Z measurements have distinct roles. Unimplemented operations are
 refused even if marked ideal in the outer body. Input-error placeholders and
 matched fresh ancilla specifications have their own boundary contracts.
 
+## More commands
+
+The commands below have their own guides or sections.
+
 ## Signed surgery instruments
 
-See [the surgery interface and replay examples](../ftqc_gadgets/SURGERY.md) for physical measurement receipts, installed feed-forward schedules and conditional residual laws.
+See [the surgery interface and replay examples](SURGERY.md) for physical measurement receipts, installed feed-forward schedules and conditional residual laws.
 
 ### Magic transfer certificates
 
@@ -447,4 +479,17 @@ measurements, physical scheduling and full-attempt pricing.
 
 Run `python3 -m ftqc_gadgets installed-action spec.json` to verify a physical unitary on an unknown data input. Supply `kind: installed-action`, a code, its signed action receipt, the physical width, tick-ordered disjoint gates, and an undirected coupler list. Data occupies sites zero through n−1. Spectators can undergo a separate unitary. A missing edge, data-generator sign error or leaked data support fails replay. See the [worked example](../FTQC.md#code-automorphisms).
 
-The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.
+## Staged logical gates
+
+`python3 -m ftqc_gadgets staged SPEC.json -o receipt.json` checks a gauge
+switch between Steane and the 15-qubit Reed–Muller code with transversal T†,
+or a pieceable CCZ on three Steane blocks, on every basis column with a common
+phase and through one fault. See [STAGED.md](STAGED.md) for the protocols,
+the fault model and the ideal services they assume.
+
+## License
+
+MIT License. Copyright (c) 2026 Anthropic, PBC. Created by Matthew D. Schwartz;
+code written by Claude (Anthropic) under his supervision. Documentation is
+licensed CC BY 4.0. See LICENSE, LICENSE-CONTENT and NOTICE at the repository
+root.

@@ -1,188 +1,163 @@
 # ftqc_decoders — GUIDE
 
-KIND: package (Python, 100% stdlib for the default certified tier; `decimal_bounds.py`,
-`dem.py`, `bp_osd.py`, `relay_bp.py`, `union_find.py`, `mwpm.py`, `ssf_metacheck.py`,
-`tanner_local.py`, `sat_mwd.py`, `effective_distance.py`, `enclosures.py`, `bridges.py`, `certify.py`,
-`cli.py`, `adapters/{external_decoders,sinter_bridge}.py`, `selftest.py`, `examples/`).
-Battery class: **selftest** (runs in `< 2 s` from a cold clone with zero external
-packages and zero floating-point literals; optional external backends `tesseract-decoder`,
-`pymatching`, `ldpc`, `chromobius`, `stim`/`sinter`, and `cadical` are probed dynamically
-and audited as untrusted solvers when installed).
+Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+
+KIND: package (Python standard library for the default tier; no
+floating-point literals). Decoders: `bp_osd.py` (BP+OSD and BP+LSD),
+`relay_bp.py`, `union_find.py`, `mwpm.py`, `ssf_metacheck.py`,
+`tanner_local.py`, `sat_mwd.py`. Certificates and bounds:
+`effective_distance.py`, `enclosures.py`, `decimal_bounds.py`. Interchange:
+`dem.py`, `adapters/` (Stim/sinter and external decoders). Bridges to the
+other tools: `bridges.py`, `surface_memory.py`, `surgery_signatures.py`,
+`automorphisms.py`, `staged.py`. `certify.py`, `cli.py`, `selftest.py`,
+`examples/`. Optional: `stim`, `sinter`, `tesseract-decoder`, `pymatching`,
+`ldpc`, `chromobius`, `cadical`, each probed at run time. Battery class:
+selftest.
 
 ## PURPOSE
 
-Certified operational syndrome decoders, quantum trapping-set / effective-distance
-($d_{\mathrm{eff}}$) verifiers, Stim `.dem` & `sinter` interchange, and non-vacuous
-logical-error-rate (`LER`) enclosures for fault-tolerant quantum computing (FTQC).
+Code distance and circuit distance describe what an exponential-time
+minimum-weight decoder or postselection achieves. A real fault-tolerance
+scheme uses a polynomial-time decoder, which can fail on patterns well below
+half the distance. This package checks concrete decoders and writes
+`ftqc_decoders-receipt-1` receipts:
 
-In a fault-tolerance proof, code distance (`ftqc_codes`) and circuit distance
-(`ftqc_audit`, `ftqc_extractors`) bound the lightest *undetected* fault — what an
-exponential-time minimum-weight oracle or postselection achieves. Operational FTQC
-requires a polynomial-time classical decoder. On degenerate quantum LDPC (`BB72`,
-`BB144`, `HGP`) and topological codes, iterative decoders can stagnate or misdecode at
-strictly lower fault weight $w < \lfloor(d - 1)/2\rfloor$ on symmetric split-stabilizer
-trapping sets, while naive global union bounds $\binom{L}{t+1} p^{t+1}$ saturate
-vacuously at `1` on multi-round schedules ($L > 10^4$). `ftqc_decoders` closes those
-gaps with replayable `ftqc_decoders-receipt-1` certificates:
+- **Decoders in exact arithmetic**: BP with normalized min-sum on scaled
+  integers or sum-product on rationals, followed by OSD (orders 0 and CS(w)) or
+  by localized statistics decoding (LSD); disordered-memory Relay-BP;
+  half-edge Union-Find and BeliefFind; Edmonds Blossom matching with exact
+  rational duals and an LP optimality check; small-set-flip and two-stage
+  metacheck repair for single-shot codes and surgery; local decoding for
+  quantum Tanner codes; a SAT minimum-weight decoder whose optimality proof is
+  re-checked with the LRAT checker of `ftqc_codes`.
+- **Radius certificates** (`certify-radius`): every pattern up to weight R is
+  decoded and checked; the first failure, if any, is returned as a witness.
+- **Trapping-set witnesses** (`trapping-set`): targeted probes (split
+  stabilizer supports, logical midpoints) that find patterns a decoder fails
+  on, and comparisons showing which other decoders correct them.
+- **Logical-error enclosures** (`enclose`): exact weight shells, a
+  connected-cluster (Peierls) bound, and sampled weight shells, rounded
+  outward and labelled analytical or empirical.
+- **Interchange**: a Stim `.dem` parser and writer, a `sinter` decoder class,
+  and wrappers that run Tesseract, PyMatching, ldpc and Chromobius and audit
+  every returned correction against the syndrome.
+- **Bridges**: procedural decoders for `ftqc_gadgets` where lookup tables are
+  too large, decoding of `ftqc_extractors` gross-code probes and surgery
+  metachecks, single-fault decoding of surface-code memory, decoder-latency
+  estimates for `ftqc_uncompute`, automorphism ensembles from verified code
+  actions, and the terminal recovery table of the staged pieceable CCZ.
 
-1. **Zero-float deterministic stdlib decoders**:
-   - `bp_osd` (`bp_osd.py`): scaled-integer Normalized Min-Sum (`NMS` with dyadic
-     warm-up) and exact-rational bias Sum-Product BP (`delta = 1 - 2p in Q`, zero
-     transcendentals) paired with global Ordered Statistics Decoding (`OSD-0`,
-     `OSD-CS(w)`) [Fossorier & Lin 1995; Panteleev & Kalachev 2021; Roffe et al. 2020].
-   - `bp_lsd` (`bp_osd.py`): **Localized Statistics Decoding** (`LSD-0`, `LSD-CS(w)`)
-     performing on-the-fly `GF(2)` Gaussian elimination inside grown syndrome clusters
-     rather than globally ($O(1)$ cluster rank vs $O(n)$ global rank on `BB144`)
-     [Hillmann et al. 2025].
-   - `relay_bp` (`relay_bp.py`): **Disordered-Memory Relay-BP** breaking symmetric
-     quantum trapping sets on bivariate bicycle codes (`BB72`, `BB144`) via rational
-     per-variable memory disorder $\gamma_v \in [\gamma_{\min}, \gamma_{\max}]$
-     (including negative repulsive weights) relayed across legs, *without* Gaussian
-     elimination [Müller et al. 2025; Bravyi et al. 2024].
-   - `union_find` & `belief_find` (`union_find.py`): half-edge cluster growth +
-     linear-time spanning-tree peeling on graphlike codes [Delfosse & Zémor 2020;
-     Delfosse & Nickerson 2021] with cluster-local `GF(2)` elimination on hypergraphs
-     [Delfosse, Londe & Beverland 2022].
-   - `mwpm` (`mwpm.py`): disjoint-lineage exact graphlike Minimum-Weight Perfect
-     Matching via Edmonds' primal-dual Blossom algorithm over exact `Fraction` dual
-     potentials with LP complementary-slackness certification [Edmonds 1965; Dennis,
-     Kitaev, Landahl & Preskill 2002].
-   - `ssf` & `decode_with_metachecks` (`ssf_metacheck.py`): Small-Set-Flip for HGP /
-     expander codes [Leverrier, Tillich & Zémor 2015; Fawzi, Grospellier & Leverrier
-     2018] and two-stage metacheck syndrome repair ($M \tilde{s} \to \hat{s} \to \hat{e}$)
-     for single-shot / mapping-cone qLDPC surgery [Campbell 2019; Cowtan, He,
-     Williamson & Yoder 2025], directly consuming `ftqc_extractors/surgery_sequence.py`.
-   - `tanner_local` & `simulate_tanner_single_shot_rounds` (`tanner_local.py`):
-     iterative local-neighborhood mismatch-reduction decoding for Quantum Tanner codes
-     (`arXiv:2206.07750`, `arXiv:2306.12470`), consuming ordered vertex neighborhoods from
-     `ftqc_codes` and tracking `coset_reduced_weight` modulo stabilizers across consecutive
-     noisy data + syndrome rounds.
-   - `sat_mwd` (`sat_mwd.py`): inhomogeneous Tseitin-XOR + Sinz sequential-counter CNF
-     exact minimum-weight decoder verified in-tree by `ftqc_codes.lrat` [Sinz 2005;
-     Cruz-Filipe et al. 2017; Berent et al. 2024].
-2. **Universal Stim `.dem` & `sinter.Decoder` interchange + audited external backends**:
-   - Lossless pure-stdlib zero-float `.dem` parser/emitter (`dem.py`), `BootLoopsSinterDecoder`
-     (`adapters/sinter_bridge.py`), and untrusted-solver wrappers (`adapters/external_decoders.py`,
-     using `scipy.sparse.csc_matrix` $O(\mathrm{nnz})$ check handoffs on high-rate blocks)
-     for **Tesseract** (`quantumlib/tesseract-decoder`, $A^*$ + beam-search MLE [Beni et al.
-     2025, 2026]), **PyMatching v2** (Sparse Blossom [Higgott & Gidney 2025]), **ldpc v2**
-     (`BpOsdDecoder`, `BpLsdDecoder`, `BeliefFindDecoder`), and **Chromobius** [Gidney &
-     Jones 2023]. Every candidate mechanism mask returned by an external C++/Rust solver
-     is independently audited for syndrome agreement, exact soft weight, and logical
-     observable action.
-3. **Operational radius, trapping-set witness search & non-vacuous `LER` enclosures**:
-   - `certify_operational_radius` & `search_trapping_sets` (`effective_distance.py`):
-     certifies operational decoding through weight $s$ or exhibits replayable sub-distance
-     trapping-set / finite-order-OSD counterexamples via stabilizer split-support and
-     logical-midpoint probes [Poulin & Chung 2008; Raveendran & Vasić 2021].
-   - `enclose_exact_shells`, `enclose_peierls_cluster`, `enclose_stratified_shells`
-     (`enclosures.py`): outward-rounded `Decimal` enclosures (`ROUND_FLOOR` /
-     `ROUND_CEILING`), including connected-cluster Peierls percolation bounds
-     [Kovalev & Pryadko 2013; Gottesman 2014] that stay $\ll 1$ where global union
-     bounds saturate at `1`, and rare-event weight-shell splitting [Bravyi & Vargo 2013].
-   - `bridges.py`: on-demand `Decoder.rule` hook for `ftqc_gadgets` (removing the
-     $2^{n-k}$ lookup-table cap on `qr:47`, `bch`, `bb72`), operational open-probe
-     decoding on `ftqc_extractors` BB144 `RecordModel`s, and classical reaction-latency
-     accounting for `ftqc_uncompute` [Terhal 2015].
+## SCOPE
+
+Static codes (one Pauli sector at a time) and detector error models, with
+independent mechanisms of given priors. Radius certificates are exhaustive at
+the stated radius. Enclosures hold under the assumptions they print.
 
 ## USE-WHEN
 
-- Proving that a concrete polynomial-time decoder achieves operational radius $t_{\mathrm{dec}}$
-  on a CSS code or circuit-level `RecordModel`, or finding a sub-distance trapping-set
-  witness where `bp_only` / `OSD-1` / `UF` fails below $\lfloor(d - 1)/2\rfloor$.
-- Running `ftqc_gadgets` `ec`/`gate`/`close` analyses on codes (`qr:47`, `bch`, `bb72`)
-  whose $2^{n-k}$ syndrome table exceeds memory/time budgets.
-- Replacing zero-syndrome postselection with operational decoding on `ftqc_extractors`
-  BB144 `gross_circuit` probes or `surgery_sequence.py` mapping-cone metachecks.
-- Driving external C++ decoders (**Tesseract**, **PyMatching**, **ldpc**) on BootLoops
-  circuits/codes via `.dem` while auditing every returned recovery deterministically.
-- Computing non-vacuous analytical (`peierls_cluster`, `exact_shells`) or clearly tagged
-  empirical (`stratified_shells`) logical-error-rate bounds and `reaction_depth` stalls.
+- A proof needs a polynomial-time decoder to correct every pattern up to some
+  radius, or a witness that it does not.
+- `ftqc_gadgets` must analyse a code whose syndrome table is too large
+  (`qr:47`, BCH, BB72).
+- An external decoder's output should be audited before it is trusted.
+- A rough analytical logical-error bound is wanted under explicit assumptions.
 
 ## NOT-FOR
 
-- Multi-core $10^9$-shot Monte-Carlo threshold sweeps in pure Python — export `.dem`
-  via `convert-dem` or use `BootLoopsSinterDecoder` / `TesseractSinterDecoder` inside
-  `sinter.collect` in an environment with the chosen decoder and `sinter` installed.
-- Proving static or circuit *information-theoretic* minimum distance — use `ftqc_codes`,
-  `ftqc_audit`, or `ftqc_extractors` for undetected-fault lower bounds.
+- Distance proofs: use `ftqc_codes`, `ftqc_faults` or `ftqc_extractors`.
+- Monte Carlo threshold sweeps: export `.dem` (`convert-dem`) or use the
+  sinter decoder class in an environment with the decoders installed.
 
-## EXAMPLE
+## INVOKE
 
-Run from the BootLoops repository root (supports both `PYTHONPATH=tools python3 -m ftqc_decoders`
-and `python3 -m tools.ftqc_decoders`):
+From the BootLoops root with `export PYTHONPATH="$PWD/tools"` (or
+`python3 -m tools.ftqc_decoders` without it):
 
-```sh
-work=$(mktemp -d)
+    python3 -m ftqc_decoders certify-radius --code golay --decoder bp_osd --osd-order 2 --radius 2 -o r.json
+    python3 -m ftqc_decoders trapping-set --code bb144 --decoder bp_only --compare relay_bp,bp_lsd,bp_osd -o ts.json
+    python3 -m ftqc_decoders enclose --code bb144 --mode peierls_cluster --p 1/10000 --radius 5
+    python3 -m ftqc_decoders check STUDY.json -o receipt.json
+    python3 -m ftqc_decoders verify receipt.json
+    python3 -m ftqc_decoders decode --code bb72 --faults 2,19 --decoder external:tesseract
+    python3 -m ftqc_decoders convert-dem --code bb144 -o bb144.dem
+    python3 -m ftqc_decoders backends
+    python3 -m ftqc_decoders.surface_memory --distance 3 --rounds 3 --basis Z
 
-# 1. Discover a weight-3 symmetric split-stabilizer trapping set on BB144 (d=12)
-#    under plain BP, and prove Relay-BP, BP+LSD, and BP+OSD all heal it:
-python3 -m tools.ftqc_decoders trapping-set --code bb144 --decoder bp_only \
-  --compare relay_bp,bp_lsd,bp_osd -o "$work/bb144_ts.receipt.json"
-python3 -m tools.ftqc_decoders verify "$work/bb144_ts.receipt.json"
+Exit codes: 0 proved or verified, and also a `trapping-set` run that finds a
+witness (read `status`); 1 a radius counterexample or a decode that does not
+converge; 2 refusal: malformed or floating-point input, a receipt that does
+not replay, a missing optional backend (`CADICAL-NOT-FOUND`).
 
-# 2. Check all 277 X-sector patterns of weight zero, one or two on Golay [[23,1,7]].
-#    Success proves that BP+OSD-2 corrects through weight two.
-python3 -m tools.ftqc_decoders certify-radius --code golay --decoder bp_osd \
-  --osd-order 2 --radius 2 -o "$work/golay_r2.receipt.json"
-python3 -m tools.ftqc_decoders verify "$work/golay_r2.receipt.json"
+## OUTPUTS
 
-# 3. Bound BB144 logical error assuming independent decoding of disjoint clusters
-#    and successful decoding of every connected cluster through size five.
-python3 -m tools.ftqc_decoders enclose --code bb144 --mode peierls_cluster \
-  --p 1/10000 --radius 5
+Receipts with the study, the decoder configuration, `status` (`proved`,
+`counterexample`, `trapping_set_found`, ...), `holds_through`, witnesses as
+fault-mechanism lists with the decoder's output and the flipped observables,
+and for enclosures `ler_lo`, `ler_hi`, the assumption text and the plain union
+bound for comparison.
 
-# 4. With stim and tesseract-decoder installed, run audited Tesseract on BB72.
-python3 -m tools.ftqc_decoders decode \
-  --code bb72 --faults 2,19 --decoder external:tesseract
-```
+## GATES
 
-## ACCEPTANCE BATTERY
+`python3 tools/ftqc_decoders/selftest.py` followed by
+`python3 -m unittest ftqc_decoders.test_automorphisms`: 10 legs in 2 s on a
+four-core Linux virtual machine.
 
-`python3 tools/ftqc_decoders/selftest.py` (registered in `tools/BATTERIES.json` under
-`ftqc_decoders`) runs 8 self-contained legs in `< 2 s`:
+- `L0` no floats or complex numbers in the package; disjoint lineage of
+  `mwpm.py`.
+- `L1` `.dem` round trip (`repeat`, `shift_detectors`); Blossom against a
+  bitmask dynamic program and LP duality on repetition, toric 4×4 and 30
+  random odd-blossom graphs.
+- `L2` the BP family, OSD-CS(2), BP+LSD and Relay-BP on Steane, Golay,
+  QR-47, BB72 and BB144.
+- `L3` Union-Find, BeliefFind, SSF, surgery metachecks from
+  `ftqc_extractors`, SAT minimum-weight decoding.
+- `L4` the BB144 trapping set; the Golay OSD-1 versus OSD-2 witness.
+- `L5` outward rounding, exact shells, the Peierls bound, sampled shells, the
+  gadget bridge, all examples, optional live external decoders.
+- `L6` quantum Tanner radius-1 certificates and single-shot rounds; sparse
+  handoff on PP256 and APM1152.
+- `N1–N6` floats, invalid metachecks, non-graphlike matching, forged LRAT
+  proofs and tampered receipts are refused.
+- `M1–M4` mutations in `bp_osd.py`, `union_find.py`, `mwpm.py` and
+  `decimal_bounds.py` are caught.
 
-- `L0_purity_and_lineage`: AST zero-float/zero-complex scan across all package modules
-  and disjoint-lineage check on `mwpm.py`.
-- `L1_dem_stim_and_mwpm`: Stim `.dem` round-trip (`repeat` blocks, `shift_detectors`)
-  and `MWPM` Edmonds Blossom vs exact bitmask DP + LP strong duality on `Repetition(5)`,
-  `Toric 4x4`, and 30 random odd-blossom weighted graphs.
-- `L2_bp_osd_lsd_relay`: `NMS`, exact-rational `Sum-Product`, `OSD-CS(2)`, `BP+LSD`,
-  and `Relay-BP` across `Steane`, `Golay`, `QR-47`, `BB72`, and `BB144`.
-- `L3_uf_ssf_metachecks_sat_lrat`: half-edge `Union-Find`, `BeliefFind`, `SSF`, live
-  `ftqc_extractors/surgery_sequence.py` mapping-cone metachecks, and `SAT+LRAT` MWD.
-- `L4_trapping_sets_and_deff`: `BB144` split-stabilizer trapping set + `Golay` `OSD-1`
-  vs `OSD-2` witness replay.
-- `L5_enclosures_bridges_examples_cli`: outward `Decimal` containment, exact shells,
-  Peierls cluster bound, Hoeffding shells, `ftqc_gadgets` procedural decoder bridge,
-  all packaged `examples/*.json`, and optional live `Tesseract`/`PyMatching`/`ldpc` probes.
-- `L6_tanner_single_shot_and_sparse_handoff`: Quantum Tanner `D_8` `[[36,8,3]]` radius-1
-  certification (`X` and `Z`), consecutive-round single-shot data + syndrome error simulation
-  on `D_8` `[[36,8,3]]` and `S_3` `[[288,8]]`, and sparse `scipy_csc` handoffs on `PP256` and
-  `APM1152`.
-- `N1_N6_sabotage_controls`: float inputs, invalid metachecks, non-graphlike MWPM,
-  forged LRAT proofs, and tampered receipts all refused with expected codes.
-- `M1_M4_mutant_kills`: scratch-copy mutations in `bp_osd.py`, `union_find.py`,
-  `mwpm.py`, and `decimal_bounds.py` all killed.
+## FOOTGUNS
 
-## KNOWN-GAPS
-
-- `peierls_cluster` bounds assume disjoint interaction-graph components decode
-  independently up to `verified_component_radius`; global `OSD` couples components when
-  BP fails globally, so use `peierls_cluster` with local cluster decoders (`union_find`,
+- **The Peierls bound takes its radius as an input.** `--radius` (the study
+  field `verified_component_radius`) is the size of connected clusters the
+  decoder is *assumed* to correct; the name notwithstanding, nothing verifies
+  it. Establish it separately, for example with `certify-radius` on the same
+  decoder, which is feasible only for small codes and radii.
+- **The Peierls bound is not always better.** On the BB144 example at
+  p = 10⁻⁴ and radius 5 it gives 1.6 × 10⁻¹⁴ against 1.1 × 10⁻¹⁴ for the
+  plain union bound C(n, 6)p⁶ printed beside it. Both share the radius
+  assumption.
+- The cluster bound also assumes that disjoint clusters decode independently.
+  Global OSD couples clusters; use it with local decoders (`union_find`,
   `mwpm`, `bp_lsd`).
-- `sat_mwd` proves weight-0/weight-1 optimality natively in Python and invokes `cadical`
-  for weight $\ge 2$ syndromes; without `cadical` on `PATH`, weight $\ge 2$ `sat_mwd`
-  refuses with `CADICAL-NOT-FOUND`.
-- External `chromobius` returns predicted logical observable flips directly without an
-  internal mechanism vector, so its receipt marks `syndrome_verified: false`
-  (`lineage: external-observable-only`), whereas `tesseract`, `pymatching`, and `ldpc`
-  return full mechanism vectors audited against `H * e_hat == s`.
+- A trapping-set receipt is a witness, not a radius: it shows one failure and
+  which decoders fix it.
+- Sampled-shell enclosures are empirical and labelled so.
+- Static-code studies decode one sector under independent flips; they are
+  code-capacity statements, not circuit-level ones, unless the input is a
+  circuit detector error model.
 
-## CREDIT & LITERATURE REFERENCES
+## KNOWN GAPS
 
-All code in `tools/ftqc_decoders/` is a clean-room MIT implementation from the published
-literature below; external decoders are invoked out-of-tree via optional Python adapters:
+- Radius certificates are exhaustive and so limited to small radii (277
+  patterns for Golay at radius 2; Golay BP+OSD-2 fails at radius 3).
+- `sat_mwd` proves optimality for syndromes of weight at least two only with
+  `cadical` installed; otherwise it refuses with `CADICAL-NOT-FOUND`.
+- External Chromobius returns observable flips without a mechanism vector, so
+  its receipts say `syndrome_verified: false`; Tesseract, PyMatching and ldpc
+  return full corrections that are audited.
+- The decoder-latency estimate for `ftqc_uncompute` covers single-fault
+  syndromes and supplied tick costs.
+
+## CREDIT
+
+The decoders here are implemented from the published literature below;
+external decoders are called through optional adapters and are not bundled.
 
 - **Iterative quantum BP & trapping sets**: D. Poulin and Y. Chung, *Quantum Inf. Comput.*
   **8**(10), 987–1000 (2008), [arXiv:0801.1241](https://arxiv.org/abs/0801.1241);
@@ -234,3 +209,10 @@ literature below; external decoders are invoked out-of-tree via optional Python 
 Select `{"algorithm":"automorphism_ensemble","base":"bp_osd","permutations":[...]}` in a decoder study or pass it with `decode --decoder-spec FILE`. Permutations push original mechanism indices to new indices. A static CSS study can supply `actions` containing verified code-action receipts in place of `permutations`. Each action must preserve single-qubit errors in the selected sector. For DEMs, provide explicit mechanism maps. The verifier checks priors, weights, check row space and the joint check/observable row space. It inverse-transports each candidate, tests its original syndrome, and selects a valid minimum-soft-weight candidate including the identity member. See [reference results](../FTQC.md#code-automorphisms).
 
 The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.
+
+## License
+
+MIT License. Copyright (c) 2026 Anthropic, PBC. Created by Matthew D. Schwartz;
+code written by Claude (Anthropic) under his supervision. Documentation is
+licensed CC BY 4.0. See LICENSE, LICENSE-CONTENT and NOTICE at the repository
+root.

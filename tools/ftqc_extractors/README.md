@@ -38,7 +38,7 @@ The example measures a weight-two logical Z on an eight-qubit HGP block. Two rou
 
 Static distance counts physical qubits in a nontrivial logical Pauli. Circuit distance counts faulty **locations** that evade all checks and change a protected result. One faulty CNOT can affect both operands. The circuit proofs assume an ideal input codespace and terminal syndrome. Include any routing gates or idle locations whose faults the claim should cover. An exact distance needs both a lower bound and a matching witness. A search that exhausts its budget leaves the obligation open.
 
-The default exact backend and receipt replay run with the packages in this checkout. Generating SAT/LRAT evidence for `circuit` or `t_gate` additionally requires CaDiCaL. Run `python3 run_selftests.py ftqc_extractors` for the package tests. The guides cover the [input schema and exit codes](GUIDE.md), [logical T and resource assumptions](T_PROOFS.md), and [ftqc_audit cross-checks](AUDIT.md).
+Receipts rest on ideal encoded inputs and terminal syndromes, on the listed locations only, and, for phenomenological bounds, on published theorems whose hypotheses are checked but not re-derived. The default exact backend and receipt replay run with the packages in this checkout. Generating SAT/LRAT evidence for `circuit` or `t_gate` additionally requires CaDiCaL. Run `python3 run_selftests.py ftqc_extractors` for the package tests. The guides cover the [input schema and exit codes](GUIDE.md), [logical T and resource assumptions](T_PROOFS.md), and [ftqc_audit cross-checks](AUDIT.md).
 
 ## Measure a gross-code logical Z
 
@@ -49,3 +49,5 @@ With noisy syndrome extraction, the seven-round schedule has exact circuit dista
 The [simultaneous injection study](INJECTION.md) constructs general CSS carrier Cliffords, checks selected Bell-pair preparations, and audits logical-Y source batches in the BB144 and HGP225 memories. [Injection example](examples/bb144-injection-4.json)
 
 Run `python3 -m ftqc_extractors injection bb-uniform` to audit a published closed Y probe. [Injection cases, decoder settings and seeded sampling](INJECTION.md)
+
+See the [guide](GUIDE.md) for inputs, gates, hazards and known gaps, and [`../FTQC.md`](../FTQC.md) for how this tool fits with the others.

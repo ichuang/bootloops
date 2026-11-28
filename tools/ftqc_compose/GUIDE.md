@@ -1,4 +1,142 @@
-# ftqc_compose
+# ftqc_compose — GUIDE
+
+Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+
+KIND: package (Python 3.10+, standard library; imports the sibling FTQC
+packages, whose receipts it re-verifies). Support families and contracts:
+`supports.py`, `contracts.py`, `hgp.py`, `level.py`, `stochastic.py`.
+Schedules: `tails.py` (cone bounds), `filters.py` and `filter_models.py`
+(purification trees), `volumes.py`. Distillation and logical T: `distill.py`,
+`logical_t.py`, `magic_*.py`, `addressable_magic.py`. Measurement residuals
+and channels: `gross_residual.py`, `surgery.py`, `injection_batch.py`.
+In-situ factory: `insitu.py`, `bicycle_*.py`, `pivot.py`. Staged gates:
+`staged.py`. Optional comparisons: `compare_autdec.py`,
+`compare_bicycle_compiler.py`. Tests `test_*.py`, `examples/`. Battery class:
+selftest.
+
+## PURPOSE
+
+Join operations whose receipts come from the other tools and compute what
+follows for the whole: whether each output meets the next input's
+requirements, and what failure probability follows under a stated noise law.
+Every study is one JSON input to `check`, which writes a receipt that `verify`
+replays. The framework is the composable fault tolerance of He, Nguyen and
+Pattison (bad-support families, typed contracts, level reduction,
+local-stochastic noise), extended by studies for fault-cone tail bounds,
+purification-tree contracts, schedule volumes, distillation into a logical T,
+residuals of logical measurements, magic-state consumers and staged gates.
+
+## SCOPE
+
+Results are exact rational computations on finite objects. Their meaning
+depends on premises that the receipt lists: noise laws (independence or the
+local-stochastic subset condition, declared by the user and checked only for
+an explicit finite law on at most 16 sites), quoted theorems (Theorem 4.11 and
+Proposition 4.9 of He, Nguyen and Pattison, the cone theorem and the filter
+rule of `ftqc_gadgets`), supplied contracts, clean encoded inputs and ideal
+classical processing. A result that rests on a premise is labelled
+`conditional`.
+
+## USE-WHEN
+
+- Two or more certified operations are used in sequence or in parallel and
+  their interfaces (wires, codes, logical bases, decoders, frames) must match.
+- A fault-count receipt needs a probability: union bounds over bad supports,
+  tail bounds over the fault cones of a schedule, a factory bound carried into
+  a logical T.
+- A schedule needs a cost in expected physical locations.
+
+## NOT-FOR
+
+- Discharging the quoted theorems or the noise hypotheses: they remain
+  premises.
+- Tight logical error rates. Most bounds are union bounds; see FOOTGUNS.
+- Simulation or sampling, except where a study says so.
+
+## INVOKE
+
+From the BootLoops root with `export PYTHONPATH="$PWD/tools"`:
+
+    python3 -m ftqc_compose check STUDY.json -o RECEIPT.json
+    python3 -m ftqc_compose verify STUDY.json RECEIPT.json
+
+`check` exits 0 for a proof, 1 for a checked counterexample (the receipt is
+still written) and 2 for invalid input, a failed join or a refused resource.
+`verify` exits 0 when the receipt replays faithfully and 2 otherwise.
+
+## INPUTS
+
+The `kind` field selects the study. Each has a section below.
+
+| Kind | What it computes |
+|---|---|
+| `family` | minimal bad supports of a union, product or substitution of families, checked against a Boolean interpreter on up to 16 sites |
+| `contract`, `hgp-repeat` | typed sequential and parallel joins under the accepted-diagonal-Pauli scope; the one-edge HGP measurement pair |
+| `level` | level reduction of a DAG of gadgets (Theorem 4.11), optionally with a classical output check or `distill15` |
+| `local-stochastic` | the probability bound of a checked support cover at an exact rate |
+| `cone-bound`, `filter-contract`, `volume` | tail bounds over fault cones, purification-tree contracts, expected physical locations of a schedule |
+| `distilled-logical-t`, `magic-logical-t`, `addressable-magic-t` | a factory bound carried through an encoder or transfer into a logical T |
+| `magic-batch`, `magic-interleaved` | joint error laws of correlated factory outputs at their consumers |
+| `gross-residual`, `block-reading-residual` | residual data and frame errors after a gross-code measurement or a two-block reading |
+| `decoded-surgery`, `surgery-channel` | decoded or exact output law of an installed surgery instrument |
+| `injection-batch` | joint accepted error law of simultaneous Y sources at ideal S consumers (needs Stim) |
+| `insitu-rm15`, `insitu-retries`, `bb144-rm15`, `bb144-rm15-price` | the in-situ BB144 factory: source assignment, retries, installation and pricing |
+| `installed-action`, `rm15-action` | a signed code action on couplers; RM15 axes in a verified frame |
+| `staged-program` | joined stages of the switched T or pieceable CCZ under a pair-noise premise |
+
+Inputs are trusted JSON; do not run files from sources you do not trust.
+
+## OUTPUTS
+
+A receipt with the input digest, `status` (`proved`, `conditional`,
+`computed`, `counterexample`, `no bound`), the computed values as exact
+rationals (with outward-rounded decimals where useful), and the list of
+premises and ideal boundaries the result depends on.
+
+## GATES
+
+`python3 -m unittest discover -s tools/ftqc_compose -t tools` (the
+registered battery): 90 tests, 3 skipped, in 22 s on a four-core Linux virtual
+machine without Stim, just above the toolkit's 20 s standard. The cone and
+filter tests compare the bounds with exact enumeration, exact accepted-output
+laws and sampled physical failures; 17 planted defects in the cone bounds and
+42 in the filter calculus each fail them. Receipt tests refuse tampered
+evidence, stale digests and failed joins.
+
+## FOOTGUNS
+
+- **Union bounds are loose.** The decoded surface-code ZZ example has no
+  single-fault failure, yet at p = 10⁻⁵ its bound is 1.2 × 10⁻⁴ because every
+  pair of its 1,542 locations is charged. Read a bound as a certified ceiling,
+  not an estimate.
+- **The noise premise is per subset.** Local-stochastic noise bounds the joint
+  probability of every set of locations, which per-site rates alone do not
+  give.
+- **Conditional rates need acceptance.** A bound on "accepted and wrong" is not
+  a bound on "wrong given accepted" until an acceptance lower bound is
+  supplied.
+- **Contracts are hypotheses in `cone-bound`.** Derive them with
+  `filter-contract` or say where they come from.
+- **Correlated outputs.** Outputs of one factory batch or one catalysed
+  stage are not independent; the magic studies refuse to treat them so unless
+  distinct instances and an independence premise are declared.
+- **Locations once.** Shared padding or a reused ancilla couples neighbouring
+  leaves; each physical location must have one identity in the enclosing
+  circuit.
+
+## KNOWN GAPS
+
+- No end-to-end theorem: the quoted theorems and the cone and filter
+  arguments are not proved here.
+- The bundle filter for arbitrary damaged quantum inputs is open for the HGP
+  leaves, so friendliness cannot be required of them.
+- A general noncommuting adaptive surgery contract and automatic use of
+  surgery channels in the filter calculus are open (see
+  [the surgery plan](../../PLANS/extractor-surgery.md)).
+- Physical circuits for the ideal services of the staged gates (cat seeds,
+  extended seeds, terminal recovery) are not certified.
+
+## Bad-support families
 
 Build and replay finite bad-support calculations from He, Nguyen and Pattison, §2. A support is bad when it contains a listed generator. The receipt counts inclusion-minimal generators by size. This polynomial gives a union bound when the event family covers physical failures and the supplied noise law obeys the local-stochastic subset condition.
 
@@ -194,4 +332,25 @@ measurements, physical scheduling and full-attempt pricing.
 
 The `installed-action` study binds physical couplers, ticks and fault propagation to a verified signed code action. Use the ordinary `check` and `verify` commands. The `rm15-action` study transports the 15 rotation axes into a verified frame. The existing `bb144-rm15` installation checks the signed Gross orbit and replays physical return routes. See [code automorphisms](../FTQC.md#code-automorphisms) for examples and an optional Qiskit comparison.
 
-The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.
+## Staged programs
+
+A `staged-program` study joins the stages of the switched T or the pieceable
+CCZ, checks that consecutive ports match in block order, code digest, logical
+representatives, signs and frame, and bounds the failure by the sum over
+stages of the location pairs times p², under the premise that every pair of
+distinct locations is jointly faulty with probability at most p². The banked
+`examples/switched-t.json` gives 44431/10¹² at p = 10⁻⁶. See the
+[staged logical gate guide](../ftqc_gadgets/STAGED.md).
+
+CREDIT: Zhiyang He, Quynh T. Nguyen and Christopher A. Pattison, *Composable
+Quantum Fault-Tolerance* (arXiv:2508.08246), §§2 and 4, Theorem 4.11,
+Propositions 4.9, 5.2 and 7.9. The cone and filter studies use the cone and
+factory certificates of `ftqc_gadgets`; the distillation check follows Bravyi
+and Kitaev's 15-to-1 protocol.
+
+## License
+
+MIT License. Copyright (c) 2026 Anthropic, PBC. Created by Matthew D. Schwartz;
+code written by Claude (Anthropic) under his supervision. Documentation is
+licensed CC BY 4.0. See LICENSE, LICENSE-CONTENT and NOTICE at the repository
+root.

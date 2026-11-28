@@ -6,6 +6,7 @@ All notable changes to BootLoops are recorded here. The format follows
 
 ## Unreleased
 
+- FTQC documentation rewritten. [`tools/FTQC.md`](tools/FTQC.md) now goes from the argument the eight tools check to their conventions, a section on what they do not do, measured battery times, how receipts connect and worked examples ordered by size; its figure is redrawn by level. Every FTQC `GUIDE.md` follows the toolkit sections (KIND, PURPOSE, SCOPE, USE-WHEN, NOT-FOR, INVOKE, INPUTS, OUTPUTS, GATES, FOOTGUNS, KNOWN GAPS, CREDIT), with measured battery numbers and promotional wording removed. Documented gaps include the unverified radius input of the `ftqc_decoders` cluster bound, the heuristic surface-code error formula in `ftqc_magic` pipelines, and the 10⁻⁹ acceptance floor of `ftqc_magic` cultivation receipts when Lp ≥ 1. No code changed.
 - The eight FTQC tools now share signed code-action receipts for permutations, local Cliffords and folds. Measurement orbit replay, installed schedules and single-fault spread, decoder ensembles, RM15 frames and reaction pricing are described in the [FTQC guide](tools/FTQC.md#code-automorphisms).
 - The LP(8,4) comparison now verifies both implementations on the same ordered slots and records the single-fault counterexample for the translated schedule.
 

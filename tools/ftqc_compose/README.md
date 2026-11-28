@@ -1,6 +1,14 @@
 # ftqc_compose
 
-Check bad-support families, join typed gadgets in series or parallel, and replay a diagonal-Pauli proof for two one-edge HGP measurements on the same encoded memory. The receipt records which inputs, decoders, physical locations, ideal boundaries and unresolved premises its conclusion uses.
+Joins operations certified by the other FTQC tools and computes what follows
+for the whole: typed joins of wires, codes, logical bases and decoders;
+bad-support families and level reduction after He, Nguyen and Pattison;
+probability bounds under declared local-stochastic or independent noise; tail
+bounds over the fault cones of a correction schedule; contracts for
+purification trees; schedule volumes; and factory bounds carried into a
+logical T. Every result is a receipt that lists the premises it rests on, and
+is marked conditional when it rests on a quoted theorem, a supplied contract or
+a declared noise law.
 
 From the BootLoops root:
 
@@ -13,10 +21,7 @@ python3 -m ftqc_compose verify "$out/spec.json" "$out/receipt.json"
 python3 run_selftests.py ftqc_compose
 ```
 
-See the [package guide](GUIDE.md) for the contract language, evidence and limits, and the [FTQC overview](../FTQC.md) for related tools.
-
-The [level-reduction and noise rules](GUIDE.md#level-reduction) also check unconditional circuits with typed interfaces and calculate exact rational local-stochastic bounds. The 15-to-1 example verifies all single-resource corrections and the 105 two-resource bad supports under fault-free processing.
-
-The [gross-code residual checker](GUIDE.md#gross-code-residual-data-and-frame) transports data and split-frame errors to the BB144 output. The [distilled logical T study](GUIDE.md#from-a-distilled-qubit-to-logical-t) checks the encoding interface, all four adaptive branches, and separate bounds for factory, encoder and online faults.
-
-The [simultaneous source contract](GUIDE.md#simultaneous-y-source-and-ideal-consumers) tracks correlated Y errors through two ideal S consumers, including a single physical fault that damages both outputs.
+The example checks two nondestructive measurements of logical Z on the same
+eight-qubit HGP memory and their composition; `edge-hook` replays the negative
+control. See the [guide](GUIDE.md) for every study kind, its premises and its
+limits, and [`../FTQC.md`](../FTQC.md) for how the tools fit together.

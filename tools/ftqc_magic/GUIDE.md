@@ -1,234 +1,194 @@
 # ftqc_magic — GUIDE
 
-KIND: package (Python, 100% stdlib for the default certified tier; `rings.py`, `ir.py`,
-`matrix.py`, `galois.py`, `limits.py`, `recycle.py`, `search.py`, `cultivate.py`,
-`caliper.py`, `qldpc_factory.py`, `pipeline.py`, `catalog.py`, `certify.py`, `cli.py`,
-`bridges/{faults_bridge,compose_bridge,extractors_bridge}.py`, `selftest.py`, `examples/`).
-Battery class: **selftest** (runs in `< 5 s` from a cold clone with zero external packages
-and zero floating-point literals; optional `cadical` and `stim` backends are probed
-dynamically for live LRAT proofs and stabilizer-proxy cross-checks when installed).
+Tool page: none yet. Overview of the FTQC tools: [`../FTQC.md`](../FTQC.md).
+
+KIND: package (Python standard library for the default tier; no
+floating-point literals; optional `cadical` for live LRAT proofs and `stim`
+for cross-checks). Exact arithmetic: `rings.py` (Z[√2], Q(√2), Z[ω₈],
+polynomials over Q), `ir.py` (phase-polynomial targets). Factories:
+`matrix.py` (binary and PPR), `galois.py` (GF(2^s) trace codes), `limits.py`
+(non-triorthogonal codes, lower bounds), `recycle.py` and `search.py`
+(check-qubit recycling), `catalog.py`. Cultivation and escape: `cultivate.py`,
+`caliper.py`. qLDPC factories: `qldpc_factory.py`. Composition:
+`pipeline.py`, `delivery.py`, `action_program.py`, `insitu.py`, `staged.py`,
+`bridges/`. `certify.py`, `cli.py`, `selftest.py`, `examples/`. Battery
+class: selftest.
 
 ## PURPOSE
 
-Certified verification, active-qubit compression, cultivation Clifford-hook analysis,
-open-boundary escape postselection, single-shot qLDPC factory verification, and
-multi-stage pipeline composition for magic-state factories in fault-tolerant quantum
-computing (FTQC).
+Exact statements about magic-state factories and the pipelines that combine
+them, as `ftqc_magic-receipt-1` receipts, and the correlation rules that decide
+whether their outputs may be used as independent.
 
-Between 2004 and 2026, magic-state production evolved from Bravyi–Kitaev 15-to-1
-Reed–Muller distillation (`2004`) and Bravyi–Haah triorthogonal matrices (`2012`) through
-catalyzed `|CCZ> -> 2|T>` conversion and asymmetric surface-code blocks (`2019`), magic
-state cultivation (`2024–2025`), and a wave of `2026` advances: mid-circuit check
-recycling (`49T -> 1T` in 5 active qubits), high-rate multi-output borrowed-identity
-transforms, $\mathrm{GF}(2^s)$ self-dual trace binarization and 3-twirl concatenation,
-non-triorthogonal signed-stabilizer collapse over $\mathbb{Z}[\omega_8]$, exact $O(n^3)$
-simulation of non-Pauli Clifford hook faults in cultivation, open-boundary Caliper escape
-postselection, and single-shot 3D tricycle $\to$ 4D quadcycle qLDPC `CCZ` factories.
+- **Distillation.** For binary, PPR, GF(2^s)-trace and non-triorthogonal
+  (signed stabilizer over Z[ω₈]) factories of T, CS, CCZ, CCZ^m and CCCZ: the
+  target action, the distance, the exact acceptance and output error as
+  polynomials in the input error rate (by dynamic programming over syndromes
+  and cosets), the leading coefficient, and lower bounds on the number of
+  inputs where known. Example: Bravyi–Haah 49-to-1, distance 5, 1411p⁵.
+- **Check-qubit recycling.** Schedules that measure and reset check qubits in
+  the middle of the circuit, with a replay of the physical qubit pool; for
+  example 49-to-1 on 5 active qubits instead of 14. Optional LRAT proofs that
+  fewer qubits are impossible for small cases.
+- **Cultivation.** An exact simulation of the Clifford errors
+  H± = (X ± Y)/√2 that arise when Pauli faults cross T checks, in time O(n³),
+  which gives the |T⟩ fault distance d_T of a check schedule and the counts of
+  malignant fault sets, beside the |S⟩-proxy distance d_S that a stabilizer
+  simulation would report.
+- **Escape stages.** Worst-case complementary gaps across open future
+  boundaries of a matching graph (Caliper), cross-checked with the Blossom
+  decoder of `ftqc_decoders`, and the expected volume of adaptive escape.
+- **qLDPC CCZ factories.** Chain-complex checks of 3D tricycle and 4D
+  quadcycle constructions, metacheck repair through `ftqc_decoders`, and the
+  fan-out condition that keeps a transversal CCZ from halving the circuit
+  distance.
+- **Pipelines.** Stages composed with outward rounding, catalysed C2T
+  conversion checked exactly over Z[ω₈], and contracts with a correlation mode
+  (`INDEPENDENT_SINGLE`, `BATCH_CORRELATED`, `CATALYST_POISONED`) exported to
+  `ftqc_compose`, `ftqc_extractors` and `ftqc_uncompute`.
 
-Composing these techniques naively introduces subtle soundness hazards — unflagged
-cultivation Clifford hooks drop $|T\rangle$ fault distance below $|S\rangle$-proxy
-predictions, reused `C2T` catalysts correlate all output $|T\rangle$ errors across rounds,
-multi-output factories emit correlated $Z$-error batches, naive depth-2 transversal `CCZ`
-halves qLDPC circuit distance, and terminal gap formulas overestimate mid-circuit escape
-confidence across open future boundaries. `ftqc_magic` unifies all seven frameworks
-behind exact cyclotomic/rational arithmetic and fail-closed `ftqc_magic-receipt-1`
-certificates:
+## SCOPE
 
-1. **Exact zero-float cyclotomic & rational core (`rings.py`, `ir.py`)**:
-   - Exact arithmetic in $\mathbb{Z}[\sqrt{2}]$, $\mathbb{Q}(\sqrt{2})$, $\mathbb{Z}[\omega_8]$
-     ($\omega_8 = e^{i\pi/4}$), and `PolyQ` ($\mathbb{Q}[p]$), with integer-squaring order
-     predicates (`isqrt`) and outward-rounded `Decimal` bounds (`ROUND_CEILING` for
-     infidelities and spacetime wire-ticks; `ROUND_FLOOR` for acceptance probabilities).
-   - `PhasePolynomialTarget` canonicalizes arbitrary degree-3 diagonal gates over
-     $\mathbb{Z}_8$ (`T^k`, `CS`, `CCZ^m`, `CS_{01}CS_{02} ~ CCZ`) and degree-4 `CCCZ`,
-     computing exact $4^k$ Pauli squared-modulus multisets for Clifford-orbit matching.
-2. **Binary / PPR / borrowed-identity & Galois-qudit distillation (`matrix.py`, `galois.py`)**:
-   - Verifies generalized triorthogonality, check decoupling, exact diagonal Clifford
-     correction synthesis (`S`, `CZ`), borrowed-identity kernel coset extraction, parent
-     capacity $\binom{r}{\le 2} + \binom{r}{\le 1} + 1$, parity lift (`d -> d+1`),
-     puncturing downward closure, and Proposition 5 free-row extension [JWS26].
-   - Computes exact all-orders `Fraction` acceptance and conditional infidelity via
-     syndrome/output coset dynamic programming, cross-checked against `ftqc_codes` /
-     CaDiCaL SAT+LRAT distance proofs when available.
-   - Constructs $\mathrm{GF}(2^s)$ self-dual trace bases ($\mathrm{Tr}(b_i b_j) = \delta_{ij}$),
-     binarizes qudit $U_3$ (`CS`) and $U_7$ (`CCZ`) factories (punctured $\mathrm{GF}(8)$
-     Reed–Solomon, $\mathrm{GF}(4)$ Hermitian curve $y^2 + y = x^3$, and `64T -> 2 CCZ`
-     `[[64, 6, 4]]` [GPRW26]), and evaluates exact 3-twirl correlated weight transfer.
-3. **Non-triorthogonal $\mathbb{Z}[\omega_8]$ collapse & fundamental lower bounds (`limits.py`)**:
-   - Implements Theorem 1 of Balada Gaggioli & Mareček [BGM26]: exact closed-form Pauli
-     expectations over $\mathbb{Z}[\omega_8]$ certifying $G_{00} > 0$, rank-1
-     Cauchy–Schwarz collapse $G_{00} G_{ee} = |G_{0e}|^2$ for all $|e| < d$, rational
-     complement symmetry ($e \leftrightarrow e \oplus 1^n$), and target Pauli-spectrum
-     matching — certifying the optimal non-triorthogonal `[[9, 1, 2]]` `9T -> 1T`
-     ($p_{\mathrm{acc}}(0) = 1/128$, $\epsilon = \frac{27}{2} p^2 + O(p^3)$) and
-     `[[6, 4, 1]]` `6T -> CCCZ` protocols alongside general $n_{\min}(\tau, d)$ lower bounds.
-4. **Mid-circuit check recycling & LRAT spatial no-go theorems (`recycle.py`, `search.py`)**:
-   - Minimizes output/check row weights over $\mathrm{GL}(r, 2)$ cosets and solves
-     mid-circuit check-qubit recycling via multi-start greedy + branch-and-bound +
-     optional CaDiCaL Sinz-CNF/LRAT lower bounds, compressing `15T -> 1T` from $5 \to 4$
-     qubits (with `A <= 3` UNSAT LRAT proved) and Bravyi–Haah `49T -> 1T` ($d = 5$) from
-     $14 \to 5$ active qubits, verified by independent physical pool replay [JVBS26].
-   - Constructs canonical repetition-code families $\mathcal{F}_N^0$ (`T`) and
-     $\mathcal{F}_N^1$ ($\sqrt{T}$), solves $S_N$-symmetric families (`45T -> 1T` at
-     $N = 9, d = 3$), and replays banked LRAT UNSAT refutations via `ftqc_codes.lrat`
-     proving $N = 4 \implies d \le 2$ for `T` and $N \le 5 \implies d \le 2$ for `CCZ`.
-5. **Exact $O(n^3)$ Clifford-hook cultivation verifier (`cultivate.py`)**:
-   - Propagates circuit Pauli faults across $T / T^\dagger$ checks into non-Pauli Clifford
-     errors $H_{\pm} = (X \pm Y)/\sqrt{2}$ and implements Algorithm 1 + Proposition 1 of
-     Chan et al. [CSSC26] over $\mathbb{Q}(\sqrt{2})$ in $O(n^3)$ binary symplectic time.
-   - Reproduces exact single/double/triple malignant fault counts on `MSC-3` (`mal_T[2] = 4`,
-     `mal_S[3] = 82`), proving that unflagged double-checking degrades from $d_S = 3$ on
-     $|S\rangle$ to $d_T = 2$ on $|T\rangle$, while two $Z$-flag ancillas (`msc3_z_flagged`)
-     or Itogawa et al.'s 2-round short check (`itogawa_2round`) restore full $d_T = 3$
-     (cross-checked on $|S\rangle$ against `ftqc_faults.audit` and `stim`).
-6. **Open-boundary Caliper escape & single-shot qLDPC factories (`caliper.py`, `qldpc_factory.py`)**:
-   - Partitions escape DEMs into $D_{\mathrm{comm}} \sqcup D_{\mathrm{open}}$, computes
-     parity-lifted shortest paths $d_b(u, v)$, and certifies worst-case soft-weight
-     complementary gaps across hidden open-boundary syndromes (cross-checked against
-     `ftqc_decoders.mwpm.decode_mwpm`), plus exact adaptive escape spacetime volume [MMZLA26].
-   - Verifies 3D tricycle chain complexes ($H_X H_Z^T = 0$, $M_X H_X = 0$), depth-1
-     $d = 2$ repetition fan-out restoration vs. depth-2 distance halving, 4D quadcycle
-     mapping-cone extension ($M_X H_X = 0$, $M_Z H_Z = 0$) with live single-shot syndrome
-     repair via `ftqc_decoders.ssf_metacheck.decode_with_metachecks`, homomorphic
-     $|{\det}\rangle \mapsto |\mathrm{CCZ}\rangle^{\otimes 2}$ minor collapse, and
-     monotone AOD wrap-class shuttle counts $\Theta^{(N)}$ [MMZLA26q].
-7. **Pipeline composition, catalysis & sibling bridges (`pipeline.py`, `bridges/`)**:
-   - Verifies Gidney–Fowler `C2T` (`|CCZ>|T> -> |T>^{\otimes 3}`) exactly over
-     $\mathbb{Z}[\omega_8]$, sizes asymmetric Litinski $(d_X, d_Z, d_m)$ surface-code
-     patches, composes multi-stage cultivation/escape/distillation/catalysis/qLDPC
-     pipelines with outward rational rounding at inter-stage boundaries, and exports
-     read-only contracts for `ftqc_compose`, `ftqc_extractors`, and `ftqc_uncompute`.
+The distillation model is the standard one: independent Z-type errors of rate
+p on the input T rotations, and ideal Clifford checks with postselection on
+all +1 outcomes. Cultivation is analysed on its final check subcircuit with an
+ideal encoded [[7,1,3]] |T⟩ input and depolarizing circuit noise on every
+gate, preparation, idle and measurement. A pipeline feeds each stage's
+conditional output error into the next as its input rate. Each receipt lists
+its premises.
 
 ## USE-WHEN
 
-- Certifying exact distance, leading error polynomial, active-qubit schedule, and
-  fundamental $n_{\min}(\tau, d)$ optimality gap of a `T`, `CS`, `CCZ`, `CCZ^m`, or `CCCZ`
-  magic-state factory (triorthogonal, PPR, $\mathrm{GF}(2^s)$ trace, or non-triorthogonal
-  signed stabilizer).
-- Compressing logical check qubits of a PPR factory (`15-to-1`, `49-to-1`, `64-to-1`,
-  `47-to-CCZ`) via mid-circuit measurement and reset.
-- Auditing whether a magic-state cultivation check schedule suffers non-Pauli Clifford
-  hook degradation ($d_T < d_S$) that $|S\rangle$-state stabilizer simulations miss, or
-  sizing mid-circuit Caliper escape postselection across open future boundaries.
-- Composing hybrid multi-stage pipelines (e.g., `Z-flagged cultivation -> Caliper escape ->
-  recycled 15-to-1` or `cultivation -> 8T-to-CCZ -> catalyzed C2T`) with automatic
-  enforcement of correlation and catalyst-poisoning rules, or finding Pareto-optimal
-  pipelines for a target `(p_phys, target_infidelity, max_active_qubits)` budget.
+- A factory's distance, leading error, acceptance or active-qubit count is an
+  input to a resource argument and should be checked exactly.
+- A cultivation schedule should be checked for Clifford-hook degradation
+  (d_T < d_S) that a stabilizer simulation of |S⟩ misses.
+- Factory outputs are consumed downstream and the consumer must know whether
+  they are independent, batch-correlated or tied to a catalyst.
 
 ## NOT-FOR
 
-- Full $10^9$-shot Monte-Carlo threshold sweeps of surface-code memory or escape stages
-  — use `ftqc_decoders` (`BootLoopsSinterDecoder` / `sinter`) for large-scale sampling
-  and supply the resulting physical rate to `ftqc_magic`.
-- Logical reversible cleanup (`HMR` / spooky pebbling) — use `ftqc_uncompute` and feed it
-  the `ftqc_uncompute_pricing` record emitted by `ftqc_magic`.
+- Circuit-level noise inside distillation Cliffords: the model treats them as
+  ideal.
+- Threshold-scale sampling of memories or escape stages: use
+  `ftqc_decoders` with Stim or sinter and supply the resulting rate.
+- Logical arithmetic cleanup: use `ftqc_uncompute`, fed by the pricing record
+  this package exports.
 
-## CLI & RECEIPT SCHEMA
+## INVOKE
 
-Run from the BootLoops repository root (`PYTHONPATH=tools python3 -m ftqc_magic` or
-`python3 -m tools.ftqc_magic`):
+From the BootLoops root with `export PYTHONPATH="$PWD/tools"`:
 
-```sh
-export PYTHONPATH=tools
-work=$(mktemp -d)
+    python3 -m ftqc_magic check SPEC.json -o receipt.json
+    python3 -m ftqc_magic verify SPEC.json receipt.json
+    python3 -m ftqc_magic recycle --factory bh_49_1_5_t [--lrat]
+    python3 -m ftqc_magic cultivate --variant msc3_z_flagged --p 1/1000 [--external]
+    python3 -m ftqc_magic catalog
+    python3 -m ftqc_magic suggest --target CCZ --p 1/1000 --infidelity 1/1000000000
+    python3 -m ftqc_magic switched-source STUDY.json
 
-# Build and independently verify a source-pinned ftqc_magic-receipt-1 certificate
-python3 -m ftqc_magic check tools/ftqc_magic/examples/flagged_cultivation_caliper_15to1.json \
-  -o "$work/pipe.receipt.json"
-python3 -m ftqc_magic verify \
-  tools/ftqc_magic/examples/flagged_cultivation_caliper_15to1.json "$work/pipe.receipt.json"
+`pipeline` is an alias for `check` on a multi-stage spec. Exit codes: 0 ok;
+2 refusal, which covers malformed input, a receipt that does not replay, and a
+named hazard such as `UNFLAGGED-CULTIVATION-HOOK-DEGRADATION` (the refusal is
+written to stderr as JSON).
 
-# Compress active logical qubits on a catalog factory (--lrat invokes CaDiCaL if installed)
-python3 -m ftqc_magic recycle --factory bh_49_1_5_t
+## OUTPUTS
 
-# Run exact O(n^3) Clifford-hook cultivation analysis (--external runs ftqc_faults & Stim)
-python3 -m ftqc_magic cultivate --variant msc3_z_flagged --p 1/1000
+`ftqc_magic-receipt-1`: `schema`, `kind`, `spec_sha256`, `source_sha256` (a
+hash of the package's Python sources), `contract` (target, distance,
+active and total qubits, correlation mode, exact and decimal
+`acceptance_lower`, `conditional_infidelity_upper`,
+`unnormalized_failure_upper`, `expected_wire_ticks_per_output_upper`,
+`premises`), `optimality_gap` where a lower bound is known, `exports` for the
+sibling tools, and stage `details`.
 
-# List all 17 built-in landmark factories or suggest Pareto-optimal pipelines
-python3 -m ftqc_magic catalog
-python3 -m ftqc_magic suggest --target CCZ --p 1/1000 --infidelity 1/1000000000
-```
+## GATES
 
-Every `ftqc_magic-receipt-1` JSON document carries `schema`, `kind`, `spec_sha256`,
-`source_sha256` (hash of all package `.py` sources), `contract` (target phase polynomial,
-`distance`, `active_qubits`, `correlation_mode`, outward-rounded `acceptance_prob_lo`,
-`conditional_infidelity_hi`, `expected_wire_ticks_per_output_hi`, and explicit
-`premises`), `optimality_gap` (against proven $n_{\min}(\tau, d)$ lower bounds where
-applicable), `exports` (`ftqc_compose`, `ftqc_extractors`, `ftqc_uncompute` bridge
-records), and stage-specific `details`.
+`python3 tools/ftqc_magic/selftest.py` followed by
+`python3 -m unittest ftqc_magic.test_action_program`: 10 legs in 8 s on a
+four-core Linux virtual machine without CaDiCaL or Stim.
 
-## KNOWN HAZARDS
+- `L0` no floats or complex numbers; replay of the banked example receipts.
+- `L1` exact rings, outward rounding, Clifford-orbit matching of targets.
+- `L2` landmark binary and PPR factories, borrowed-identity transforms,
+  parity lift, puncturing, GF(2^s) trace binarization, 3-twirl.
+- `L3` Z[ω₈] collapse on the [[9,1,2]] 9-to-1 factory (acceptance 1/128,
+  error 27/2 p²) and others, lower bounds on n.
+- `L4` recycling of 15-to-1 (5 → 4) and 49-to-1 (14 → 5); banked LRAT no-go
+  proofs re-checked with `ftqc_codes.lrat`.
+- `L5` cultivation: unflagged MSC-3 has d_T = 2 with four malignant weight-2
+  sets against d_S = 3; Z-flagged and two-round variants have d_T = 3.
+- `L6` Caliper gaps and escape volume; tricycle and quadcycle checks.
+- `L7` C2T, pipelines, `suggest`, bridges, CLI round trip.
+- `N1–N6` the hazards below are refused; `M1–M4` four code mutations are
+  caught.
 
-1. **Unflagged cultivation Clifford-hook degradation (`N1: UNFLAGGED-CULTIVATION-HOOK-DEGRADATION`)**:
-   Propagating a single Pauli fault halfway through a transversal $T / T^\dagger$ check
-   creates $H_{\pm} = (X \pm Y)/\sqrt{2}$, spreading across subsequent CNOTs into a
-   weight-2 undetectable logical error on $|T\rangle$ even when the Clifford $|S\rangle$
-   proxy achieves $d_S = 3$ (`msc3_unflagged`: $d_T = 2$ vs $d_S = 3$). `cultivate.py`
-   refuses any schedule whose exact $\mathbb{Q}(\sqrt{2})$ $|T\rangle$ fault distance falls
-   below `claimed_t_distance`.
-2. **Catalyst error poisoning (`N2: CATALYST-POISONING-HAZARD`)**: Gidney–Fowler `C2T` and
-   phase-catalysis ladders reuse a persistent catalyst state; a single undetected error on
-   the catalyst flips *every* subsequent output, violating the independent-input premise
-   of downstream distillation and multi-shot `ftqc_compose` tail bounds. `CATALYST_POISONED`
-   contracts are strictly terminal (`terminal_single_shot=True`).
-3. **Multi-output batch correlation (`N3: MULTI-OUTPUT-CORRELATION-HAZARD`)**: Block
-   factories with $k > 1$ outputs (`14T -> 2T`, `63T -> 2T`, `64T -> 2 CCZ`, qLDPC
-   $|{\det}\rangle \mapsto 2\,\mathrm{CCZ}$) suffer joint $Z$-error patterns across outputs
-   within the same accepted block (`BATCH_CORRELATED`). Feeding them into a downstream
-   distillation stage or independent `cone-bound` study requires explicit
-   `interleaving="distinct_instances"` (or `"distinct-instances"`) or `"joint_3twirl"`.
-4. **Depth-2 transversal `CCZ` distance halving (`N4: DEPTH2-TRANSVERSAL-CCZ-HALVING`)**:
-   On 3D tricycle qLDPC codes without a $d = 2$ repetition fan-out outer layer, physical
-   `CCZ` gates share qubits across depth 2 and propagate faults to halve circuit distance
-   to $\lceil d/2\rceil$.
-5. **Open-boundary naive gap overconfidence (`N5: OPEN-BOUNDARY-NAIVE-GAP-HAZARD`)**:
-   Evaluating terminal MWPM complementary gaps with $s_{\mathrm{open}} = 0$ during
-   mid-circuit escape ignores hidden defects on open future time boundaries that erode the
-   true conditional gap; `caliper.py` refuses `naive_terminal_gap` whenever
-   $D_{\mathrm{open}} \ne \emptyset$.
+## FOOTGUNS
 
-## ACCEPTANCE BATTERY
+1. **Clifford-hook degradation** (`UNFLAGGED-CULTIVATION-HOOK-DEGRADATION`).
+   A Pauli fault halfway through a transversal T check becomes H±, which can
+   spread into an undetected weight-2 logical error on |T⟩ even when the |S⟩
+   proxy has distance 3. `cultivate` refuses a schedule whose d_T is below
+   `claimed_t_distance`.
+2. **Catalyst poisoning** (`CATALYST-POISONING-HAZARD`). C2T and phase
+   catalysis reuse a catalyst; one error on it flips every later output.
+   `CATALYST_POISONED` contracts are terminal.
+3. **Batch correlation** (`MULTI-OUTPUT-CORRELATION-HAZARD`). Outputs of one
+   accepted block of a multi-output factory share Z errors. Downstream use as
+   independent needs `interleaving="distinct_instances"` or `"joint_3twirl"`.
+4. **Depth-2 transversal CCZ** (`DEPTH2-TRANSVERSAL-CCZ-HALVING`) on tricycle
+   codes without the d = 2 fan-out layer halves the circuit distance.
+5. **Open boundaries** (`OPEN-BOUNDARY-NAIVE-GAP-HAZARD`). A terminal gap
+   evaluated mid-circuit ignores defects on open future boundaries.
+6. Receipts bind the package source hash: any code change invalidates old
+   receipts, which must be reissued with `check`.
 
-`python3 tools/ftqc_magic/selftest.py` (registered in `tools/BATTERIES.json` under
-`ftqc_magic`, `cwd: root`) executes in `< 5 s` from a cold clone with zero external
-dependencies:
+## KNOWN GAPS
 
-- `L0_purity_and_pinned_receipts`: AST scan across all `tools/ftqc_magic/**/*.py` files
-  forbidding `float`/`complex` literals and `float()`/`complex()` calls, plus independent
-  replay verification of all 4 banked `examples/*.receipt.json` fixtures.
-- `L1_rings_and_ir`: $\mathbb{Z}[\sqrt{2}]$, $\mathbb{Q}(\sqrt{2})$, $\mathbb{Z}[\omega_8]$,
-  `PolyQ`, outward `ROUND_CEILING`/`ROUND_FLOOR` soundness, and Clifford-orbit matching
-  (`CS_{01}CS_{02} ~ CCZ`).
-- `L2_binary_galois_and_transforms`: Landmark binary/PPR factories (`bk_15_1_3_t`,
-  `bh_14_2_2_t`, `bgm_36_3_3_cs2_ccz`, `bgm_48_3_4_ccz_2level`, `jws_63_2_3_t2`),
-  borrowed-identity kernel transform, parity lift, puncturing downward closure,
-  $\mathrm{GF}(2^s)$ self-dual trace binarization (`gf8_rs`, `gf4_hermitian_ag`,
-  `gprw_64_6_4_2ccz`), and 3-twirl global vs. local concatenation.
-- `L3_collapse_and_lower_bounds`: Exact $\mathbb{Z}[\omega_8]$ stabilizer collapse on
-  `bgm_9_1_2_t` (`1/128`, `27/2 p^2`), `bgm_6_4_1_cccz`, `bgm_3_2_1_cs`, and $n_{\min}$
-  optimality bounds.
-- `L4_recycling_and_spatial_nogo`: Active-qubit compression on `15-to-1` ($5 \to 4$) and
-  `49-to-1` ($14 \to 5$), canonical $\mathcal{F}_N^0$, $S_9$ `45T -> 1T`, and banked LRAT
-  spatial no-go refutations (`(4, "T", 3)` and `(5, "CCZ", 3)`) via `ftqc_codes.lrat`
-  (plus live CaDiCaL LRAT when installed).
-- `L5_cultivation_clifford_hooks`: Exact $O(n^3)$ `msc3_unflagged` ($d_T = 2, d_S = 3$,
-  `4` vs `82`) vs. `msc3_z_flagged` ($d_T = 3$) and `itogawa_2round` ($d_T = 3$), plus
-  live `ftqc_faults.audit` and `stim` cross-checks when installed.
-- `L6_caliper_and_qldpc`: Caliper worst-case open-boundary gap (+ Blossom cross-check) &
-  adaptive escape volume; 3D tricycle + 4D quadcycle metacheck repair +
-  $|{\det}\rangle \mapsto |\mathrm{CCZ}\rangle^{\otimes 2}$ + AOD shuttle budget.
-- `L7_pipeline_catalysis_bridges_and_cli`: Gidney–Fowler `C2T` $\mathbb{Z}[\omega_8]$
-  proof, `compose_magic_pipeline`, `suggest_pipelines`, sibling bridges, and CLI
-  `check`/`verify` subprocess round-trip.
-- `N1_N6_sabotage_controls`: Deterministic fail-closed refusal checks across all six
-  sabotage classes (`N1`–`N6`).
-- `M1_M4_mutant_kills`: Four isolated-tempdir subprocess code-mutation self-audits across
-  `limits.py`, `cultivate.py`, `pipeline.py`, and `rings.py` confirming zero surviving
-  mutants.
-- Expected summary line: `SELF-TEST: ALL PASS (rc 0)`.
+- **Ideal Cliffords in distillation.** Factory error polynomials count only
+  input errors. Faults in the Clifford checks are not modelled.
+- **Heuristic surface-code error in pipelines.** A stage with `litinski`
+  patch sizes adds 0.1·(100p)^((d+1)/2) per rotation to its input rate
+  (`pipeline.LitinskiBlockSpec.topological_error_per_ppr`), a scaling formula
+  that is not derived or certified here.
+- **Pipeline distance is a product** of stage distances, a bookkeeping value
+  rather than a proved circuit distance.
+- **Supplied probabilities.** Caliper continuation and terminal acceptance
+  probabilities are inputs; they enter the expected cost.
+- **Cultivation acceptance.** The acceptance lower bound is 1 − Lp for L
+  locations (Bernoulli). When Lp ≥ 1 the code substitutes a floor of 10⁻⁹,
+  which is not a proven lower bound (the true acceptance can be smaller); do
+  not use cultivation receipts in that regime.
+- **Cultivation is a subcircuit.** The injection and growth stages before the
+  final checks are not simulated; the encoded input is ideal.
+- `suggest` searches the built-in catalog under these models; its "optimal"
+  pipelines are optimal only within them.
 
-CREDIT: Clean-room MIT implementation authored from published mathematical equations and
-circuit specifications (zero third-party source lines bundled). Punctured Reed–Muller and
+## Delivery to encoded consumers
+
+Use `ftqc_magic.delivery.read_delivery(spec, receipt)` for a strict replay
+with normalized phases, ordered state groups, Clifford corrections,
+acceptance, correlations and rational resource bounds. For binary producers
+the two mask tables give the joint mass with acceptance and its conditional
+law. Other supported producers can carry a state bound alone. Cost per
+batch, per grouped quantum state and per native output are recorded
+separately. For example, a binary CCZ can have three native output wires
+but only one deliverable three-qubit state. Strict v1 receipts bind the
+producer Python sources. To use a historical spec at a new revision,
+reissue its receipt with `python3 -m ftqc_magic check`.
+
+The [in-situ BB144 factory guide](../ftqc_extractors/BICYCLE_FACTORY.md)
+covers injection batch replay, RM15 input assignment, signed native pivot
+measurements, physical scheduling and full-attempt pricing.
+
+## Code automorphisms
+
+Use `check` and `verify` with a `rm15-action` specification containing a code, a signed action receipt and five ordered logical destination `slots`. Replay transports the prepare-plus axes, all 15 signed Pauli rotations, the four postselection axes and the output X and Z into that frame. The exponent applies to the signed axis. Use the existing installed Gross factory for physical timing and source quality. See [code automorphisms](../FTQC.md#code-automorphisms).
+
+`switched-source STUDY` applies the staged switched T of `ftqc_compose` to a fresh ideal encoded |+⟩ and reports a unit-yield source with the conditional infidelity bound of that model; see the [staged logical gate guide](../ftqc_gadgets/STAGED.md).
+
+CREDIT: Implemented from the published equations and circuit specifications; no
+third-party source is bundled. Punctured Reed–Muller and
 triorthogonal matrix distillation follow S. Bravyi and A. Kitaev [BK05], S. Bravyi and
 J. Haah [BH12], E. T. Campbell and M. Howard [CH17], J. Haah, M. B. Hastings, D. Poulin
 and D. Wecker [HHPW17], and J. Haah and M. B. Hastings [HH18]; asymptotic and finite-length
@@ -252,25 +212,9 @@ postselection follows A. Mehta, V. Menon, H. Zhou, M. D. Lukin and J. P. Bonilla
 shuttle budgets follow V. Menon, A. Mehta, H. Zhou, M. D. Lukin and J. P. Bonilla Ataides
 [MMZLA26q]. Bracketed keys resolve in `REFERENCES.md` at the repository root.
 
-### Delivery to encoded consumers
+## License
 
-Use `ftqc_magic.delivery.read_delivery(spec, receipt)` for a strict replay
-with normalized phases, ordered state groups, Clifford corrections,
-acceptance, correlations and rational resource bounds. For binary producers
-the two mask tables give the joint mass with acceptance and its conditional
-law. Other supported producers can carry a state bound alone. Cost per
-batch, per grouped quantum state and per native output are recorded
-separately. For example, a binary CCZ can have three native output wires
-but only one deliverable three-qubit state. Strict v1 receipts bind the
-producer Python sources. To use a historical spec at a new revision,
-reissue its receipt with `python3 -m ftqc_magic check`.
-
-The [in-situ BB144 factory guide](../ftqc_extractors/BICYCLE_FACTORY.md)
-covers injection batch replay, RM15 input assignment, signed native pivot
-measurements, physical scheduling and full-attempt pricing.
-
-## Code automorphisms
-
-Use `check` and `verify` with a `rm15-action` specification containing a code, a signed action receipt and five ordered logical destination `slots`. Replay transports the prepare-plus axes, all 15 signed Pauli rotations, the four postselection axes and the output X and Z into that frame. The exponent applies to the signed axis. Use the existing installed Gross factory for physical timing and source quality. See [code automorphisms](../FTQC.md#code-automorphisms).
-
-The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.
+MIT License. Copyright (c) 2026 Anthropic, PBC. Created by Matthew D. Schwartz;
+code written by Claude (Anthropic) under his supervision. Documentation is
+licensed CC BY 4.0. See LICENSE, LICENSE-CONTENT and NOTICE at the repository
+root.
