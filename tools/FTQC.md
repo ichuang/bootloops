@@ -98,7 +98,7 @@ are handled separately (see the next section but one).
 `ftqc_faults` holds two engines with their own guides and batteries:
 [`ftqc_audit`](ftqc_audit/GUIDE.md) (location faults in one circuit) and
 [`ftqc_zx`](ftqc_zx/GUIDE.md) (relations between circuits, after Rodatz, Poór
-and Kissinger). Their old import names and command lines still work.
+and Kissinger). Both can also be imported and run under those names.
 
 ## What the tools do not do
 
@@ -411,7 +411,8 @@ static distance 12. Each of the two CSS probes has 25,048 noisy locations. The
 receipt proves exact circuit distance **7**: a projected search excludes every
 harmful set of at most six faults in both probes, and flipping one port
 measurement in every round changes the logical result while passing every
-detector. With twelve rounds the exact distance is 10
+detector. With twelve rounds the exact distance is 10; that run needs a
+larger search budget and supplied witnesses
 ([details](ftqc_extractors/GROSS_CIRCUIT.md)). The schedule, its barriers and
 idle placement are choices of this implementation, and the input and the final
 test measurements are ideal.
@@ -706,7 +707,7 @@ radial and pair-partition codes. `ftqc_extractors.addressable_surgery`
 installs signed slot measurements and classical feed-forward on an explicit
 coupler inventory, and `ftqc_compose.addressable_magic` delivers a verified
 single-output T state into a named slot while preserving the other data slots
-and their Bell references. [High-rate QEC plan](../PLANS/high-rate-qec.md)
+and their Bell references.
 
 ```sh
 python3 -m ftqc_codes construct pp256 -o "$out/pp256.construct.json"

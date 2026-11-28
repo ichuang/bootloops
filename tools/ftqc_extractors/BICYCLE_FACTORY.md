@@ -21,7 +21,7 @@ and transfer into the reference factory and charges its HGP output encoder.
 
 The Extractors `bicycle_rm15_map` study gives the signed BB basis and all 15
 physical joint parities. In this basis eight use the spare in logical zero.
-Each parity is a coordinate translation of the existing one-round Gross Z
+Each parity is a coordinate translation of the one-round Gross Z
 merge/split, including its public sign and physical split correction. The
 translation preserves both stabilizer groups. The six-coordinate layout is
 given in `bicycle.layout`; these are our port choices. Rotation signs use
@@ -59,12 +59,9 @@ arbitrary-fault circuit distance is open. Complete physical Clifford probes
 replace every raw T by +i and compare the final signed output against a
 separate amplitude calculation while preserving a Bell spectator.
 
-The research companion banks replay commands and explicit JSON inputs in
-`studies/insitu-bicycle/`. From the research root, with
-`PYTHONPATH=bootloops/tools`, representative commands are
+The tests `ftqc_extractors.test_bicycle`, `ftqc_compose.test_insitu` and
+`ftqc_compose.test_bicycle_install` build and replay these studies:
 
 ```sh
-python3 -m ftqc_magic verify studies/insitu-bicycle/shared-rm15.json studies/insitu-bicycle/shared-rm15-receipt.json
-python3 -m ftqc_compose verify studies/insitu-bicycle/bb144-installed.json studies/insitu-bicycle/bb144-installed-receipt.json
-python3 -m ftqc_compose.bicycle_install studies/insitu-bicycle/bb144-installed.json -o /tmp/bb144-schedule.json
+PYTHONPATH=tools python3 -m unittest ftqc_extractors.test_bicycle ftqc_compose.test_insitu ftqc_compose.test_bicycle_install
 ```

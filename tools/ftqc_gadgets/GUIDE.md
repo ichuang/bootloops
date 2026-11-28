@@ -441,7 +441,7 @@ Error Correction Codes" (CAV 2025, arXiv:2501.14380). Teleportation-based error
 correction: E. Knill (2005). Syndrome extraction with encoded ancillas: A. Steane
 (1997). Fault model and simulator: ftqc_audit. Codes: ftqc_codes.
 
-New receipts use `ftqc_gadgets-receipt-1` and `ftqc_gadgets-composition-1`. The verifier also reads archived `gadgetcert-receipt-1` and `gadgetcert-composition-1` receipts.
+Receipts use `ftqc_gadgets-receipt-1` and `ftqc_gadgets-composition-1`. The verifier also reads `gadgetcert-receipt-1` and `gadgetcert-composition-1` receipts.
 
 Two-level reduction binds each inner operation to its signed logical action on
 canonical encoded Bell inputs. Input and output order identifies the CNOT

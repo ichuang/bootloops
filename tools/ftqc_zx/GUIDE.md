@@ -9,7 +9,7 @@ lives in `tools/ftqc_faults/zx/`: `gf2.py`, `diagram.py`, `pauliweb.py`,
 `decoder_synth.py`, `contracts.py`, `cli.py`, `adapters/` (optional `pyzx` and
 `stim` bridges), `battery.py`, `selftest.py`, `examples/`. `tools/ftqc_zx/`
 forwards to it. The canonical command is `python3 -m ftqc_faults zx`;
-`python3 -m ftqc_zx` and `python3 tools/ftqc_zx/cli.py` still work. Battery
+`python3 -m ftqc_zx` and `python3 tools/ftqc_zx/cli.py` are equivalent. Battery
 class: selftest.
 
 ## PURPOSE

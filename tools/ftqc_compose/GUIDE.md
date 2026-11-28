@@ -131,8 +131,7 @@ evidence, stale digests and failed joins.
 - The bundle filter for arbitrary damaged quantum inputs is open for the HGP
   leaves, so friendliness cannot be required of them.
 - A general noncommuting adaptive surgery contract and automatic use of
-  surgery channels in the filter calculus are open (see
-  [the surgery plan](../../PLANS/extractor-surgery.md)).
+  surgery channels in the filter calculus are open.
 - Physical circuits for the ideal services of the staged gates (cat seeds,
   extended seeds, terminal recovery) are not certified.
 
@@ -330,7 +329,7 @@ measurements, physical scheduling and full-attempt pricing.
 
 ## Code automorphisms
 
-The `installed-action` study binds physical couplers, ticks and fault propagation to a verified signed code action. Use the ordinary `check` and `verify` commands. The `rm15-action` study transports the 15 rotation axes into a verified frame. The existing `bb144-rm15` installation checks the signed Gross orbit and replays physical return routes. See [code automorphisms](../FTQC.md#code-automorphisms) for examples and an optional Qiskit comparison.
+The `installed-action` study binds physical couplers, ticks and fault propagation to a verified signed code action. Use the ordinary `check` and `verify` commands. The `rm15-action` study transports the 15 rotation axes into a verified frame. The `bb144-rm15` installation checks the signed Gross orbit and replays physical return routes. See [code automorphisms](../FTQC.md#code-automorphisms) for examples and an optional Qiskit comparison.
 
 ## Staged programs
 

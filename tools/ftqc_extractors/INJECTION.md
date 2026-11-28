@@ -6,7 +6,7 @@ The source implements Sections III–IV of Liu et al., arXiv:2604.05126v1. A sig
 
 From BootLoops, set `PYTHONPATH=tools`. Run `python -m ftqc_extractors check tools/ftqc_extractors/examples/bb144-injection-4.json`. For the noisy study run `python -m ftqc_extractors injection bb-uniform`. Add `--faults modes.jsonl --decode` to inspect accepted elementary faults after BP+OSD. The standard finite checker uses Stim for the physical probes. Decoder and sampling support additionally require NumPy, stimbposd and ldpc.
 
-The reference checkout is kunliu7/qldpc-msi at 09b005ef4f2038baaa5fea565468ec18044567e7. To regenerate the examples, install that checkout in an isolated Python 3.12 environment with its declared dependencies. Run the following from BootLoops using that interpreter.
+The reference implementation is kunliu7/qldpc-msi at 09b005ef4f2038baaa5fea565468ec18044567e7. To regenerate the examples, install that version in an isolated Python 3.12 environment with its declared dependencies. Run the following from BootLoops using that interpreter.
 
 ```sh
 env -u PYTHONPATH python tools/ftqc_extractors/import_injection.py /path/to/qldpc-msi tools/ftqc_extractors/examples --circuits tools/ftqc_extractors/examples/injection-circuits
@@ -27,6 +27,6 @@ For larger fixed carrier and Bell layouts, `python -m ftqc_extractors.injection_
 
 The [general BB144 source](examples/bb144-injection-general.json) injects all twelve carriers and the [general HGP225 source](examples/hgp225-injection-general.json) injects all nine. Both replay the carrier Clifford and projection frame. The published four- and six-output noisy benchmarks use the selected preparations instead.
 
-## Seeded study on bish.local
+## Seeded sampling study
 
 With the published two-round BB circuit at uniform p = 0.001, 158,809 of 2,000,000 attempts passed. There were 1,029 wrong batches including 15 with multiple wrong outputs. The conditional batch error was 0.006479 (individual 95% Wilson interval 0.006097–0.006886), compared with Fig. 2's 0.00647. Dividing the batch rate by four gives 0.001620. The two-round discard fraction was 0.92060. The separate three-round run discarded 0.93194, consistent with the published roughly 93% figure. Under asymmetric noise, 95,181 of 500,000 three-round attempts passed and 251 had a wrong output. The batch rate divided by four was 0.000659. For six HGP outputs at p = 0.0001, 35,929 of 100,000 attempts passed and 184 of those batches contained an error. The full histograms include each marginal and the correlated error mass; empirical estimates do not certify a noisy T source.

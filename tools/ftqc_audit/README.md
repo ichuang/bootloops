@@ -1,8 +1,8 @@
 # ftqc_audit
 
 The location-fault engine of [ftqc_faults](../ftqc_faults/GUIDE.md). Its code
-is in `tools/ftqc_faults/audit/`; this directory keeps the old import name and
-command line working.
+is in `tools/ftqc_faults/audit/`; this directory provides the import name
+`ftqc_audit` and its command line.
 
 For one scheduled Clifford circuit it gives the fault model (detectors fired,
 observables flipped and output damage for every Pauli at every location),

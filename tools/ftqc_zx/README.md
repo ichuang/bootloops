@@ -2,7 +2,7 @@
 
 The ZX fault-equivalence engine of [ftqc_faults](../ftqc_faults/GUIDE.md),
 after Rodatz, Poór and Kissinger. Its code is in `tools/ftqc_faults/zx/`; this
-directory keeps the old import name and command line working.
+directory provides the import name `ftqc_zx` and its command line.
 
 It decides w-fault equivalence between Clifford circuits (two independent
 computations must agree), checks constructive ZX rewrite proofs, synthesizes

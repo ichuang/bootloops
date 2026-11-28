@@ -9,7 +9,7 @@ for code constructions). The code lives in `tools/ftqc_faults/audit/`
 `library.py`, `stimleg.py`, `record_model.py`, `projected.py`,
 `projected_supports.cpp`, `spacetime.py`, `selftest.py`); `tools/ftqc_audit/`
 forwards to it. The canonical command is `python3 -m ftqc_faults audit`;
-`python3 -m ftqc_audit` still works.
+`python3 -m ftqc_audit` is equivalent.
 Battery class: partial (everything exact runs from the clone; the SAT leg needs
 `cadical`, the Stim leg needs the `stim` Python package; both skip with a named
 line otherwise).
@@ -90,8 +90,8 @@ Legs:
 
 ## INVOKE
 
-From the BootLoops root with `export PYTHONPATH="$PWD/tools"` (the
-examples use the legacy prefix `ftqc_audit`; `ftqc_faults audit` is the same):
+From the BootLoops root with `export PYTHONPATH="$PWD/tools"` (the examples
+use the short prefix `ftqc_audit`, equivalent to `ftqc_faults audit`):
 
     python3 -m ftqc_audit analyze surface:3,2 --legs A,B,S -o r.json
     python3 -m ftqc_audit analyze surface:3,2,z,bad
@@ -219,7 +219,7 @@ The [ftqc_extractors comparison guide](../ftqc_extractors/AUDIT.md) shows how to
 
 Run `python3 -m ftqc_audit records CIRCUIT.json` on an exported CSS probe with explicit detectors and record-only endpoints. The report checks through weight two. Supply repeatable `--fault LOCATION:LABEL` arguments for forward replay, or `--stim` for an independent comparison of all single-fault signatures. ftqc_extractors combines both probes with the bounded projected-support search and the readout check to certify the gross-code measurement. [Run and interpret the gross-code experiment](../ftqc_extractors/GROSS_CIRCUIT.md)
 
-Receipts use `ftqc_audit-receipt-1`. The verifier also accepts archived `faultcert-receipt-1` evidence.
+Receipts use `ftqc_audit-receipt-1`. The verifier also reads `faultcert-receipt-1` receipts.
 
 The `injection` command audits the closed Y probes built from simultaneous CSS preparations. The optional fault ledger retains the physical sites and Pauli mode of each accepted fault. [Circuit models and command](../ftqc_extractors/GUIDE.md#closed-physical-y-probes)
 

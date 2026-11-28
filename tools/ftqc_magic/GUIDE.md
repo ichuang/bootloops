@@ -174,7 +174,7 @@ law. Other supported producers can carry a state bound alone. Cost per
 batch, per grouped quantum state and per native output are recorded
 separately. For example, a binary CCZ can have three native output wires
 but only one deliverable three-qubit state. Strict v1 receipts bind the
-producer Python sources. To use a historical spec at a new revision,
+producer Python sources. To use a spec checked under another source revision,
 reissue its receipt with `python3 -m ftqc_magic check`.
 
 The [in-situ BB144 factory guide](../ftqc_extractors/BICYCLE_FACTORY.md)
@@ -183,7 +183,7 @@ measurements, physical scheduling and full-attempt pricing.
 
 ## Code automorphisms
 
-Use `check` and `verify` with a `rm15-action` specification containing a code, a signed action receipt and five ordered logical destination `slots`. Replay transports the prepare-plus axes, all 15 signed Pauli rotations, the four postselection axes and the output X and Z into that frame. The exponent applies to the signed axis. Use the existing installed Gross factory for physical timing and source quality. See [code automorphisms](../FTQC.md#code-automorphisms).
+Use `check` and `verify` with a `rm15-action` specification containing a code, a signed action receipt and five ordered logical destination `slots`. Replay transports the prepare-plus axes, all 15 signed Pauli rotations, the four postselection axes and the output X and Z into that frame. The exponent applies to the signed axis. Use the installed Gross factory (`bb144-rm15` in `ftqc_compose`) for physical timing and source quality. See [code automorphisms](../FTQC.md#code-automorphisms).
 
 `switched-source STUDY` applies the staged switched T of `ftqc_compose` to a fresh ideal encoded |+⟩ and reports a unit-yield source with the conditional infidelity bound of that model; see the [staged logical gate guide](../ftqc_gadgets/STAGED.md).
 

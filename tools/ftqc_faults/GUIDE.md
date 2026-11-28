@@ -77,7 +77,7 @@ From the BootLoops root with `export PYTHONPATH="$PWD/tools"`:
     python3 -m ftqc_faults steane --verify steane.json
 
 `audit` and `zx` take the subcommands documented in their guides. The old
-forms `python3 -m ftqc_audit ...` and `python3 -m ftqc_zx ...` still work.
+forms `python3 -m ftqc_audit ...` and `python3 -m ftqc_zx ...` are equivalent.
 Library: `ftqc_faults.audit`, `ftqc_faults.zx`, `ftqc_faults.action`.
 
 Exit codes: 0 ok; 1 a finding (counterexample, disagreement, receipt
@@ -85,7 +85,7 @@ mismatch); 2 usage or malformed input.
 
 ## OUTPUTS
 
-`ftqc_audit-receipt-1` (archived `faultcert-receipt-1` is still read),
+`ftqc_audit-receipt-1` (`faultcert-receipt-1` receipts are also read),
 `ftqc_zx-contract-v1` and the Steane bridge receipt, which binds both probe
 circuits and the ordered response ledger by digest.
 
@@ -95,8 +95,8 @@ Measured on a four-core Linux virtual machine with Python 3.10, without Stim
 or CaDiCaL: `ftqc_audit` 5,637 checks in 0.7 s (two named skips),
 `ftqc_zx` 10 legs in 5 s, `ftqc_faults` 5 tests in 0.5 s. The last runs the
 Steane bridge on both sectors, checks that a changed output Pauli or a changed
-measurement record is detected, and checks that the old module objects and
-entry points are the same as the new ones. The engine guides list their own
+measurement record is detected, and checks that the `ftqc_audit` and
+`ftqc_zx` names resolve to the same modules and entry points. The engine guides list their own
 gates.
 
 ## FOOTGUNS
@@ -152,14 +152,14 @@ must agree with the audit adjoint signatures and with forward replay on the
 four detectors, all raw record flips and the X and Z masks of the seven
 outputs. A changed result fails replay.
 
-## Existing clients and receipts
+## Import names and receipts
 
-The canonical imports are `ftqc_faults.audit` and `ftqc_faults.zx`. Existing
-`ftqc_audit` and `ftqc_zx` imports and command lines keep working, and
-circuit receipts and stochastic contracts keep their schemas and verifiers.
+The canonical imports are `ftqc_faults.audit` and `ftqc_faults.zx`; the
+imports and command lines `ftqc_audit` and `ftqc_zx` are equivalent. Circuit
+receipts and stochastic contracts have their own schemas and verifiers.
 Published injection cases and decoder sampling belong to `ftqc_extractors`
-(`python3 -m ftqc_extractors injection bb-uniform`); the old audit injection
-and sampling commands forward there. [Injection guide](../ftqc_extractors/INJECTION.md)
+(`python3 -m ftqc_extractors injection bb-uniform`); the audit engine's
+injection and sampling commands forward there. [Injection guide](../ftqc_extractors/INJECTION.md)
 
 ## Code automorphisms
 

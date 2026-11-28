@@ -23,8 +23,8 @@ python3 -m ftqc_uncompute price-staged "$study" --feedback-ticks 1 --terminal-wi
 
 ## Codes and instruments
 
-`ftqc_codes certify rm15` uses sites 0 through 6 in the existing Steane
-order. Bit 0 of each mask denotes site 0. The extra eight sites carry a fixed
+`ftqc_codes certify rm15` uses sites 0 through 6 in the Steane order
+of that package. Bit 0 of each mask denotes site 0. The extra eight sites carry a fixed
 CSS state with X generators given by the three upper copies of the Steane
 rows and the all-ones upper mask. A split computational-basis column is a
 uniform coset of the seven split X generators. An RM column is a uniform
@@ -110,6 +110,6 @@ feedback delay and per-stage seed and terminal service budgets. Zero service
 budgets show the online contribution. An end-to-end physical volume requires
 budgets for the actual supplied services.
 
-Each study lives in the existing package that owns its claim. The generic
-Clifford audit, ZX verification and accepted diagonal-Pauli contracts retain
-their respective fault models.
+Each study lives in the package that owns its claim. The generic Clifford
+audit, ZX verification and accepted diagonal-Pauli contracts keep their own
+fault models.
