@@ -15,8 +15,13 @@ Every number in the chain is the total weight of a family of sets of physical lo
 that covers an event: weights of covers on disjoint sources multiply, weights of
 alternatives add, and a first accepted attempt costs 1 / (1 - weight of rejection).  No
 contract is declared and nothing is assumed independent.  The result bounds the
-probability that some decoding event of the program sees more than its radius of dirty
-coordinates or that a delivered ancilla is junk.  What remains is listed in two groups:
+probability that some outer decoding event of the program sees more than its radius of dirty
+columns or that an outer ancilla delivered to the program is junk.  A column is dirty for an
+outer event when an inner decoding event of its cone fails there, an inner ancilla that event
+consumed is junk, or an outer ancilla in the cone is dirty there; failures of single inner
+events are not excluded, they are what the outer code corrects.  The chain exists only when
+the weight of rejection is below one at every check, which the study verifies and otherwise
+refuses.  What remains is listed in two groups:
 the noise condition, and the deterministic statements quoted from the other studies, whose
 hypotheses those studies check on the instance.
 """
@@ -32,10 +37,16 @@ NOISE = "Pr[all locations of S faulty] <= p^|S| for every finite set S of physic
 DETERMINISTIC = [
     "the cone theorem for the program, for every raw preparation and for every check (ftqc_gadgets.cones: "
     "hypotheses checked, induction quoted)",
-    "the filter rule for every purification tree (ftqc_gadgets.factories: quoted and tested against propagation)",
+    "the filter rule for every purification tree, with the classification of its locations (junk-capable, local "
+    "to one coordinate, able to cause rejection) and of the steps of its checks (ftqc_gadgets.factories: quoted "
+    "and tested against propagation)",
     "a check accepts when both incoming patterns of its sector are trivial and no location or decoding event of "
     "the step that can cause rejection is faulty, and a rejected check is repeated with fresh inputs",
-    "distinct ancillas, distinct attempts and distinct columns occupy distinct physical locations",
+    "preparations, steps of checks, attempts, ancillas, program gates and columns occupy pairwise distinct "
+    "physical locations, each location belongs to one coordinate of one column, and the noise condition holds "
+    "jointly on the locations of all attempts, executed or not",
+    "in a tree of encoded blocks, a survivor shares sources with the partner's side of a check only through its "
+    "latest correction and only at the same column (checked on one column of the tree)",
 ]
 DISCHARGED = [
     "the ancilla contracts (derived in steps 1 and 2 instead of declared)",
@@ -43,8 +54,10 @@ DISCHARGED = [
     "conditioning on acceptance (replaced by the first accepted attempt)",
 ]
 CONCLUSION = (
-    "With probability at least 1 - upper, no delivered ancilla is junk and every decoding event of the program has "
-    "at most its radius of dirty coordinates; by the cone theorem every decoder then returns the pattern it faces.")
+    "With probability at least 1 - upper, no outer ancilla delivered to the program is junk and every outer "
+    "decoding event of the program has at most its radius of dirty columns; by the cone theorem every outer "
+    "decoder then returns the pattern it faces.  Single inner decoding events may fail: their failures are the "
+    "dirty columns that the outer code corrects.")
 
 
 def _sha(obj):

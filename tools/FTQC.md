@@ -153,8 +153,9 @@ do, with no probability in them. The tools check their hypotheses on the
 instance; the general arguments are quoted, not proved here.
 
 1. *The cone theorem.* If every decoding event has at most its radius of dirty
-   coordinates, every decoder returns the pattern it faces
-   (`ftqc_gadgets cones`).
+   coordinates, every decoder returns the pattern it faces, and the same holds
+   one level up with columns for coordinates, a column being dirty when an
+   inner event there fails (`ftqc_gadgets cones`).
 2. *The filter rule.* A block that leaves an accepted check is bad only in the
    ways the rule lists: both inputs bad, or enough dirty coordinates on the two
    sides together; otherwise its old errors survive only where the partner's
@@ -162,16 +163,22 @@ instance; the general arguments are quoted, not proved here.
 3. *Acceptance.* A check accepts when its incoming patterns are trivial and
    nothing in its own step that can cause rejection is faulty, and a rejected
    check is repeated with fresh inputs.
-4. *Bookkeeping.* Distinct ancillas, distinct attempts and distinct columns
-   occupy distinct physical locations.
+4. *Bookkeeping.* Preparations, checks, attempts, ancillas, program gates and
+   columns occupy pairwise distinct physical locations, each location belongs
+   to one coordinate of one column, and in a tree of encoded blocks a
+   survivor shares faults with its partner's side only through its latest
+   correction, at the same column.
 
 **Theorem (probabilistic closure).** Under the noise assumption and
-statements 1 to 4, the probability that a delivered ancilla is bad or that
-some decoding event of the program has more than its radius of dirty
-coordinates is at most U(p). Otherwise every decoder returns the pattern it
-faces. U(p) is an explicit rational number, computed by the `closure` study of
-`ftqc_compose`. It is of order p^((t₁+1)(t₂+1)) when the trees purify enough
-that bad ancillas are not the leading term.
+statements 1 to 4, and for p small enough that every check rejects with
+weight below one, the probability that an outer ancilla delivered to the
+program is bad or that some outer decoding event of the program has more
+than t₂ dirty columns is at most U(p). Otherwise every outer decoder returns
+the pattern it faces. Single inner decoding events are allowed to fail: their
+failures are the dirty columns that the outer code corrects. U(p) is an
+explicit rational number, computed by the `closure` study of `ftqc_compose`,
+which also checks the smallness condition. In the instance below it scales as
+p^((t₁+1)(t₂+1)); in general the order depends on how far the trees purify.
 
 **How to read it.** The input about the noise is a bound on its correlation
 functions, and the output is a bound on the failure of the whole. No model of
@@ -217,7 +224,7 @@ python3 -m ftqc_compose verify tools/ftqc_compose/examples/closure-two-level-ste
 ```
 
 The receipt gives U = 5.121 × 10⁻¹³ at p = 10⁻⁶ and lists the noise assumption,
-the four deterministic statements, and the premises the chain no longer needs.
+the deterministic statements, and the premises the chain no longer needs.
 At p = 10⁻⁵ and 10⁻⁷ the bound is 5.15 × 10⁻⁹ and 5.12 × 10⁻¹⁷: fourth order,
 as two levels with t = 1 should give.
 
