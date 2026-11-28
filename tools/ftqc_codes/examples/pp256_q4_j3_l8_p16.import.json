@@ -1,0 +1,109 @@
+{
+  "schema": "ftqc_codes-import-1",
+  "name": "q4-j3-l8-p16-d12-w9-girth6",
+  "code_type": "css",
+  "field": "GF(2)",
+  "index_base": 1,
+  "producer": {
+    "name": "kasaikenta/canonical-logical-bases-pp-codes",
+    "revision": "d10faecead37ad9c5044a5308f52cbcb524235c4",
+    "license_data": "CC0-1.0"
+  },
+  "parameters": {
+    "n": 256,
+    "k": 64,
+    "J": 3,
+    "L": 8,
+    "P": 16
+  },
+  "sources": {
+    "hx": {
+      "format": "matrix_market",
+      "index_base": 1,
+      "path": "q4_j3_l8_p16/Hx_binary.mtx",
+      "sha256": "df47ad7193d101f5871783abfbdbc70e7e5fb69abfac7fcfe177f95bab3658c0"
+    },
+    "hz": {
+      "format": "matrix_market",
+      "index_base": 1,
+      "path": "q4_j3_l8_p16/Hz_binary.mtx",
+      "sha256": "f67982b1bb8b5819db5520e6f935c8b9c91b7f85c232e7627a4e42eb1dbd476b"
+    }
+  },
+  "candidate_logicals": {
+    "convention": "positive_css",
+    "coordinates": "native",
+    "lx": {
+      "format": "matrix_market",
+      "index_base": 1,
+      "path": "q4_j3_l8_p16/Lx_binary.mtx",
+      "sha256": "dba38cc55f1b785334d0250ab4756f79c9a24d7afd061523a4b204a9b9687048"
+    },
+    "lz": {
+      "format": "matrix_market",
+      "index_base": 1,
+      "path": "q4_j3_l8_p16/Lz_binary.mtx",
+      "sha256": "7726b44a79d54dce9ba564fe91d475785bf0309904f26270ad0629b1cf4323cf"
+    }
+  },
+  "witnesses": {
+    "d_x": {
+      "index_base": 0,
+      "coordinates": "native",
+      "support": [
+        0,
+        6,
+        8,
+        48,
+        50,
+        52,
+        66,
+        82,
+        96,
+        126,
+        224,
+        242
+      ]
+    },
+    "d_z": {
+      "index_base": 0,
+      "coordinates": "native",
+      "support": [
+        6,
+        10,
+        13,
+        20,
+        21,
+        28,
+        29,
+        34,
+        36,
+        39,
+        44,
+        45,
+        52,
+        61,
+        66,
+        68,
+        90,
+        92,
+        93,
+        107,
+        122
+      ]
+    }
+  },
+  "provenance": {
+    "paper": "Okada & Kasai, Canonical Logical Bases and Pair-Partition CPM CSS Codes",
+    "version": "arXiv:2607.14091v4 / archive d10faece",
+    "locator": "codes/q4-j3-l8-p16-d12-w9-girth6"
+  },
+  "paper_claims": {
+    "d": 12,
+    "d_x": 12,
+    "d_z": 12,
+    "girth_binary": 6
+  },
+  "raw_sha256": "ae0e0d3f792d7bb0728ed27dbcf58bb04e0c60b58f1d1770d933d05a4c8bcd8a",
+  "sha256": "ae0e0d3f792d7bb0728ed27dbcf58bb04e0c60b58f1d1770d933d05a4c8bcd8a"
+}

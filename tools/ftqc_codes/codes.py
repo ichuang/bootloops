@@ -7,6 +7,7 @@ their least weight is d_X.  Z-type: ker(H_X) outside rowspace(H_Z), d_Z.
 """
 import hashlib
 import json
+import os
 
 from . import gf2
 
@@ -242,6 +243,46 @@ def concatenate(outer, inner, name=None):
                    dict(family="concat", outer=outer.name, inner=inner.name))
 
 
+def _radial90():
+    from . import constructions
+    return constructions.radial90()
+
+
+def _lp6_2():
+    from . import constructions
+    return constructions.lifted_product([[3]], [[3]], 3, name="LP(6,2)")
+
+
+def _pp184():
+    from . import families_highrate
+    return families_highrate.pp184_50()
+
+
+def _pp256():
+    from . import families_highrate
+    return families_highrate.pp256_68()
+
+
+def _pp576():
+    from . import families_highrate
+    return families_highrate.pp576_148()
+
+
+def _apm1152():
+    from . import families_highrate
+    return families_highrate.apm1152_580()
+
+
+def _qt_d8_36():
+    from . import families_highrate
+    return families_highrate.quantum_expanders_d8_36_8_3()
+
+
+def _qt_s3_288():
+    from . import families_highrate
+    return families_highrate.quantum_expanders_s3_288_8()
+
+
 FAMILIES = {
     "steane": (steane, "Steane [[7,1,3]]"),
     "golay": (golay, "Golay [[23,1,7]]"),
@@ -265,14 +306,30 @@ NAMED = {
     "bb90": lambda: bb(15, 3, ["x9", "y1", "y2"], ["y0", "x2", "x7"], "BB90"),
     "bb108": lambda: bb(9, 6, ["x3", "y1", "y2"], ["y3", "x1", "x2"], "BB108"),
     "bb144": lambda: bb(12, 6, ["x3", "y1", "y2"], ["y3", "x1", "x2"], "BB144"),
+    "radial90": _radial90,
+    "lp6_2": _lp6_2,
+    "pp184": _pp184,
+    "pp256": _pp256,
+    "pp576": _pp576,
+    "apm1152": _apm1152,
+    "qt_d8_36": _qt_d8_36,
+    "qt_s3_288": _qt_s3_288,
 }
 
 
 def load(spec):
-    """spec: path to a JSON code file, or 'family[:args]' such as 'qr:47'."""
+    """spec: path to a JSON code / import / construction file, or 'family[:args]'."""
     if spec.endswith(".json"):
+        base_dir = os.path.dirname(os.path.abspath(spec))
         with open(spec) as f:
-            return CSSCode.from_json(json.load(f))
+            d = json.load(f)
+        if isinstance(d, dict) and d.get("schema") == "ftqc_codes-import-1":
+            from . import interchange
+            return interchange.load_import_manifest(d, base_dir=base_dir)
+        if isinstance(d, dict) and d.get("schema") == "ftqc_codes-construction-spec-1":
+            from . import constructions
+            return constructions.from_spec(d, base_dir=base_dir)
+        return CSSCode.from_json(d)
     fam, _, arg = spec.partition(":")
     fam = fam.lower()
     if fam in NAMED and not arg:

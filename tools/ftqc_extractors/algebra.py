@@ -3,6 +3,8 @@
 from itertools import combinations
 from math import comb
 
+from ftqc_codes import certify as _fc_certify, constructions as _fc_constructions
+
 
 class Limit(Exception):
     """A calculation exceeded its explicit work budget."""
@@ -79,6 +81,21 @@ def seed(rows):
 
 
 def hgp(a, na, b, nb):
+    """Tillich-Zemor hypergraph product routed through `ftqc_codes.constructions.hgp`."""
+    if na >= 1 and nb >= 1 and a and b:
+        try:
+            code = _fc_constructions.hgp(
+                a,
+                na,
+                b,
+                nb,
+                max_n=10_000_000,
+                max_rows=10_000_000,
+                max_nnz=100_000_000,
+            )
+            return code.n, code.hx, code.hz
+        except _fc_certify.Refusal as exc:
+            raise ValueError(str(exc)) from None
     ma, mb = len(a), len(b)
     offset = na * nb
     at, bt = transpose(a, na), transpose(b, nb)

@@ -1,26 +1,8 @@
 """Audited optional drivers for external QEC decoders (`Tesseract`, `PyMatching`, `ldpc`,
 `Chromobius`, `MWPF`, `relay_bp`), following the BootLoops untrusted-solver pattern.
 
-Primary external target:
-  * **Tesseract** (`quantumlib/tesseract-decoder`, Apache-2.0):
-    L. A. Beni et al. (Google Quantum AI), "Tesseract: A Search-Based Decoder for
-    Quantum Error Correction", arXiv:2503.10988 (2025); arXiv:2602.02985 (2026).
-    Driven via exact Stim `.dem` serialization -> `TesseractConfig.compile_decoder()`
-    -> `decode_to_errors(syndrome)` (which returns exact DEM mechanism indices, so
-    `ftqc_decoders` independently audits syndrome agreement, soft weight, and logical
-    observable flips!).
-
-Additional optional backends:
-  * **PyMatching v2** (`pymatching`, Apache-2.0): O. Higgott & C. Gidney, Quantum 9, 1600 (2025), arXiv:2303.15933.
-  * **ldpc v2** (`ldpc`, MIT): `BpOsdDecoder`, `BpLsdDecoder`, `BeliefFindDecoder`
-    (Roffe et al., arXiv:2005.07016; Hillmann et al., Nat. Commun. 16, 8214, 2025, arXiv:2406.18655).
-  * **Chromobius** (`chromobius`, Apache-2.0): C. Gidney & C. Jones, arXiv:2312.08813.
-
-Untrusted-solver audit rule:
-  External binaries/extensions are NEVER trusted blindly: every candidate mechanism
-  vector `e_hat` returned by an external backend is independently verified against
-  `problem.syndrome_of(e_hat) == syndrome` and scored with `problem`'s exact integer
-  weights (`soft_weight_of`).
+Uses `scipy.sparse.csc_matrix` (`O(nnz)`) whenever `scipy` is available so large
+high-rate blocks (`n=256..2304+`) avoid dense check-matrix allocations.
 
 Zero `float` or `complex` literals or `float()` calls appear in this module.
 """
@@ -58,6 +40,7 @@ def probe_external_backends() -> dict[str, dict[str, Any]]:
         "chromobius": "chromobius",
         "mwpf": "mwpf",
         "relay_bp": "relay_bp",
+        "scipy": "scipy",
     }
     report: dict[str, dict[str, Any]] = {}
     for key, mod_name in pkg_map.items():
@@ -72,6 +55,38 @@ def probe_external_backends() -> dict[str, dict[str, Any]]:
             except Exception as exc:
                 report[key] = {"available": False, "module": mod_name, "error": str(exc)}
     return report
+
+
+def build_check_matrix_for_external(
+    problem: DecodingProblem,
+    *,
+    prefer_sparse: bool = True,
+) -> tuple[Any, str]:
+    """Build `(H, representation)` as `scipy.sparse.csc_matrix` (`O(nnz)`) when available, else dense `uint8`."""
+    import numpy as np
+
+    if prefer_sparse and importlib.util.find_spec("scipy.sparse") is not None:
+        from scipy import sparse
+
+        rows: list[int] = []
+        cols: list[int] = []
+        for col_j in range(problem.num_mechanisms):
+            for row_i in bit_positions(problem.mech_detectors[col_j]):
+                rows.append(row_i)
+                cols.append(col_j)
+        data = np.ones(len(rows), dtype=np.uint8)
+        mat = sparse.csc_matrix(
+            (data, (rows, cols)),
+            shape=(problem.num_checks, problem.num_mechanisms),
+            dtype=np.uint8,
+        )
+        return mat, "scipy_csc"
+
+    h_mat = np.zeros((problem.num_checks, problem.num_mechanisms), dtype=np.uint8)
+    for r_i, row_m in enumerate(problem.check_rows):
+        for c_j in bit_positions(row_m):
+            h_mat[r_i, c_j] = 1
+    return h_mat, "numpy_dense"
 
 
 def _build_indexed_stim_dem(problem: DecodingProblem) -> tuple[str, list[int]]:
@@ -132,18 +147,18 @@ def decode_external(
     backend: str = "tesseract",
     options: dict[str, Any] | None = None,
 ) -> DecodeResult:
-    """Dispatch `syndrome` to an external decoder (`tesseract`, `pymatching`, `ldpc_*`, `chromobius`)
-    and independently audit the returned recovery against `problem`.
-    """
+    """Dispatch `syndrome` to an external decoder and independently audit the returned recovery."""
     opts = dict(options or {})
     if syndrome < 0 or (syndrome >> problem.num_checks):
         raise RefusalError("SYNDROME-OUT-OF-RANGE", f"Syndrome exceeds {problem.num_checks} checks")
+
+    prefer_sparse = bool(opts.get("prefer_sparse", True))
 
     if backend == "tesseract":
         if importlib.util.find_spec("stim") is None or importlib.util.find_spec("tesseract_decoder") is None:
             raise RefusalError(
                 "BACKEND-NOT-INSTALLED",
-                "External backend 'tesseract' requires `stim` and `tesseract-decoder` (e.g. `/home/ike/.venvs/ftqc_decoders/bin/python`)",
+                "External backend 'tesseract' requires `stim` and `tesseract-decoder`",
             )
         import numpy as np
         import stim
@@ -154,7 +169,6 @@ def decode_external(
         det_beam = int(opts.get("det_beam", 20))
         pqlimit = int(opts.get("pqlimit", 200_000))
         beam_climbing = bool(opts.get("beam_climbing", True))
-        # Set `merge_errors=False` so `decode_to_errors` indices match `dem_to_mech` 1-to-1!
         cfg = tesseract.TesseractConfig(
             dem=s_dem,
             det_beam=det_beam,
@@ -197,12 +211,7 @@ def decode_external(
         import numpy as np
         import pymatching
 
-        # Pass exact integer `problem.weights` to `Matching.from_check_matrix` so PyMatching
-        # solves the identical integer-weighted matching and returns full mechanism recovery `e_hat`!
-        h_mat = np.zeros((problem.num_checks, problem.num_mechanisms), dtype=np.uint8)
-        for r_i, row_m in enumerate(problem.check_rows):
-            for c_j in bit_positions(row_m):
-                h_mat[r_i, c_j] = 1
+        h_mat, mat_kind = build_check_matrix_for_external(problem, prefer_sparse=prefer_sparse)
         matcher = pymatching.Matching.from_check_matrix(h_mat, weights=list(problem.weights))
         syn_arr = np.zeros(problem.num_checks, dtype=np.uint8)
         for d_idx in bit_positions(syndrome):
@@ -217,7 +226,11 @@ def decode_external(
             syndrome,
             e_mask,
             decoder_label="external:pymatching",
-            extra_stats={"backend": "pymatching", "version": str(getattr(pymatching, "__version__", "installed"))},
+            extra_stats={
+                "backend": "pymatching",
+                "matrix_format": mat_kind,
+                "version": str(getattr(pymatching, "__version__", "installed")),
+            },
         )
 
     if backend in ("ldpc_bposd", "ldpc_bplsd", "ldpc_belieffind"):
@@ -226,10 +239,7 @@ def decode_external(
         import ldpc
         import numpy as np
 
-        h_mat = np.zeros((problem.num_checks, problem.num_mechanisms), dtype=np.uint8)
-        for r_i, row_m in enumerate(problem.check_rows):
-            for c_j in bit_positions(row_m):
-                h_mat[r_i, c_j] = 1
+        h_mat, mat_kind = build_check_matrix_for_external(problem, prefer_sparse=prefer_sparse)
         channel = [p.numerator / p.denominator for p in problem.priors]
         max_iter = int(opts.get("max_iters", 30))
 
@@ -272,7 +282,11 @@ def decode_external(
             syndrome,
             e_mask,
             decoder_label=f"external:{backend}",
-            extra_stats={"backend": "ldpc", "version": str(getattr(ldpc, "__version__", "installed"))},
+            extra_stats={
+                "backend": "ldpc",
+                "matrix_format": mat_kind,
+                "version": str(getattr(ldpc, "__version__", "installed")),
+            },
         )
 
     if backend == "chromobius":
@@ -293,7 +307,6 @@ def decode_external(
         for o_i in range(problem.num_observables):
             if int(obs_bytes[o_i // 8]) & (1 << (o_i % 8)):
                 obs_mask |= 1 << o_i
-        # Chromobius predicts observables directly without returning an internal error vector
         return DecodeResult(
             decoder="external:chromobius",
             error_mask=0,

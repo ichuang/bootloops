@@ -8,7 +8,7 @@ The arrows show what one tool supplies to another in selected studies.
 
 | Tool | Input and question | Evidence |
 |---|---|---|
-| [ftqc_codes](ftqc_codes/GUIDE.md) | Given CSS check matrices, which logical errors can the memory detect? | Code parameters, bounds on X and Z distance, witnesses and hierarchical decoding guarantees. |
+| [ftqc_codes](ftqc_codes/GUIDE.md) | Given CSS check matrices or a high-rate algebraic seed, which logical errors can the memory detect and how are its logical slots addressed? | Code parameters, construction ancestry (`ftqc_codes-construction-1`), paired logical bases (`ftqc_codes-basis-1`), lift symmetries, bounds on X and Z distance, witnesses and hierarchical decoding guarantees. |
 | [ftqc_extractors](ftqc_extractors/GUIDE.md) | Which logical measurements can a fixed apparatus perform, and what fault distance does a surgery sequence preserve? | Fixed-coupler graphs and bridges, transversal block readings, padded hypergraph surgery, physical fault witnesses, and resource-conditional logical T receipts. |
 | [ftqc_faults](ftqc_faults/GUIDE.md) | How do faults propagate in this circuit, and can an implementation replace a reference under a specified fault model? | Physical fault signatures, distance intervals and witnesses from the audit engine. ZX equivalence, synthesis, flag decoder tables, and stochastic contracts from the ZX engine. |
 | [ftqc_decoders](ftqc_decoders/GUIDE.md) | Does a polynomial-time decoder achieve the code or circuit distance without trapping sets, and what operational error rate does it certify? | Operational radius proofs, split-stabilizer trapping-set witnesses, two-stage metacheck repair, Peierls cluster LER bounds, Stim `.dem` export and audited external (`Tesseract`, `PyMatching`, `ldpc`) runs. |
@@ -160,6 +160,16 @@ From BootLoops, run the nine suites, including the separate audit and ZX engine 
 ```sh
 python3 run_selftests.py ftqc_codes ftqc_audit ftqc_extractors ftqc_decoders ftqc_gadgets ftqc_zx ftqc_compose ftqc_uncompute ftqc_magic
 python3 run_selftests.py ftqc_faults
+```
+
+## Addressable high-rate blocks and single-slot Magic delivery
+
+`ftqc_codes` emits replayable `ftqc_codes-construction-1` and `ftqc_codes-basis-1` receipts binding ordered matrices, named symplectic logical slots, stabilizer dressings, and lift symmetries (`LP`, `2BGA`, Quantum Tanner, `radial90`, and pair-partition `PP256` / `APM1152`). `ftqc_extractors.addressable_surgery` installs signed slot measurements and classical feed-forward on explicit coupler inventories, flattens schedules through `ftqc_faults` and `ftqc_decoders`, verifies typed residual contracts in `ftqc_compose`, and prices reaction stalls in `ftqc_uncompute`. `ftqc_compose.addressable_magic` delivers verified single-output `ftqc_magic` $T$ states via `occupied_swap` into a named resource slot while preserving untouched data slots and Bell references. [High-rate QEC roadmap](../PLANS/high-rate-qec.md)
+
+```sh
+python3 -m ftqc_codes construct pp256 -o "$out/pp256.construct.json"
+python3 -m ftqc_codes basis lp6_2 --method spectral -o "$out/lp6_2.basis.json"
+PYTHONPATH=tools python3 -m unittest ftqc_extractors.test_highrate_qec ftqc_compose.test_addressable_magic
 ```
 
 ## Supply states from inside a CSS memory

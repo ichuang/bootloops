@@ -64,6 +64,10 @@ def evaluate(spec):
         from .magic_batch import consume_batch
 
         return consume_batch(spec)
+    if spec["kind"] == "addressable-magic-t":
+        from .addressable_magic import consume_addressable_lp_t
+
+        return consume_addressable_lp_t(spec)
     if spec["kind"] == "insitu-retries":
         from .insitu import retries
         return retries(spec)

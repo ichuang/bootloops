@@ -231,3 +231,100 @@ def price_circuit_with_zx_contract(
         "total_wire_ticks_upper": str(total_volume),
         "total_logical_escape_upper": str(total_escape),
     }
+
+
+def estimate_reaction_decoder_latency(
+    circuit_or_depth: KickMixCircuit | int,
+    schedule_metrics: dict[str, Any],
+    *,
+    decoder_stall_ticks_per_reaction: int | Fraction | str = 0,
+    shuttle_ticks_per_reaction: int = 0,
+    surviving_logicals: int = 1,
+    bare_code_k: int | None = None,
+    layout_name: str = "planar_local",
+) -> dict[str, Any]:
+    """Compute exact / outward-rounded reaction-depth latency and decoder-stall spacetime budget.
+
+    Distinguishes bare code rate `k/n` from `physical_qubits_per_surviving_logical`
+    during active surgery/measurement schedules, and charges data-qubit idling across
+    all measured classical decoder stall ticks. Zero binary floating-point values are used.
+    """
+    if isinstance(circuit_or_depth, KickMixCircuit):
+        rx_depth = int(circuit_or_depth.reaction_depth())
+    elif type(circuit_or_depth) is int and circuit_or_depth >= 0:
+        rx_depth = circuit_or_depth
+    else:
+        raise ValueError("circuit_or_depth must be a KickMixCircuit or nonnegative int")
+
+    for req_k in ("num_data_qubits", "peak_ancilla_qubits", "rounds_per_reaction", "ticks_per_round"):
+        val = schedule_metrics.get(req_k)
+        if type(val) is not int or val < 0:
+            raise ValueError(f"schedule_metrics[{req_k!r}] must be a nonnegative int")
+
+    n_data = schedule_metrics["num_data_qubits"]
+    n_anc = schedule_metrics["peak_ancilla_qubits"]
+    rounds_per_rx = schedule_metrics["rounds_per_reaction"]
+    ticks_per_rnd = schedule_metrics["ticks_per_round"]
+    couplers = schedule_metrics.get("installed_couplers", 0)
+
+    if n_data < 1:
+        raise ValueError("num_data_qubits must be >= 1")
+    if type(couplers) is not int or couplers < 0:
+        raise ValueError("installed_couplers must be a nonnegative int")
+    if type(shuttle_ticks_per_reaction) is not int or shuttle_ticks_per_reaction < 0:
+        raise ValueError("shuttle_ticks_per_reaction must be a nonnegative int")
+    if type(surviving_logicals) is not int or surviving_logicals < 1:
+        raise ValueError("surviving_logicals must be a positive int")
+    if bare_code_k is not None and (type(bare_code_k) is not int or bare_code_k < 0):
+        raise ValueError("bare_code_k must be a nonnegative int or None")
+
+    if type(decoder_stall_ticks_per_reaction) is int:
+        stall_per_rx = Fraction(decoder_stall_ticks_per_reaction, 1)
+    elif isinstance(decoder_stall_ticks_per_reaction, Fraction):
+        stall_per_rx = decoder_stall_ticks_per_reaction
+    elif isinstance(decoder_stall_ticks_per_reaction, str):
+        stall_per_rx = Fraction(decoder_stall_ticks_per_reaction)
+    else:
+        raise ValueError("decoder_stall_ticks_per_reaction must be int, Fraction, or exact string")
+
+    if stall_per_rx < 0:
+        raise ValueError("decoder_stall_ticks_per_reaction must be nonnegative")
+
+    ctx = Context(prec=28, rounding=ROUND_CEILING)
+    peak_total = n_data + n_anc
+    active_rounds = rx_depth * rounds_per_rx
+    active_wall_ticks = active_rounds * ticks_per_rnd
+    shuttle_wall_ticks = rx_depth * shuttle_ticks_per_reaction
+
+    total_stall_frac = Fraction(rx_depth, 1) * stall_per_rx
+    stall_ticks_ceil = (total_stall_frac.numerator + total_stall_frac.denominator - 1) // total_stall_frac.denominator
+    stall_ticks_dec = ctx.divide(Decimal(total_stall_frac.numerator), Decimal(total_stall_frac.denominator))
+
+    total_wall_ticks_ceil = active_wall_ticks + shuttle_wall_ticks + stall_ticks_ceil
+    active_qubit_ticks = (active_wall_ticks + shuttle_wall_ticks) * peak_total
+    stall_idle_qubit_ticks_ceil = stall_ticks_ceil * n_data
+    total_qubit_ticks_ceil = active_qubit_ticks + stall_idle_qubit_ticks_ceil
+
+    return {
+        "layout": str(layout_name),
+        "reaction_depth": rx_depth,
+        "rounds_per_reaction": rounds_per_rx,
+        "active_rounds": active_rounds,
+        "ticks_per_round": ticks_per_rnd,
+        "active_wall_ticks": active_wall_ticks,
+        "shuttle_wall_ticks": shuttle_wall_ticks,
+        "decoder_stall_ticks_exact": f"{total_stall_frac.numerator}/{total_stall_frac.denominator}",
+        "decoder_stall_ticks_upper": str(stall_ticks_dec),
+        "decoder_stall_ticks_ceil": stall_ticks_ceil,
+        "total_wall_ticks_ceil": total_wall_ticks_ceil,
+        "installed_couplers": couplers,
+        "peak_data_qubits": n_data,
+        "peak_ancilla_qubits": n_anc,
+        "peak_total_qubits": peak_total,
+        "surviving_logicals": surviving_logicals,
+        "bare_code_rate": f"{bare_code_k}/{n_data}" if bare_code_k is not None else None,
+        "physical_qubits_per_surviving_logical": f"{peak_total}/{surviving_logicals}",
+        "active_qubit_ticks": active_qubit_ticks,
+        "stall_idle_qubit_ticks_ceil": stall_idle_qubit_ticks_ceil,
+        "total_qubit_ticks_ceil": total_qubit_ticks_ceil,
+    }
