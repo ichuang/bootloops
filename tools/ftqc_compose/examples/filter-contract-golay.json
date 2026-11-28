@@ -1,0 +1,24 @@
+{
+  "kind": "filter-contract",
+  "level": "physical",
+  "p": "1/10000",
+  "tree": {
+    "n": 23,
+    "wmin": {
+      "X": 8,
+      "Z": 7
+    },
+    "sequence": "XZXZXZ"
+  },
+  "leaf": {
+    "locations": 151,
+    "X": {
+      "junk": 70,
+      "local": 5
+    },
+    "Z": {
+      "junk": 71,
+      "local": 5
+    }
+  }
+}

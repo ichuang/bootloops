@@ -1,0 +1,142 @@
+{
+  "contract": {
+    "acceptance_lower": "124067921525479007/16000000000000000000",
+    "acceptance_lower_dec": "0.0077542450953424379375",
+    "active_qubits": 9,
+    "conditional_infidelity_upper": "1678707726013997/124067921525479007000",
+    "conditional_infidelity_upper_dec": "0.000013530554114016103002218062575456017195496566045752",
+    "correlation_mode": "INDEPENDENT_SINGLE",
+    "distance": 2,
+    "expected_wire_ticks_per_output_upper": "1296000000000000000000/124067921525479007",
+    "expected_wire_ticks_per_output_upper_dec": "10445.891122096770735204575211331540536515373148646",
+    "input_error_rate": "1/1000",
+    "k_outputs": 1,
+    "leading_order_coeff": 36,
+    "n_inputs": 9,
+    "name": "bgm26_9t_1t_d2",
+    "optimality_gap_inputs": 0,
+    "optimality_lower_bound_n": 9,
+    "premises": [
+      "independent twirled Z-input errors of rate p on n noisy |T> states",
+      "ideal stabilizer measurements and postselection on all +1 outcomes"
+    ],
+    "target_label": "T",
+    "total_wires": 9,
+    "unnormalized_failure_upper": "1678707726013997/16000000000000000000000",
+    "unnormalized_failure_upper_dec": "1.049192328758748125e-7"
+  },
+  "details": {
+    "collapse": {
+      "denom_scale": 131072,
+      "exact_distance": 2,
+      "g00_scaled": {
+        "a": 1024,
+        "b": 0
+      },
+      "harmful_pattern_counts": [
+        0,
+        0,
+        36,
+        45,
+        90,
+        75,
+        76,
+        15,
+        6,
+        1
+      ],
+      "optimality": {
+        "lower_bound_n": 9,
+        "source": "BGM26_Prop5_Prop7",
+        "tight_known": true
+      },
+      "rational_polynomials": {
+        "acceptance_poly_coeffs": [
+          "1/128",
+          "-15/256",
+          "87/256",
+          "-1",
+          "51/32",
+          "-21/16",
+          "7/16"
+        ],
+        "damage_poly_coeffs": [
+          "0",
+          "0",
+          "27/256",
+          "-141/256",
+          "81/64",
+          "-3/2",
+          "7/8",
+          "-3/16"
+        ],
+        "ideal_acceptance": "1/128",
+        "leading_error_ratio": "27/2"
+      }
+    }
+  },
+  "exports": {
+    "ftqc_compose_ancilla_contract": {
+      "atom_tag": "t1",
+      "correlation_mode": "INDEPENDENT_SINGLE",
+      "independent_contract": {
+        "fail": "0.000013530554114016103002218062575456017195496566045752",
+        "modes": [
+          [
+            1,
+            "0.000013530554114016103002218062575456017195496566045752"
+          ]
+        ],
+        "pi": "0.99998646944588598389699778193742454398280450343395"
+      },
+      "interleaving": null,
+      "local_stochastic_contract": {
+        "equivalents": {
+          "t1": "0.000013530554114016103002218062575456017195496566045752"
+        }
+      },
+      "source_name": "bgm26_9t_1t_d2",
+      "target": "T"
+    },
+    "ftqc_compose_summary": {
+      "acceptance_prob_lo": "0.0077542450953424379375",
+      "conditional_failure_hi": "0.000013530554114016103002218062575456017195496566045752",
+      "distance": 2,
+      "expected_wire_ticks_per_output_hi": "10445.891122096770735204575211331540536515373148646",
+      "factory_name": "bgm26_9t_1t_d2",
+      "target": "T",
+      "unnormalized_accepted_failure_hi": "1.049192328758748125e-7"
+    },
+    "ftqc_extractors_record": {
+      "conditional_infidelity_hi": "0.000013530554114016103002218062575456017195496566045752",
+      "correlation_mode": "INDEPENDENT_SINGLE",
+      "expected_wire_ticks_per_output_hi": "10445.891122096770735204575211331540536515373148646",
+      "fault_distance": 2,
+      "k_outputs": 1,
+      "kind": "ftqc_magic_source",
+      "name": "bgm26_9t_1t_d2",
+      "peak_active_qubits": 9,
+      "target_state": "T"
+    },
+    "ftqc_uncompute_pricing": {
+      "magic_metadata": {
+        "t_correlation_mode": "INDEPENDENT_SINGLE",
+        "t_peak_active_qubits": 9,
+        "t_source": "bgm26_9t_1t_d2"
+      },
+      "t_factory_escape_hi": "0.000013530554114016103002218062575456017195496566045752",
+      "t_factory_wire_ticks": 10446
+    }
+  },
+  "kind": "signed_stabilizer",
+  "optimality_gap": {
+    "actual_n": 9,
+    "gap_inputs": 0,
+    "lower_bound_n": 9,
+    "source": "BGM26_Prop5_Prop7",
+    "tight_known": true
+  },
+  "schema": "ftqc_magic-receipt-1",
+  "source_sha256": "1a5d503e1270e39d00fcdb10e1f1fcec14849f06c4ff0442cf87b0d994d0fa99",
+  "spec_sha256": "86c69a8adaf8e0088015bcdf6913a6593070e407fd22c40476a0c73f0ba8f7bb"
+}

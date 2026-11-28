@@ -1,0 +1,1 @@
+{"schema":1,"kind":"fixed_graph","n":4,"checks":["+XXXX","+ZZZZ"],"vertices":4,"edges":[[0,1],[1,2],[2,3],[3,0]],"ports":[0,1,2,3],"cycles":[15],"routes":[7,7],"max_degree":7,"logical":"-YYII","target":2}

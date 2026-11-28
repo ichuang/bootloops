@@ -1,0 +1,24 @@
+{
+  "kind": "staged-gadget",
+  "operation": "rm15-phase",
+  "blocks": [
+    "data"
+  ],
+  "exponents": [
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1,
+    -1
+  ]
+}

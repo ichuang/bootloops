@@ -1,0 +1,40 @@
+{
+  "kind": "pipeline",
+  "p_phys": "1/1000",
+  "stages": [
+    {
+      "caliper_escape": {
+        "committed_rounds": 2,
+        "committed_syndrome": 1,
+        "continuation_probs": [
+          "4/5",
+          "4/5",
+          "4/5"
+        ],
+        "distance": 3,
+        "mode": "caliper",
+        "round_qubits": [
+          15,
+          35,
+          65,
+          98
+        ],
+        "terminal_accept_prob": "1/2",
+        "total_rounds": 4
+      },
+      "claimed_t_distance": 3,
+      "kind": "cultivation",
+      "variant": "msc3_z_flagged"
+    },
+    {
+      "factory": "bk_15_1_3_t",
+      "kind": "distillation",
+      "litinski": {
+        "d_X": 9,
+        "d_Z": 15,
+        "d_m": 9
+      },
+      "recycle": true
+    }
+  ]
+}

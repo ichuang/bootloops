@@ -1,0 +1,145 @@
+{
+  "kind": "CliffordCircuit",
+  "name": "shor_optimised_ZZZZ_prop_7_6",
+  "n_qubits": 7,
+  "input_qubits": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "output_qubits": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "all_wires_fault_free": false,
+  "fault_free_wires": [],
+  "ops": [
+    {
+      "kind": "PREP_0",
+      "qubits": [
+        4
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_0",
+      "qubits": [
+        5
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        0,
+        4
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        1,
+        5
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "PREP_PLUS",
+      "qubits": [
+        6
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        6,
+        4
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        6,
+        5
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "MEAS_X",
+      "qubits": [
+        6
+      ],
+      "mode": "noisy",
+      "label": "k3_flagA"
+    },
+    {
+      "kind": "PREP_PLUS",
+      "qubits": [
+        6
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        6,
+        4
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        6,
+        5
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "MEAS_X",
+      "qubits": [
+        6
+      ],
+      "mode": "noisy",
+      "label": "k4_flagB"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        2,
+        4
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "CX",
+      "qubits": [
+        3,
+        5
+      ],
+      "mode": "noisy"
+    },
+    {
+      "kind": "MEAS_Z",
+      "qubits": [
+        4
+      ],
+      "mode": "noisy",
+      "label": "k1"
+    },
+    {
+      "kind": "MEAS_Z",
+      "qubits": [
+        5
+      ],
+      "mode": "noisy",
+      "label": "k2"
+    }
+  ]
+}

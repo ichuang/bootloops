@@ -1,0 +1,95 @@
+{
+  "schema": "ftqc_codes-action-1",
+  "basis": {
+    "schema": "ftqc_codes-basis-1",
+    "code_name": "Steane",
+    "code_sha256": "43d0d339f39f0f000568993e5b3ddcec0982b7fa70254c8840e3d9d83ee52341",
+    "n": 7,
+    "k": 1,
+    "coordinate_order": "0..n-1",
+    "source": "binary_elimination",
+    "provenance": {},
+    "slots": [
+      {
+        "name": "q0",
+        "x": "+XIIIXXI",
+        "z": "+ZIIIZZI"
+      }
+    ],
+    "basis_sha256": "d6f7858c42d4513ddedfd8036231ceca262e33b44469b0efd268fdf3723e80a9"
+  },
+  "steps": [
+    {
+      "layer": [
+        [
+          "H",
+          0
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          1
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          2
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          3
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          4
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          5
+        ]
+      ]
+    },
+    {
+      "layer": [
+        [
+          "H",
+          6
+        ]
+      ]
+    }
+  ],
+  "code_sha256": "43d0d339f39f0f000568993e5b3ddcec0982b7fa70254c8840e3d9d83ee52341",
+  "basis_sha256": "d6f7858c42d4513ddedfd8036231ceca262e33b44469b0efd268fdf3723e80a9",
+  "logical_x": [
+    {
+      "x_mask": 0,
+      "z_mask": 1,
+      "sign": 0
+    }
+  ],
+  "logical_z": [
+    {
+      "x_mask": 1,
+      "z_mask": 0,
+      "sign": 0
+    }
+  ]
+}
