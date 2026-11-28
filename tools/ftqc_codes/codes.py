@@ -111,6 +111,12 @@ def steane():
     return c
 
 
+def rm15():
+    """Punctured Reed-Muller code, with the first seven sites in Steane order."""
+    rows = [h | (h << 8) for h in steane().hx] + [255 << 7]
+    return CSSCode("RM15", 15, rows, gf2.nullspace(rows + [32767], 15))
+
+
 def golay():
     c = qr(23)
     c.name = "Golay"
@@ -292,6 +298,7 @@ def _qt_s3_288():
 
 
 FAMILIES = {
+    "rm15": (rm15, "punctured Reed-Muller [[15,1,3]]"),
     "steane": (steane, "Steane [[7,1,3]]"),
     "golay": (golay, "Golay [[23,1,7]]"),
     "qr": (qr, "qr:P, self-dual quadratic-residue CSS code, prime P = 7 mod 8"),

@@ -38,6 +38,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="ftqc_gadgets", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    staged = sub.add_parser("staged", help="certify a staged encoded gate or conversion")
+    staged.add_argument("spec")
+    staged.add_argument("-o", "--out")
     installed = sub.add_parser("installed-action", help="verify and audit a physical Clifford route")
     installed.add_argument("spec")
     installed.add_argument("-o", "--out")
@@ -101,6 +104,14 @@ def main(argv=None):
         return txt
 
     try:
+        if args.cmd == "staged":
+            from .staged import analyze
+            with open(args.spec) as stream:
+                rec = analyze(json.load(stream))
+            txt = emit(rec, args.out)
+            if not args.out:
+                print(txt, end="")
+            return int(rec["result"]["status"] != "proved")
         if args.cmd == "installed-action":
             from .installed_action import analyze
             with open(args.spec) as stream:
@@ -148,6 +159,11 @@ def main(argv=None):
         if args.cmd == "verify":
             with open(args.receipt) as f:
                 rec = json.load(f)
+            if rec.get("schema") == "ftqc_gadgets-staged-1":
+                from .staged import verify
+                verify(rec)
+                print("verified staged gadget")
+                return 0
             if rec.get("schema") in ("ftqc-gadgets-fresh-transfer-1","ftqc-gadgets-occupied-swap-1"):
                 from .magic_transfer import verify_transfer
                 verify_transfer(rec)
