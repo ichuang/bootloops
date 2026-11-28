@@ -35,6 +35,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Certified magic-state distillation factories, cultivation, and pipelines.",
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
+    switched = sub.add_parser("switched-source", help="certify fresh encoded plus through a switched T")
+    switched.add_argument("study", type=Path)
+    switched.add_argument("-o", "--out")
 
     p_check = sub.add_parser("check", help="Build a certified ftqc_magic-receipt-1 from a JSON spec")
     p_check.add_argument("spec", help="Path to input JSON specification")
@@ -77,6 +80,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     try:
+        if args.cmd == "switched-source":
+            from .staged import prepare
+            _write_or_print(prepare(json.loads(args.study.read_text())), args.out)
+            return 0
         if args.cmd in ("check", "verify"):
             spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
             if spec.get("kind") in ("insitu-rm15", "rm15-action"):

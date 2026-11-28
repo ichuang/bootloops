@@ -1,0 +1,22 @@
+{
+  "kind": "staged-gadget",
+  "operation": "raise",
+  "blocks": [
+    "data"
+  ],
+  "checks": [
+    1542,
+    3084,
+    1285
+  ],
+  "corrections": [
+    0,
+    29,
+    39,
+    58,
+    78,
+    83,
+    105,
+    116
+  ]
+}

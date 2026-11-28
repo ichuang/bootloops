@@ -35,6 +35,8 @@ def analyze(spec):
             result = check(spec)
         else:
             result = staged_switch.check(spec)
+        from .staged_work import workload
+        result["workload"] = workload(spec,result)
     except Counterexample as failure:
         result = dict(status="counterexample", witness=failure.evidence)
     return dict(schema="ftqc_gadgets-staged-1", spec=spec,

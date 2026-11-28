@@ -251,9 +251,28 @@ def _cmd_selftest(_ns: argparse.Namespace) -> int:
     return run_selftest()
 
 
+def _cmd_staged(ns):
+    from .adapters.staged import price
+    try:
+        result = price(parse_strict_json(Path(ns.study).read_text()), ns.feedback_ticks,
+                       ns.terminal_wire_ticks, ns.seed_wire_ticks)
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    _write_or_print(json.dumps(result, indent=2), ns.output)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="ftqc_uncompute", description="MBUC, spooky pebbling & superposition masking toolkit")
     sub = p.add_subparsers(dest="command", required=True)
+
+    direct = sub.add_parser("price-staged", help="price a verified staged gate")
+    direct.add_argument("study")
+    for option in ("feedback-ticks", "terminal-wire-ticks", "seed-wire-ticks"):
+        direct.add_argument("--" + option, required=True, type=int)
+    direct.add_argument("-o", "--output")
+    direct.set_defaults(func=_cmd_staged)
 
     p_chk = sub.add_parser("check", help="Validate a .kmx circuit or JSON spec and emit a receipt")
     p_chk.add_argument("target")
