@@ -49,6 +49,34 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(set(labels), set(range(5)))
         self.assertTrue(all(c.bit_count() <= 3 for c in paths))
 
+    def test_physical_surface_seam(self):
+        from copy import deepcopy
+        from ftqc_extractors.surgery_bench import surface_setting
+        from ftqc_extractors.installed_surgery import compile_schedule
+        from ftqc_extractors.surgery_layout import transport
+        from .surgery_faults import pair_search
+
+        for axis in "ZX":
+            setting = surface_setting(3, 3, axis)
+            spec, peak = compile_schedule(setting)
+            layout = setting["transport"]
+            transport(layout["initial"], layout["layers"], spec["ticks"], 1)
+            instrument = Instrument(spec)
+            self.assertEqual(peak, 35)
+            self.assertEqual(pair_search(instrument)["status"], "excluded")
+            self.assertEqual(instrument.audit(1, 100000)["status"], "proved")
+            wrong = deepcopy(spec)
+            # Complement a measured split-frame control with an unconditional
+            # Pauli on one of its targets; the ideal Choi check must reject it.
+            q = next(op[1] for row in wrong["ticks"] for op in row if op[0] == "Z_IF")
+            wrong["ticks"].extend([[["S", q]], [["S", q]]])
+            with self.assertRaises(ValueError):
+                Instrument(wrong)
+            broken = deepcopy(setting)
+            broken["couplers"].pop()
+            with self.assertRaises(ValueError):
+                compile_schedule(broken)
+
     def test_surface_patch_bridges(self):
         from .surgery_design import build
         from .surgery import Instrument

@@ -223,11 +223,25 @@ def architecture(case):
     )
 
 
+def surface_setting(distance, rounds, axis):
+    """Install one signed merge/split on fixed square-grid couplers."""
+    from ftqc_gadgets.surface_surgery import patch_pair
+
+    spec, coordinates = patch_pair(distance, rounds, axis)
+    setting = installed([(spec, list(range(len(coordinates))), None)],
+                        spec["n"], spec["checks"], 2, idles=True)
+    setting["transport"] = dict(initial=coordinates, gate_range=1,
+                                layers=[dict(moves=[], move_time=0, gate_time=1)
+                                        for _ in spec["ticks"]])
+    return setting
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "case",
         choices=[
+            "surface-zz", "surface-xx",
             "two-block",
             "two-block-parsimonious",
             "radial90",
@@ -245,9 +259,14 @@ def main():
             "parallel-parsimonious",
         ],
     )
+    ap.add_argument("--distance", type=int, default=3, help="rotated patch distance")
+    ap.add_argument("--rounds", type=int, help="surface merge and split repetitions (default: distance)")
     ap.add_argument("-o", required=True, type=Path)
     args = ap.parse_args()
-    if args.case.startswith("two-block"):
+    if args.case.startswith("surface-"):
+        result = surface_setting(args.distance, args.distance if args.rounds is None else args.rounds,
+                                 args.case[-1].upper())
+    elif args.case.startswith("two-block"):
         result = two_block("adapter" if args.case == "two-block" else "parsimonious")
     elif args.case == "hgp-padded":
         result = product_sequence([7], 3, [3, 3], 2, [3, 5], 2, [2, 2], 12)
