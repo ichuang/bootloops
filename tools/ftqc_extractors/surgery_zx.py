@@ -1,4 +1,4 @@
-"""Compile both ideal instruments of Theorem 9.1 and compare them with ftqc_zx."""
+"""Compile both ideal instruments of Theorem 9.1 and compare them with ftqc_faults.zx."""
 
 from types import SimpleNamespace
 from ftqc_faults.zx.diagram import CircuitOp, CliffordCircuit

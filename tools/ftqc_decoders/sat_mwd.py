@@ -46,8 +46,8 @@ def _ensure_tools_on_path() -> None:
 
 
 def find_cadical() -> str | None:
-    """Locate `cadical` via `FTQC_CODES_CADICAL`, `QECCERT_CADICAL`, or `PATH`."""
-    cand = os.environ.get("FTQC_CODES_CADICAL") or os.environ.get("QECCERT_CADICAL")
+    """Locate `cadical` via `FTQC_CODES_CADICAL` or `PATH`."""
+    cand = os.environ.get("FTQC_CODES_CADICAL")
     if cand:
         return cand if os.path.isfile(cand) and os.access(cand, os.X_OK) else None
     return shutil.which("cadical")

@@ -1,4 +1,4 @@
-"""Command-Line Interface for `ftqc_zx`.
+"""Command-Line Interface for `ftqc_faults.zx`.
 
 Exit codes (BootLoops convention):
   0 : PASS / certified / clean
@@ -288,11 +288,11 @@ def cmd_selftest(args: argparse.Namespace) -> int:
     else:
         for leg in report["legs"]:
             print(f"  [{'PASS' if leg['passed'] else 'FAIL'}] {leg['id']}: {leg['summary']}")
-        print(f"[{'PASS' if report['passed'] else 'FAIL'}] ftqc_zx battery ({report['passed_count']}/{report['total_count']} legs)")
+        print(f"[{'PASS' if report['passed'] else 'FAIL'}] ftqc_faults.zx battery ({report['passed_count']}/{report['total_count']} legs)")
     return 0 if report["passed"] else 1
 
 
-def build_parser(prog="ftqc_zx") -> argparse.ArgumentParser:
+def build_parser(prog="ftqc_faults zx") -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog=prog,
         description="ZX-calculus w-fault equivalence, Pauli-web verifier, FTQC synthesizer, and zero-float contract compiler.",
@@ -341,7 +341,7 @@ def build_parser(prog="ftqc_zx") -> argparse.ArgumentParser:
     p_syn.add_argument("--json", action="store_true")
     add_common_preset_args(p_syn)
 
-    p_con = sub.add_parser("contract", help="Emit zero-float outward-rounded ftqc_zx-contract-v1 JSON")
+    p_con = sub.add_parser("contract", help="Emit zero-float outward-rounded ftqc_faults-zx-contract-1 JSON")
     p_con.add_argument("target", help="JSON circuit file or preset name")
     p_con.add_argument("--p", default="1e-4", help="Exact physical fault rate string (e.g. 1e-4 or 1/10000)")
     p_con.add_argument("--idle-ratio", default="1", help="Exact idle-to-gate fault ratio (e.g. 1 or 1/10)")
@@ -362,7 +362,7 @@ def build_parser(prog="ftqc_zx") -> argparse.ArgumentParser:
     return ap
 
 
-def main(argv: list[str] | None = None, *, prog="ftqc_zx") -> int:
+def main(argv: list[str] | None = None, *, prog="ftqc_faults zx") -> int:
     parser = build_parser(prog)
     try:
         args = parser.parse_args(argv)

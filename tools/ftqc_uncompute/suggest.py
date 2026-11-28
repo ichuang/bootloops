@@ -3,7 +3,7 @@
 Detects suboptimal reversible uncomputation patterns across both `.kmx` (`KickMixCircuit`)
 and `ArithDAG` inputs, ranks rewrite candidates (`R1`–`R7`) by exact resource deltas
 `Delta(Toffoli, T, Rotations, Qubits, Depth, ReactionDepth, D_tr)`, prices physical QEC
-wire-tick spacetime against `ftqc_zx-contract-v1` gadget contracts, and synthesizes +
+wire-tick spacetime against `ftqc_faults-zx-contract-1` gadget contracts, and synthesizes +
 auto-verifies rewritten circuits/DAGs.
 
 Rules:
@@ -97,7 +97,7 @@ def _price_delta_wire_ticks(
 ) -> Decimal | None:
     if zx_contract is None:
         return None
-    if zx_contract.get("schema") != "ftqc_zx-contract-v1":
+    if zx_contract.get("schema") != "ftqc_faults-zx-contract-1":
         raise ValueError(f"Unsupported ZX contract schema: {zx_contract.get('schema')!r}")
     ctx = Context(prec=28, rounding=ROUND_CEILING)
     ec_wt = Decimal(str(zx_contract["enclosures"]["expected_wire_ticks_per_shot_hi"]))

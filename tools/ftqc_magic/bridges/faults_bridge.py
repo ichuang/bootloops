@@ -12,8 +12,6 @@ from ..matrix import BinaryFactory
 def _ensure_tools_on_syspath() -> None:
     for candidate in (
         Path(__file__).resolve().parents[2],
-        Path("/Volumes/t2/Documents/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
-        Path("/home/ike/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
     ):
         if (candidate / "ftqc_faults").is_dir():
             s = str(candidate)

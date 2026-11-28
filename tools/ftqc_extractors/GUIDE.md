@@ -202,7 +202,7 @@ Inputs specify the HGP seeds, the anticommuting logical_x and logical_z masks on
 
 The physical adapter is a verified-cat parity meter with direct access to the listed sites. Implementing the protocol on a particular fixed coupler network requires compiling and checking its routing and storage locations.
 
-## Cross-checks with ftqc_audit
+## Cross-checks with ftqc_faults.audit
 
 Compare the two fault propagators on an extractor or fixed T arm, replay a logical witness, or export a verified cat for a native strict-FT analysis. The [comparison guide](AUDIT.md) gives the commands and the input, acceptance and output assumptions for each claim.
 
@@ -210,7 +210,7 @@ Compare the two fault propagators on an extractor or fixed T arm, replay a logic
 
 Use input kind `gross_z` for the published BB144 unprimed Z setting. The exact backend computes and certifies both CSS distances. The measurement command exports the merged matrices, ideal readout and split frame. See the [gross-code guide](GROSS.md) for the input, coordinate conventions, proof format and scope.
 
-Input kind `gross_circuit` compiles the noisy BB144 operation. Use `schedule --probe X` or `schedule --probe Z` to export a native ftqc_audit circuit, and `check` or `verify` for its distance. [Noise model, optional input fields and proof search](GROSS_CIRCUIT.md)
+Input kind `gross_circuit` compiles the noisy BB144 operation. Use `schedule --probe X` or `schedule --probe Z` to export a native ftqc_faults.audit circuit, and `check` or `verify` for its distance. [Noise model, optional input fields and proof search](GROSS_CIRCUIT.md)
 
 ## Full block reading
 
@@ -230,7 +230,7 @@ The [partial transversal fixture](examples/partial-block-sequence.json) embeds t
 
 Run check and verify on [Z reading](examples/gross-block-Z.json) or [X reading](examples/gross-block-X.json). Each measures twelve independent corresponding parities and leaves twelve logical qubits. Each adds 72 data qubits and 144 check meters to the two memories. Proposition 3.9 gives phenomenological distance at least 12 with twelve syndrome rounds at each boundary. The underlying BB144 distance exclusion runs independently in both sectors.
 
-The circuit benchmark uses ideal encoded inputs, one noisy merge, noisy split and ideal terminal readout. Greedy disjoint CNOT layers have explicit idles on live wires. Separate X and Z probes protect the readout and surviving algebra. Use `schedule SPEC --probe X` or `--probe Z` to export them for ftqc_audit. For either reading the two probes give circuit distance in [3,12]: all faults on one or two distinct locations are excluded, and a weight-12 fault on data is replayed. The basis label on the dual experiment denotes the probe before global Hadamard conjugation.
+The circuit benchmark uses ideal encoded inputs, one noisy merge, noisy split and ideal terminal readout. Greedy disjoint CNOT layers have explicit idles on live wires. Separate X and Z probes protect the readout and surviving algebra. Use `schedule SPEC --probe X` or `--probe Z` to export them for ftqc_faults.audit. For either reading the two probes give circuit distance in [3,12]: all faults on one or two distinct locations are excluded, and a weight-12 fault on data is replayed. The basis label on the dual experiment denotes the probe before global Hadamard conjugation.
 
 ## Expansion and intermediate time
 
@@ -256,7 +256,7 @@ Use `injection_search` with memory, logicals, count and objective (`protected` o
 
 ### Closed physical Y probes
 
-Use an `injection_circuit` input with case `bb-uniform` (two rounds, correlation driver), `bb-uniform-three` (three rounds), `bb-asymmetric` (three rounds) or `hgp-release` (three rounds). Recompile the packaged Stim schedules with the pinned reference importer. ftqc_audit binds the first detector mask to the verified fixed checks, the next mask to all first-to-second round parities, and subsequent decoder checks to later rounds and the ideal terminal Pauli measurements. Ideal logical Y signs include the phase of iXZ. Fault responses and coefficients are evaluated on the exported physical channels. The reference HGP builder includes single-qubit depolarization and omits explicit raw reset flips and two-qubit depolarizing instructions. Its reported benchmark applies to that released circuit.
+Use an `injection_circuit` input with case `bb-uniform` (two rounds, correlation driver), `bb-uniform-three` (three rounds), `bb-asymmetric` (three rounds) or `hgp-release` (three rounds). Recompile the packaged Stim schedules with the pinned reference importer. ftqc_faults.audit binds the first detector mask to the verified fixed checks, the next mask to all first-to-second round parities, and subsequent decoder checks to later rounds and the ideal terminal Pauli measurements. Ideal logical Y signs include the phase of iXZ. Fault responses and coefficients are evaluated on the exported physical channels. The reference HGP builder includes single-qubit depolarization and omits explicit raw reset flips and two-qubit depolarizing instructions. Its reported benchmark applies to that released circuit.
 
 `python3 -m ftqc_extractors injection bb-uniform --faults modes.jsonl` exports every accepted physical location/mode, its exact probability, detector syndrome and pre-decoding logical mask. Add `--decode` in the study environment to apply BP+OSD and obtain the residual error mask. Operation indices count flattened non-annotation instructions other than TICK. The coefficient in the standard receipt counts first-order faults silent on all detectors, matching Appendix F. First-order coefficients are not finite-noise upper bounds.
 

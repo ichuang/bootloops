@@ -181,7 +181,7 @@ An external hypothesis has fields `op` (hypothesis), `id`, `ideal`, `inputs`, `o
 
 The canonical battery is registered as `selftest`. It requires Python 3.10+ and the sibling packages in this checkout. It covers empty and overlapping families, physical aliasing, all 512 two-level majority inputs, incompatible joins, conditional filters, tampered evidence, and the HGP proof and hook control. Replaying a receipt rebuilds the derivation against the input SHA-256. A scope or resource refusal produces no new receipt.
 
-Credit: Zhiyang He, Quynh T. Nguyen and Christopher A. Pattison, *Composable Quantum Fault-Tolerance*, §§2 and 4. The support operations and typed composition rules follow their framework. The classical fixtures and finite diagonal-Pauli HGP checks are BootLoops implementations. The HGP ideal-flow checks come from ftqc_extractors and its forward transporter from ftqc_audit.
+Credit: Zhiyang He, Quynh T. Nguyen and Christopher A. Pattison, *Composable Quantum Fault-Tolerance*, §§2 and 4. The support operations and typed composition rules follow their framework. The classical fixtures and finite diagonal-Pauli HGP checks are BootLoops implementations. The HGP ideal-flow checks come from ftqc_extractors and its forward transporter from ftqc_faults.audit.
 
 ## Level reduction
 

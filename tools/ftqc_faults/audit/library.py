@@ -161,4 +161,4 @@ def load(spec):
             return surface(parts[0], parts[1], parts[2] if len(parts) > 2 else "z", "bad" in parts)
     except IndexError:
         raise CircuitError(f"missing arguments for {fam}") from None
-    raise CircuitError(f"unknown gadget {fam!r}; see ftqc_audit.library")
+    raise CircuitError(f"unknown gadget {fam!r}; see ftqc_faults.audit.library")

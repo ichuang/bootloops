@@ -35,11 +35,9 @@ from .rings import PolyQ, parse_exact_fraction
 
 
 def _ensure_tools_on_syspath() -> None:
-    # Support running from repo root or scratch testing against bootloops/tools.
+    # Support running from the repository root without PYTHONPATH.
     for candidate in (
         Path(__file__).resolve().parents[1],
-        Path("/Volumes/t2/Documents/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
-        Path("/home/ike/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
     ):
         if (candidate / "ftqc_codes").is_dir():
             s = str(candidate)

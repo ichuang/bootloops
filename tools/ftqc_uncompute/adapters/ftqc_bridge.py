@@ -1,4 +1,4 @@
-"""Live bridge to sibling BootLoops FTQC packages (`ftqc_audit`, `ftqc_zx`, `ftqc_extractors`).
+"""Live bridge to sibling BootLoops FTQC packages (`ftqc_faults.audit`, `ftqc_faults.zx`, `ftqc_extractors`).
 
 100% Python standard library, MIT-licensed, zero float literals or float() calls.
 """
@@ -22,12 +22,12 @@ def _ensure_tools_on_syspath() -> None:
         sys.path.insert(0, tools_dir)
 
 
-def ftqc_audit_available() -> bool:
+def audit_available() -> bool:
     _ensure_tools_on_syspath()
     return importlib.util.find_spec("ftqc_faults") is not None
 
 
-def ftqc_zx_available() -> bool:
+def zx_available() -> bool:
     _ensure_tools_on_syspath()
     return importlib.util.find_spec("ftqc_faults") is not None
 
@@ -37,13 +37,13 @@ def ftqc_compose_available() -> bool:
     return importlib.util.find_spec("ftqc_compose") is not None
 
 
-def kmx_clifford_to_ftqc_audit_ticks(
+def kmx_clifford_to_audit_ticks(
     circuit: KickMixCircuit,
     *,
     prep_public_plus: bool = True,
 ) -> list[list[tuple[Any, ...]]]:
     """Lower a Clifford + `HMR` + `R` + single-qubit `Z if b` `KickMixCircuit` into
-    `ftqc_audit.Circuit` ticks (`R`, `RX`, `H`, `S`, `SDG`, `CX`, `MX`, `Z_IF`).
+    `ftqc_faults.audit.Circuit` ticks (`R`, `RX`, `H`, `S`, `SDG`, `CX`, `MX`, `Z_IF`).
 
     Raises `ValueError` if non-Clifford gates (`CCX`, `CCZ`, `CSWAP`, `T`) or multi-qubit
     classical feedback (`CZ ... if b`) appear without prior magic-state / gadget expansion.
@@ -70,13 +70,13 @@ def kmx_clifford_to_ftqc_audit_ticks(
         if kind in ANNOTATION_OPS:
             continue
         if kind in ("CCX", "CCZ", "CSWAP"):
-            raise ValueError(f"Non-Clifford {kind} requires magic-state gadget expansion before ftqc_audit export")
+            raise ValueError(f"Non-Clifford {kind} requires magic-state gadget expansion before ftqc_faults.audit export")
         if kind in ("PUSH_CONDITION", "POP_CONDITION"):
-            raise ValueError("ftqc_audit tick export supports direct `Z q if b` feedback; flatten condition stack first")
+            raise ValueError("ftqc_faults.audit tick export supports direct `Z q if b` feedback; flatten condition stack first")
 
         if op.condition is not None:
             if kind != "Z":
-                raise ValueError(f"ftqc_audit supports 1-qubit `Z_IF` feedback, got `{kind} ... if b{op.condition}`")
+                raise ValueError(f"ftqc_faults.audit supports 1-qubit `Z_IF` feedback, got `{kind} ... if b{op.condition}`")
             inverted, record = bit_values.get(op.condition, (False, None))
             q = op.qubits[0]
             if inverted:
@@ -108,7 +108,7 @@ def kmx_clifford_to_ftqc_audit_ticks(
                 ticks.append([("S", q)])
                 ticks.append([("S", q)])
             else:
-                raise ValueError(f"Non-Clifford Z_POW({op.angle}) cannot be exported directly to ftqc_audit")
+                raise ValueError(f"Non-Clifford Z_POW({op.angle}) cannot be exported directly to ftqc_faults.audit")
         elif kind == "CX":
             ticks.append([("CX", op.qubits[0], op.qubits[1])])
         elif kind == "CZ":
@@ -139,31 +139,31 @@ def kmx_clifford_to_ftqc_audit_ticks(
         elif kind == "NEG":
             continue  # An unconditional global phase has no stabilizer observable.
         else:
-            raise ValueError(f"Unsupported ftqc_audit operation {kind!r}")
+            raise ValueError(f"Unsupported ftqc_faults.audit operation {kind!r}")
 
     return ticks
 
 
-def audit_clifford_hmr_with_ftqc_audit(
+def audit_clifford_hmr(
     circuit: KickMixCircuit,
     *,
     name: str = "hmr_clifford_gadget",
 ) -> dict[str, Any]:
-    """Build and verify a live `ftqc_audit` certificate for a Clifford+HMR `KickMixCircuit`."""
+    """Build and verify a live `ftqc_faults.audit` certificate for a Clifford+HMR `KickMixCircuit`."""
     _ensure_tools_on_syspath()
-    from ftqc_faults import audit as ftqc_audit  # type: ignore[import-not-found]
+    from ftqc_faults import audit as audit_engine  # type: ignore[import-not-found]
 
-    ticks = kmx_clifford_to_ftqc_audit_ticks(circuit, prep_public_plus=True)
+    ticks = kmx_clifford_to_audit_ticks(circuit, prep_public_plus=True)
     pub = sorted(circuit.public_qubits()) if circuit.registers else list(range(circuit.num_qubits))
-    audit_circ = ftqc_audit.Circuit(ticks, n=circuit.num_qubits, outputs=pub, name=name)
-    rec, _model = ftqc_audit.build(audit_circ, max_weight=1)
-    ftqc_audit.verify(rec, full=True)
+    audit_circ = audit_engine.Circuit(ticks, n=circuit.num_qubits, outputs=pub, name=name)
+    rec, _model = audit_engine.build(audit_circ, max_weight=1)
+    audit_engine.verify(rec, full=True)
     return {
-        "ftqc_audit_version": ftqc_audit.VERSION,
+        "audit_version": audit_engine.VERSION,
         "num_ticks": len(audit_circ.ticks),
         "num_measurements": len(audit_circ.meas),
         "outputs": audit_circ.outputs,
-        "summary": ftqc_audit.summary(rec),
+        "summary": audit_engine.summary(rec),
         "verified": True,
     }
 
@@ -176,11 +176,11 @@ def price_circuit_with_zx_contract(
     t_factory_escape_hi: str | Fraction = "1e-12",
 ) -> dict[str, Any]:
     """Compute outward-rounded physical FTQC spacetime volume and logical failure budget
-    by combining logical gate/HMR counts from `circuit` with a certified `ftqc_zx-contract-v1`
+    by combining logical gate/HMR counts from `circuit` with a certified `ftqc_faults-zx-contract-1`
     EC/Clifford gadget contract and an `ftqc_compose` logical-T half-diamond bound (rational or Decimal str).
     """
-    if zx_contract.get("schema") != "ftqc_zx-contract-v1":
-        raise ValueError(f"Expected schema 'ftqc_zx-contract-v1', got {zx_contract.get('schema')!r}")
+    if zx_contract.get("schema") != "ftqc_faults-zx-contract-1":
+        raise ValueError(f"Expected schema 'ftqc_faults-zx-contract-1', got {zx_contract.get('schema')!r}")
     if zx_contract.get("verdict") != "CONTRACT-CERTIFIED":
         raise ValueError(f"Refusing uncertified ZX contract verdict {zx_contract.get('verdict')!r}")
 

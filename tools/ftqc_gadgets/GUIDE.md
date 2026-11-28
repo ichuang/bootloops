@@ -16,7 +16,7 @@ clone).
 ## PURPOSE
 
 Fault properties of Clifford gadgets that act on unknown inputs, and comparison of
-two gadgets fault by fault. `ftqc_audit` handles circuits that start from prepared
+two gadgets fault by fault. `ftqc_faults.audit` handles circuits that start from prepared
 qubits; this package adds what a fault-tolerance argument is actually made of:
 gates and error correction applied to an arbitrary encoded state, decoders, the
 conditions under which a gadget may be replaced by a simpler description of it.
@@ -206,7 +206,7 @@ From the BootLoops root with `export PYTHONPATH="$PWD/tools"`:
 Library gadgets (`library.py`): `prep:CODE,STATE[,raw|spec|tree=SEQ][,rounds=K]`,
 `cnot:CODE[,leaky]`, `idle:CODE`, `knill:CODE[,anc=METHOD]`,
 `steane_ec:CODE[,anc=METHOD][,rounds=K]`, `measure:CODE[,x|z]`, `seq_syndrome:CODE`,
-`fc:ftqc_audit_SPEC`; suffixes
+`fc:AUDIT_SPEC` (an audit-engine library circuit); suffixes
 `,ideal` and `,idles`. CODE is a ftqc_codes spec without commas, or `rep3`.
 
 Your own gadget, in Python:
@@ -255,7 +255,7 @@ Golay gadgets at t = 3 and larger two-level tests, about 5 minutes):
   every location subset, every Pauli label and every input Pauli, with the bounds
   written out separately in the test.
 - Refinement against brute-force effect tables; refinement of a gadget against its
-  idealized form equals `ftqc_audit`'s strict fault tolerance on five circuits.
+  idealized form equals `ftqc_faults.audit`'s strict fault tolerance on five circuits.
 - Coset-leader tables and unique radius against brute force (Golay: 2048 syndromes,
   unique through weight 3).
 - Known answers: transversal CX on Steane and Golay holds through t and is
@@ -439,9 +439,9 @@ Construction" (arXiv:2506.17181). Symbolic stabilizer states and fault tolerance
 a property over fault counts: K. Chen et al., "Verifying Fault-Tolerance of Quantum
 Error Correction Codes" (CAV 2025, arXiv:2501.14380). Teleportation-based error
 correction: E. Knill (2005). Syndrome extraction with encoded ancillas: A. Steane
-(1997). Fault model and simulator: ftqc_audit. Codes: ftqc_codes.
+(1997). Fault model and simulator: ftqc_faults.audit. Codes: ftqc_codes.
 
-Receipts use `ftqc_gadgets-receipt-1` and `ftqc_gadgets-composition-1`. The verifier also reads `gadgetcert-receipt-1` and `gadgetcert-composition-1` receipts.
+Receipts use `ftqc_gadgets-receipt-1` and `ftqc_gadgets-composition-1`.
 
 Two-level reduction binds each inner operation to its signed logical action on
 canonical encoded Bell inputs. Input and output order identifies the CNOT

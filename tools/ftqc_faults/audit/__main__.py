@@ -1,4 +1,4 @@
-"""Command line:  python3 -m ftqc_audit <command> ...   (with tools/ on PYTHONPATH)
+"""Command line:  python3 -m ftqc_faults audit <command> ...   (with tools/ on PYTHONPATH)
 
   analyze SPEC [-o receipt.json] [--max-weight W] [--strict S] [--heavier 1,2] [--legs A,B,S]
                [--cap N] [--workdir DIR] [--sat-timeout T]
@@ -17,7 +17,7 @@ from . import certify, library, stimleg
 from .circuit import CircuitError
 
 
-def main(argv=None, *, prog="ftqc_audit"):
+def main(argv=None, *, prog="ftqc_faults audit"):
     argv = sys.argv[1:] if argv is None else argv
     ap = argparse.ArgumentParser(prog=prog, description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)

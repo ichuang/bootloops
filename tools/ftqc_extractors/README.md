@@ -38,13 +38,13 @@ The example measures a weight-two logical Z on an eight-qubit HGP block. Two rou
 
 Static distance counts physical qubits in a nontrivial logical Pauli. Circuit distance counts faulty **locations** that evade all checks and change a protected result. One faulty CNOT can affect both operands. The circuit proofs assume an ideal input codespace and terminal syndrome. Include any routing gates or idle locations whose faults the claim should cover. An exact distance needs both a lower bound and a matching witness. A search that exhausts its budget leaves the obligation open.
 
-Receipts rest on ideal encoded inputs and terminal syndromes, on the listed locations only, and, for phenomenological bounds, on published theorems whose hypotheses are checked but not re-derived. The default exact backend and receipt replay run with the packages in this checkout. Generating SAT/LRAT evidence for `circuit` or `t_gate` additionally requires CaDiCaL. Run `python3 run_selftests.py ftqc_extractors` for the package tests. The guides cover the [input schema and exit codes](GUIDE.md), [logical T and resource assumptions](T_PROOFS.md), and [ftqc_audit cross-checks](AUDIT.md).
+Receipts rest on ideal encoded inputs and terminal syndromes, on the listed locations only, and, for phenomenological bounds, on published theorems whose hypotheses are checked but not re-derived. The default exact backend and receipt replay run with the packages in this checkout. Generating SAT/LRAT evidence for `circuit` or `t_gate` additionally requires CaDiCaL. Run `python3 run_selftests.py ftqc_extractors` for the package tests. The guides cover the [input schema and exit codes](GUIDE.md), [logical T and resource assumptions](T_PROOFS.md), and [ftqc_faults.audit cross-checks](AUDIT.md).
 
 ## Measure a gross-code logical Z
 
 The 12 port checks of the unprimed Z setting select one logical observable of the [[144,12,12]] bivariate bicycle memory. ftqc_extractors exports the ideal measurements, split-frame rule and merged CSS checks. The distance receipt proves that the resulting [[162,11,12]] code preserves distance 12 in both Pauli sectors. Its four lower bounds and four weight-12 witnesses can be replayed without an external solver. [Run the gross-code example](GROSS.md)
 
-With noisy syndrome extraction, the seven-round schedule has exact circuit distance 7 and the twelve-round schedule has exact distance 10. ftqc_extractors exports both CSS probes to ftqc_audit and verifies the lower bounds and matching physical faults. [Noisy schedule and replay instructions](GROSS_CIRCUIT.md)
+With noisy syndrome extraction, the seven-round schedule has exact circuit distance 7 and the twelve-round schedule has exact distance 10. ftqc_extractors exports both CSS probes to ftqc_faults.audit and verifies the lower bounds and matching physical faults. [Noisy schedule and replay instructions](GROSS_CIRCUIT.md)
 
 The [simultaneous injection study](INJECTION.md) constructs general CSS carrier Cliffords, checks selected Bell-pair preparations, and audits logical-Y source batches in the BB144 and HGP225 memories. [Injection example](examples/bb144-injection-4.json)
 

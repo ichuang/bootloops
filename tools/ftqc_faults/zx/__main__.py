@@ -1,4 +1,4 @@
-"""Module entrypoint (`python3 -m ftqc_zx`)."""
+"""Module entrypoint (`python3 -m ftqc_faults zx`)."""
 
 from __future__ import annotations
 

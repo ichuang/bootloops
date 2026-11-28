@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""ftqc_audit battery.  Default tier is stdlib-only (plus ftqc_codes from this repository).
+"""ftqc_faults.audit battery.  Default tier is stdlib-only (plus ftqc_codes from this repository).
 
-    python3 tools/ftqc_audit/selftest.py
-    python3 tools/ftqc_audit/selftest.py --heavy     # adds surface d = 5 and Golay preparation at order 2
+    python3 tools/ftqc_faults/audit/selftest.py
+    python3 tools/ftqc_faults/audit/selftest.py --heavy     # adds surface d = 5 and Golay preparation at order 2
 
 The SAT leg needs cadical and the Stim leg needs the stim Python package; each skips
 with a named line when its engine is absent.  Exit 0 only if every check that ran passed.
@@ -518,7 +518,7 @@ def t_cli():
         out = os.path.join(wd, "r.json")
 
         def run(*args):
-            return subprocess.run([sys.executable, "-m", "ftqc_audit", *args], env=env, cwd=wd,
+            return subprocess.run([sys.executable, "-m", "ftqc_faults", "audit", *args], env=env, cwd=wd,
                                   capture_output=True, text=True)
         p = run("analyze", "surface:3,2", "-o", out)
         check("cli analyze exits 0", p.returncode == 0 and "circuit distance 3" in p.stdout, p.stderr[-300:])
@@ -545,7 +545,7 @@ def main():
         t = time.monotonic()
         fn(*args)
         print(f"      {fn.__name__:12s} {time.monotonic() - t:6.2f} s")
-    print(f"ftqc_audit selftest: {len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped "
+    print(f"ftqc_faults.audit selftest: {len(PASS)} passed, {len(FAIL)} failed, {len(SKIP)} skipped "
           f"in {time.monotonic() - t0:.1f} s")
     if FAIL:
         print("FAILED: " + "; ".join(sorted(set(FAIL))[:12]))

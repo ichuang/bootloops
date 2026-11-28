@@ -17,7 +17,7 @@ QUANTITIES = ("d_x", "d_z", "wmin_x", "wmin_z")
 
 
 def find_cadical():
-    cand = os.environ.get("FTQC_CODES_CADICAL") or os.environ.get("QECCERT_CADICAL")
+    cand = os.environ.get("FTQC_CODES_CADICAL")
     if cand:
         return cand if os.path.isfile(cand) and os.access(cand, os.X_OK) else None
     return shutil.which("cadical")

@@ -1,4 +1,4 @@
-"""ftqc_zx — ZX-calculus fault equivalence, Pauli-web analysis, and FTQC gadget certifier."""
+"""ftqc_faults.zx — ZX-calculus fault equivalence, Pauli-web analysis, and FTQC gadget certifier."""
 
 from .adapters import (
     audit_pyzx_rewrite,

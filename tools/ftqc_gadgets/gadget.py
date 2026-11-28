@@ -1,6 +1,6 @@
 """Gadgets: Clifford circuits with input blocks, output blocks and decoders.
 
-A gadget is compiled to a ftqc_audit circuit in which nothing is left open:
+A gadget is compiled to a ftqc_faults.audit circuit in which nothing is left open:
 
   input block   Each input block arrives as one half of a noiseless encoded Bell
                 pair whose other half is k reference qubits that are never touched

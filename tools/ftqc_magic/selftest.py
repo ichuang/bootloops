@@ -20,13 +20,6 @@ PKG_DIR = Path(__file__).resolve().parent
 TOOLS_DIR = PKG_DIR.parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
-for _cand in (
-    Path("/Volumes/t2/Documents/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
-    Path("/home/ike/RESEARCH-quantum-circuits-bootloops-2026/bootloops/tools"),
-):
-    if (_cand / "ftqc_codes").is_dir() and str(_cand) not in sys.path:
-        sys.path.insert(0, str(_cand))
-        break
 
 from ftqc_magic import (  # noqa: E402
     CATALOG_NAMES,

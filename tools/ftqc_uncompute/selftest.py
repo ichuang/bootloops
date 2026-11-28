@@ -274,25 +274,25 @@ def _leg_l6_receipts_and_bridges() -> str:
             assert ok and not errs, f"Receipt verify failed for {ef.name}: {errs}"
 
     bridge_notes: list[str] = ["5 example receipts verified"]
-    if adapters.ftqc_audit_available():
+    if adapters.audit_available():
         hmr_c = KickMixCircuit.from_kmx(
             'REGISTER r0 "x"\nAPPEND_TO_REGISTER q0 r0\nCX q0 q1\nHMR q1 b0\nZ q0 if b0\nBIT_STORE0 b0\n'
         )
-        rep = adapters.audit_clifford_hmr_with_ftqc_audit(hmr_c)
+        rep = adapters.audit_clifford_hmr(hmr_c)
         assert rep["verified"]
-        bridge_notes.append("ftqc_audit live")
-    if adapters.ftqc_zx_available():
+        bridge_notes.append("ftqc_faults.audit live")
+    if adapters.zx_available():
         try:
-            from ftqc_faults import zx as ftqc_zx  # type: ignore[import-not-found]
+            from ftqc_faults import zx as zx_engine  # type: ignore[import-not-found]
 
-            cat4, _ = ftqc_zx.synth_cat_state(4)
-            zxc = ftqc_zx.build_gadget_contract(cat4, p_phys="1/1000")
+            cat4, _ = zx_engine.synth_cat_state(4)
+            zxc = zx_engine.build_gadget_contract(cat4, p_phys="1/1000")
             ex_dqi = KickMixCircuit.from_kmx((_PKG_DIR / "examples" / "dqi_rs_tiny_mbuc.kmx").read_text(encoding="utf-8"))
             priced = adapters.price_circuit_with_zx_contract(ex_dqi, zxc, t_factory_escape_hi="21/2000")
             assert Decimal(priced["total_wire_ticks_upper"]) > Decimal(0)
-            bridge_notes.append("ftqc_zx live")
+            bridge_notes.append("ftqc_faults.zx live")
         except ModuleNotFoundError:
-            bridge_notes.append("ftqc_zx partial-local")
+            bridge_notes.append("ftqc_faults.zx partial-local")
     if adapters.ftqc_compose_available():
         import ftqc_compose  # type: ignore[import-not-found]
 
@@ -471,17 +471,17 @@ def _regress_receipt_replay() -> str:
 
 
 def _regress_audit_feedback() -> str:
-    from tools.ftqc_uncompute.adapters.ftqc_bridge import kmx_clifford_to_ftqc_audit_ticks
+    from tools.ftqc_uncompute.adapters.ftqc_bridge import kmx_clifford_to_audit_ticks
 
     ops = ["Z q0 if b0", "BIT_STORE1 b0", "Z q0 if b0", "HMR q1 b0",
            "BIT_INVERT b0", "Z q0 if b0", "HMR q1 b0", "Z q0 if b0",
            "BIT_STORE0 b0", "Z q0 if b0"]
-    ticks = kmx_clifford_to_ftqc_audit_ticks(KickMixCircuit.from_kmx("\n".join(ops)))
+    ticks = kmx_clifford_to_audit_ticks(KickMixCircuit.from_kmx("\n".join(ops)))
     assert [tick[0] for tick in ticks[1:]] == [
         ("S", 0), ("S", 0), ("MX", 1), ("R", 1), ("S", 0), ("S", 0), ("Z_IF", 0, 0),
         ("MX", 1), ("R", 1), ("Z_IF", 0, 1)]
     try:
-        kmx_clifford_to_ftqc_audit_ticks(KickMixCircuit.from_kmx("BIT_INVERT b0 if b1"))
+        kmx_clifford_to_audit_ticks(KickMixCircuit.from_kmx("BIT_INVERT b0 if b1"))
     except ValueError:
         pass
     else:
@@ -563,7 +563,7 @@ def _regress_pricing() -> str:
     from decimal import localcontext
     from tools.ftqc_uncompute.suggest import _price_delta_wire_ticks
 
-    contract = {"schema": "ftqc_zx-contract-v1", "verdict": "CONTRACT-CERTIFIED",
+    contract = {"schema": "ftqc_faults-zx-contract-1", "verdict": "CONTRACT-CERTIFIED",
                 "enclosures": {"expected_wire_ticks_per_shot_hi": "1.2345",
                                "conditional_escape_hi": "0.012345"}}
     with localcontext() as context:

@@ -61,7 +61,7 @@ def verify_bound_code_and_basis(
         code_rec_sha = None
     elif isinstance(code_or_receipt, dict):
         schema = code_or_receipt.get("schema")
-        if schema == fc_certify.SCHEMA or schema in fc_certify.LEGACY_SCHEMAS:
+        if schema == fc_certify.SCHEMA:
             fc_certify.verify(code_or_receipt)
             code = fc_codes.CSSCode.from_json(code_or_receipt["code"])
             code_rec_sha = _canonical_sha256(code_or_receipt)

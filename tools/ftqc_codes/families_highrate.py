@@ -1,6 +1,6 @@
 """Paper family specializations for high-rate quantum LDPC codes.
 
-Covers all four rows of `PLANS/high-rate-qec.md` §3:
+Covers four families:
   1. HGP trivial-lift equivalence (`arXiv:0903.0566`, `arXiv:2012.04068`) and
      lift-sensitive finite-LP distance witnesses (`arXiv:2503.07567`).
   2. Two-Block Group-Algebra (`2BGA`) CSS codes (`arXiv:2306.16400`) over

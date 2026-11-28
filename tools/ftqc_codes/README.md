@@ -17,5 +17,4 @@ receipts for code automorphisms and transversal Cliffords.
 
 Static distance says nothing about circuits or decoders; see the
 [guide](GUIDE.md) for scope, gates and hazards and [`../FTQC.md`](../FTQC.md)
-for how the FTQC tools fit together. `tools/qeccert.py` keeps the old
-`import qeccert` working.
+for how the FTQC tools fit together.

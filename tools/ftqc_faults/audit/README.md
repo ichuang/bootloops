@@ -1,8 +1,7 @@
-# ftqc_audit
+# ftqc_faults.audit
 
-The location-fault engine of [ftqc_faults](../ftqc_faults/GUIDE.md). Its code
-is in `tools/ftqc_faults/audit/`; this directory provides the import name
-`ftqc_audit` and its command line.
+The location-fault engine of [ftqc_faults](../GUIDE.md), imported as
+`ftqc_faults.audit` and run as `python3 -m ftqc_faults audit`.
 
 For one scheduled Clifford circuit it gives the fault model (detectors fired,
 observables flipped and output damage for every Pauli at every location),
@@ -12,6 +11,6 @@ by SAT with a re-checked LRAT proof, optionally cross-checked against Stim.
 
     export PYTHONPATH="$PWD/tools"                       # from the BootLoops root
     python3 -m ftqc_faults audit analyze surface:3,2 --legs A,B,S
-    python3 tools/ftqc_audit/selftest.py                 # battery
+    python3 tools/ftqc_faults/audit/selftest.py          # battery
 
 See [`GUIDE.md`](GUIDE.md).
