@@ -2,7 +2,7 @@
 
 KIND: package (Python, 100% stdlib for the default certified tier; `decimal_bounds.py`,
 `dem.py`, `bp_osd.py`, `relay_bp.py`, `union_find.py`, `mwpm.py`, `ssf_metacheck.py`,
-`sat_mwd.py`, `effective_distance.py`, `enclosures.py`, `bridges.py`, `certify.py`,
+`tanner_local.py`, `sat_mwd.py`, `effective_distance.py`, `enclosures.py`, `bridges.py`, `certify.py`,
 `cli.py`, `adapters/{external_decoders,sinter_bridge}.py`, `selftest.py`, `examples/`).
 Battery class: **selftest** (runs in `< 2 s` from a cold clone with zero external
 packages and zero floating-point literals; optional external backends `tesseract-decoder`,
@@ -52,12 +52,18 @@ gaps with replayable `ftqc_decoders-receipt-1` certificates:
      2018] and two-stage metacheck syndrome repair ($M \tilde{s} \to \hat{s} \to \hat{e}$)
      for single-shot / mapping-cone qLDPC surgery [Campbell 2019; Cowtan, He,
      Williamson & Yoder 2025], directly consuming `ftqc_extractors/surgery_sequence.py`.
+   - `tanner_local` & `simulate_tanner_single_shot_rounds` (`tanner_local.py`):
+     iterative local-neighborhood mismatch-reduction decoding for Quantum Tanner codes
+     (`arXiv:2206.07750`, `arXiv:2306.12470`), consuming ordered vertex neighborhoods from
+     `ftqc_codes` and tracking `coset_reduced_weight` modulo stabilizers across consecutive
+     noisy data + syndrome rounds.
    - `sat_mwd` (`sat_mwd.py`): inhomogeneous Tseitin-XOR + Sinz sequential-counter CNF
      exact minimum-weight decoder verified in-tree by `ftqc_codes.lrat` [Sinz 2005;
      Cruz-Filipe et al. 2017; Berent et al. 2024].
 2. **Universal Stim `.dem` & `sinter.Decoder` interchange + audited external backends**:
    - Lossless pure-stdlib zero-float `.dem` parser/emitter (`dem.py`), `BootLoopsSinterDecoder`
-     (`adapters/sinter_bridge.py`), and untrusted-solver wrappers (`adapters/external_decoders.py`)
+     (`adapters/sinter_bridge.py`), and untrusted-solver wrappers (`adapters/external_decoders.py`,
+     using `scipy.sparse.csc_matrix` $O(\mathrm{nnz})$ check handoffs on high-rate blocks)
      for **Tesseract** (`quantumlib/tesseract-decoder`, $A^*$ + beam-search MLE [Beni et al.
      2025, 2026]), **PyMatching v2** (Sparse Blossom [Higgott & Gidney 2025]), **ldpc v2**
      (`BpOsdDecoder`, `BpLsdDecoder`, `BeliefFindDecoder`), and **Chromobius** [Gidney &
@@ -150,6 +156,10 @@ python3 -m tools.ftqc_decoders decode \
 - `L5_enclosures_bridges_examples_cli`: outward `Decimal` containment, exact shells,
   Peierls cluster bound, Hoeffding shells, `ftqc_gadgets` procedural decoder bridge,
   all packaged `examples/*.json`, and optional live `Tesseract`/`PyMatching`/`ldpc` probes.
+- `L6_tanner_single_shot_and_sparse_handoff`: Quantum Tanner `D_8` `[[36,8,3]]` radius-1
+  certification (`X` and `Z`), consecutive-round single-shot data + syndrome error simulation
+  on `D_8` `[[36,8,3]]` and `S_3` `[[288,8]]`, and sparse `scipy_csc` handoffs on `PP256` and
+  `APM1152`.
 - `N1_N6_sabotage_controls`: float inputs, invalid metachecks, non-graphlike MWPM,
   forged LRAT proofs, and tampered receipts all refused with expected codes.
 - `M1_M4_mutant_kills`: scratch-copy mutations in `bp_osd.py`, `union_find.py`,
