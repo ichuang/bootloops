@@ -446,3 +446,5 @@ measurements, physical scheduling and full-attempt pricing.
 ## Code automorphisms
 
 Run `python3 -m ftqc_gadgets installed-action spec.json` to verify a physical unitary on an unknown data input. Supply `kind: installed-action`, a code, its signed action receipt, the physical width, tick-ordered disjoint gates, and an undirected coupler list. Data occupies sites zero through n−1. Spectators can undergo a separate unitary. A missing edge, data-generator sign error or leaked data support fails replay. See the [worked example](../FTQC.md#code-automorphisms).
+
+The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.

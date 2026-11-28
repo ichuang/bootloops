@@ -1,0 +1,80 @@
+{
+  "kind": "staged-program",
+  "target": "T",
+  "p": "1/1000000",
+  "stages": [
+    {
+      "kind": "staged-gadget",
+      "operation": "raise",
+      "blocks": [
+        "data"
+      ],
+      "checks": [
+        1542,
+        3084,
+        1285
+      ],
+      "corrections": [
+        0,
+        29,
+        39,
+        58,
+        78,
+        83,
+        105,
+        116
+      ]
+    },
+    {
+      "kind": "staged-gadget",
+      "operation": "rm15-phase",
+      "blocks": [
+        "data"
+      ],
+      "exponents": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    },
+    {
+      "kind": "staged-gadget",
+      "operation": "lower",
+      "blocks": [
+        "data"
+      ],
+      "checks": [
+        29,
+        39,
+        78
+      ],
+      "corrections": [
+        0,
+        1542,
+        3084,
+        2570,
+        1285,
+        771,
+        2313,
+        3855
+      ]
+    }
+  ],
+  "instances": [
+    "stage0",
+    "stage1",
+    "stage2"
+  ]
+}

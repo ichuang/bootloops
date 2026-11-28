@@ -34,6 +34,9 @@ def receipt(spec):
 
 
 def evaluate(spec):
+    if spec["kind"] == "staged-program":
+        from .staged import program
+        return program(spec)
     if spec["kind"] == "rm15-action":
         from ftqc_magic.action_program import transport
         return transport(spec)

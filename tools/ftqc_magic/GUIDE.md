@@ -272,3 +272,5 @@ measurements, physical scheduling and full-attempt pricing.
 ## Code automorphisms
 
 Use `check` and `verify` with a `rm15-action` specification containing a code, a signed action receipt and five ordered logical destination `slots`. Replay transports the prepare-plus axes, all 15 signed Pauli rotations, the four postselection axes and the output X and Z into that frame. The exponent applies to the signed axis. Use the existing installed Gross factory for physical timing and source quality. See [code automorphisms](../FTQC.md#code-automorphisms).
+
+The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.

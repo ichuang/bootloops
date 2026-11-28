@@ -108,3 +108,5 @@ CREDIT: Clean-room MIT implementation authored from published specifications (ze
 ## Code automorphisms
 
 Pass `installed_action_per_reaction=spec` to `estimate_reaction_decoder_latency` to charge one verified physical action per reaction. Supply the allocated data width, peak ancillas and coupler budget in the usual schedule metrics. The estimator replays the route and charges its elapsed ticks once per reaction, alongside active rounds and decoder stalls. See the [installation example](../FTQC.md#code-automorphisms).
+
+The [staged logical gate guide](../ftqc_gadgets/STAGED.md) describes the Steane/RM15 switch, pieceable CCZ, single-fault model and cross-tool replay.

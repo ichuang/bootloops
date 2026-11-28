@@ -22,6 +22,7 @@ from .gross_distance import gross_certificate
 
 FIELDS = {
     "installed_surgery": ("n checks targets couplers batches idles terminal_syndrome target", "transport basis surface_distance"),
+    "staged_install": ("receipt sites couplers ccz_triples", ""),
     "action_orbit": ("code basis actions seed targets", ""),
     "bicycle_rm15_map": ("", "candidate"),
     "injection_export": ("attempt block model", ""),
@@ -95,6 +96,9 @@ def evaluate(s, backend, budget, seconds, reverse=False):
         if kind == "installed_surgery":
             from .installed_surgery import analyze
             return analyze(s, budget)
+        if kind == "staged_install":
+            from .staged import install
+            return install(s)
         if kind == "action_orbit":
             from .action_orbit import analyze
             return analyze(s, budget)
