@@ -16,7 +16,7 @@ import json
 import os
 import sys
 
-from . import basis, certify, codes, constructions, symmetry
+from . import automorphisms, basis, certify, codes, constructions, symmetry
 
 
 def _targets(items):
@@ -53,6 +53,11 @@ def main(argv=None):
     bs.add_argument("spec")
     bs.add_argument("-o", "--out")
     bs.add_argument("--method", choices=("binary", "candidate", "spectral"), default="binary")
+    ac = sub.add_parser("action", help="verify physical Clifford steps on a named CSS basis")
+    ac.add_argument("spec")
+    ac.add_argument("steps", help="JSON list of push permutations and disjoint Clifford layers")
+    ac.add_argument("--basis", help="paired basis receipt (default: derive from checks)")
+    ac.add_argument("-o", "--out")
     v = sub.add_parser("verify")
     v.add_argument("receipt")
     v.add_argument("--full", action="store_true")
@@ -76,6 +81,21 @@ def main(argv=None):
                     f.write(txt + "\n")
             else:
                 print(txt)
+            return 0
+        if a.cmd == "action":
+            code = codes.load(a.spec)
+            if a.basis:
+                with open(a.basis) as f:
+                    paired = json.load(f)
+            else:
+                paired = basis.derive_paired_basis(code)
+            with open(a.steps) as f:
+                rec = automorphisms.build(code, paired, json.load(f))
+            if a.out:
+                with open(a.out, "w") as f:
+                    json.dump(rec, f, indent=2)
+            else:
+                print(json.dumps(rec, indent=2))
             return 0
         if a.cmd == "construct":
             code = codes.load(a.spec)
@@ -125,6 +145,12 @@ def main(argv=None):
         if a.cmd == "verify":
             with open(a.receipt) as f:
                 rec = json.load(f)
+            if rec.get("schema") == automorphisms.SCHEMA:
+                if not a.code:
+                    raise codes.SpecError("action verification requires --code SPEC")
+                automorphisms.verify(codes.load(a.code), rec)
+                print("ok   signed physical and logical action")
+                return 0
             if rec.get("schema") == constructions.RECEIPT_SCHEMA:
                 srec = None
                 if a.static_receipt:
